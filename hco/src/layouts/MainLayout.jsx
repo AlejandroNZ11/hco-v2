@@ -203,40 +203,40 @@ export default function MainLayout() {
   }, [photoSrc]);
 
   useEffect(() => {
-    if (!authUser) return;
+  if (!authUser) return;
 
-    if (!window.__almuerzoReminderScriptInjected) {
-      window.__almuerzoReminderScriptInjected = true;
+  if (window.__pushFirebaseScriptsLoaded) return;
+  window.__pushFirebaseScriptsLoaded = true;
 
-      const script = document.createElement("script");
-      script.src = "/almuerzos/recordatorioGlobalAlmuerzo.js?v=2";
-      script.defer = true;
-      document.head.appendChild(script);
-    }
+  const scripts = [
+    "/vendor/firebase/firebase-app-compat.js",
+    "/vendor/firebase/firebase-messaging-compat.js",
+    "/part/firebaseConfig.js",
+    "/part/pushAlmuerzo.js",
+  ];
 
-    if (!window.__pushFirebaseScriptsLoaded) {
-      window.__pushFirebaseScriptsLoaded = true;
+  function loadNext(index) {
+    if (index >= scripts.length) return;
 
-      const scripts = [
-        "/vendor/firebase/firebase-app-compat.js",
-        "/vendor/firebase/firebase-messaging-compat.js",
-        "/part/firebaseConfig.js",
-        "/part/pushAlmuerzo.js",
-      ];
+    const script = document.createElement("script");
+    script.src = `${scripts[index]}?v=3`;
+    script.defer = true;
 
-      function loadNext(index) {
-        if (index >= scripts.length) return;
+    script.onload = () => {
+      loadNext(index + 1);
+    };
 
-        const script = document.createElement("script");
-        script.src = `${scripts[index]}?v=3`;
-        script.onload = () => loadNext(index + 1);
-        script.onerror = () => console.error("No se pudo cargar:", scripts[index]);
-        document.head.appendChild(script);
-      }
+    script.onerror = () => {
+      console.error("No se pudo cargar:", scripts[index]);
+    };
 
-      loadNext(0);
-    }
-  }, [authUser]);
+    document.head.appendChild(script);
+  }
+
+  loadNext(0);
+}, [authUser]);
+
+
 
   useEffect(() => {
     if (!dropdownOpen) return;

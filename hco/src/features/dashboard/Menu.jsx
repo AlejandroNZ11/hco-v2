@@ -234,7 +234,7 @@ export default function Menu() {
         accent: "accent-blue",
         buttonText: "Ingresar",
         image: "/img/ANOMALIA.jpg",
-        url: "/APPS TARJETAS/trackinganomalias.html",
+        url: "/apps-tarjetas/anomalias",
       },
       {
         title: "Gestión de Pedidos",
@@ -252,7 +252,7 @@ export default function Menu() {
         accent: "accent-slate",
         buttonText: "Entrar",
         image: "/img/SUGERENCIA.jpg",
-        url: "/APPS TARJETAS/trackingSugerencias.html",
+        url: "/tarjetas-sugerencias/sugerencias",
       },
       {
         title: "Cuadro Q",

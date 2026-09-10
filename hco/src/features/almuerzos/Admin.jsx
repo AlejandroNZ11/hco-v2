@@ -924,69 +924,81 @@ export default function Admin() {
       )}
 
       {showAdicional && (
-        <div className="admin-modal-backdrop">
-          <div className="admin-modal">
-            <div className="admin-modal-header warning">
-              <h5>
+        <div className="admin-modal-backdrop" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
+          
+          {/* Estructura idéntica al HTML original */}
+          <div className="modal-content border-0 shadow" style={{ width: '100%', maxWidth: '500px', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden' }}>
+            
+            {/* CABECERA */}
+            <div className="modal-header border-0" style={{ backgroundColor: '#ffc107', color: '#212529', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h5 className="modal-title fw-bold m-0 d-flex align-items-center gap-2" style={{ fontSize: '20px' }}>
                 <FaUserPlus /> Adicionar almuerzo
               </h5>
-              <button onClick={() => setShowAdicional(false)}>
+              {/* Usamos un div en lugar de button para la X para evitar el bug del CSS global */}
+              <div 
+                onClick={() => setShowAdicional(false)} 
+                style={{ cursor: 'pointer', fontSize: '22px', opacity: 0.7 }}
+                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                onMouseOut={(e) => e.currentTarget.style.opacity = '0.7'}
+              >
                 <FaTimes />
-              </button>
+              </div>
             </div>
 
-            <div className="admin-modal-body">
+            {/* CUERPO DEL MODAL */}
+            <div className="modal-body p-4 text-start">
               <div className="mb-3">
-                <label className="form-label fw-bold">Buscar persona</label>
+                <label className="form-label fw-bold d-block text-center mb-2" style={{ fontSize: '16px', color: '#212529' }}>Buscar persona</label>
                 <input
                   type="text"
-                  className="form-control"
+                  className="form-control text-center shadow-none"
                   placeholder="Escribe nombre, DNI o usuario"
                   autoComplete="off"
                   value={busquedaAdicional}
                   onChange={(e) => setBusquedaAdicional(e.target.value)}
+                  style={{ borderRadius: '6px', padding: '10px', border: '1px solid #ced4da' }}
                 />
-
-                <div className="list-group mt-2 adicional-resultados">
+                
+                {/* RESULTADOS DE BÚSQUEDA - Cambiado a div para evitar los rectángulos azules */}
+                <div className="list-group mt-2 shadow-sm" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {loadingPersonas ? (
-                    <div className="list-group-item text-muted small">Cargando personas...</div>
+                    <div className="list-group-item text-muted small text-center">Cargando personas...</div>
                   ) : busquedaAdicional.trim().length < 2 ? (
-                    <div className="list-group-item text-muted small">
-                      Escribe al menos 2 caracteres para buscar.
-                    </div>
+                    seleccionadosAdicional.length === 0 ? (
+                      <div className="list-group-item text-muted small text-center">Escribe al menos 2 caracteres para buscar.</div>
+                    ) : null
                   ) : resultadosAdicional.length === 0 ? (
-                    <div className="list-group-item text-muted small">No se encontraron personas.</div>
+                    <div className="list-group-item text-muted small text-center">No se encontraron personas.</div>
                   ) : (
                     resultadosAdicional.map((persona) => (
-                      <button
-                        key={`${persona.dni}_${persona.usuario}_${persona._index}`}
-                        type="button"
+                      <div
+                        key={`${persona.dni}-${persona.usuario}-${persona.index}`}
                         className="list-group-item list-group-item-action"
+                        style={{ cursor: 'pointer', textAlign: 'left', padding: '10px 15px' }}
                         onClick={() => seleccionarPersonaAdicional(persona)}
                       >
-                        <div className="fw-bold">{persona.nombre || "Sin nombre"}</div>
-                        <div className="small text-muted">{persona.dni || persona.usuario || ""}</div>
-                      </button>
+                        <div className="fw-bold" style={{ fontSize: '14px', color: '#212529', marginBottom: '2px' }}>{persona.nombre || "Sin nombre"}</div>
+                        <div className="text-muted" style={{ fontSize: '12px' }}>{persona.dni || persona.usuario || ""}</div>
+                      </div>
                     ))
                   )}
                 </div>
               </div>
 
+              {/* LISTA DE SELECCIONADOS */}
               {seleccionadosAdicional.length > 0 && (
-                <div className="adicional-preview">
-                  <div className="mb-2 fw-bold text-success">
+                <div className="adicional-preview mb-3">
+                  <div className="mb-2 fw-bold" style={{ color: '#198754', fontSize: '14px' }}>
                     Seleccionados ({seleccionadosAdicional.length}):
                   </div>
-
                   {seleccionadosAdicional.map((persona, index) => {
                     const foto = convertirUrlDrive(persona.fotoWeb || persona.foto);
-
                     return (
                       <div
-                        key={`${persona.dni}_${persona.usuario}_${index}`}
-                        className="d-flex align-items-center justify-content-between gap-3 border rounded p-2 bg-light mb-2"
+                        key={`${persona.dni}-${persona.usuario}-${index}`}
+                        className="d-flex align-items-center justify-content-between border rounded p-2 mb-2 bg-light shadow-sm"
                       >
-                        <div className="d-flex align-items-center gap-2">
+                        <div className="d-flex align-items-center gap-3">
                           <img
                             src={foto}
                             alt="Foto"
@@ -994,53 +1006,94 @@ export default function Admin() {
                               e.currentTarget.onerror = null;
                               e.currentTarget.src = getAvatarFallback();
                             }}
+                            style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
                           />
-
                           <div style={{ lineHeight: 1.2 }}>
-                            <div className="fw-bold" style={{ fontSize: "0.9rem" }}>
-                              {persona.nombre || ""}
-                            </div>
-                            <div className="small text-muted" style={{ fontSize: "0.8rem" }}>
-                              DNI: {persona.dni || "-"}
-                            </div>
+                            <div className="fw-bold" style={{ fontSize: '14px', color: '#212529' }}>{persona.nombre || ""}</div>
+                            <div className="text-muted" style={{ fontSize: '12px' }}>DNI: {persona.dni || "-"}</div>
                           </div>
                         </div>
-
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger border-0"
+                        {/* X de eliminar cambiado a div para evitar deformación */}
+                        <div
+                          className="text-danger p-2"
+                          style={{ cursor: 'pointer', fontSize: '16px' }}
                           onClick={() => removerPersonaAdicional(index)}
                         >
                           <FaTimes />
-                        </button>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
               )}
 
-              <div className="alert alert-info mt-3 mb-0">
+              {/* ALERTA DE MENÚ */}
+              <div className="alert alert-info mt-3 mb-0 text-start" style={{ backgroundColor: '#cff4fc', color: '#055160', border: '1px solid #b6effb', padding: '12px 16px', borderRadius: '6px' }}>
                 Menú: <strong>ADICIONAL</strong>
               </div>
             </div>
 
-            <div className="admin-modal-footer">
-              <button className="btn btn-secondary fw-bold" onClick={() => setShowAdicional(false)}>
+                        {/* FOOTER DEL MODAL */}
+            <div 
+              className="modal-footer border-0" 
+              style={{ 
+                backgroundColor: '#f8f9fa', 
+                padding: '16px 20px',
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                flexWrap: 'nowrap',
+                gap: '12px'
+              }}
+            >
+              {/* Botón Cancelar (Gris) */}
+              <div 
+                className="fw-bold px-4 shadow-sm" 
+                style={{ 
+                  backgroundColor: '#6c757d', 
+                  color: '#fff', 
+                  borderRadius: '6px',
+                  padding: '10px 24px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+                onClick={() => setShowAdicional(false)}
+              >
                 Cancelar
-              </button>
-
-              <button
-                className="btn btn-warning fw-bold"
-                disabled={seleccionadosAdicional.length === 0 || registrandoAdicional}
+              </div>
+              
+              {/* Botón Registrar (Amarillo) convertido a div para evadir el CSS global azul */}
+              <div
+                className="fw-bold px-4 shadow-sm"
+                style={{ 
+                  backgroundColor: '#ffc107', 
+                  color: '#212529', 
+                  borderRadius: '6px',
+                  padding: '10px 24px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  /* Lógica para simular el estado 'disabled' */
+                  cursor: (seleccionadosAdicional.length === 0 || registrandoAdicional) ? 'not-allowed' : 'pointer',
+                  opacity: (seleccionadosAdicional.length === 0 || registrandoAdicional) ? 0.6 : 1,
+                  pointerEvents: (seleccionadosAdicional.length === 0 || registrandoAdicional) ? 'none' : 'auto'
+                }}
                 onClick={registrarAlmuerzoAdicional}
               >
-                <FaSave className="me-2" />
+                <FaSave />
                 {registrandoAdicional ? "Registrando..." : "Registrar adicional"}
-              </button>
+              </div>
             </div>
+
+
           </div>
         </div>
       )}
+
+
 
       {toast && (
         <div className={`admin-toast ${toast.tipo === "danger" ? "danger" : "success"}`}>

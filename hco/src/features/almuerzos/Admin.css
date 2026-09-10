@@ -514,3 +514,116 @@
     .admin-table tbody tr:hover { background-color: #f8f9fa; }
     .admin-table img { width: 43px; height: 43px; border-radius: 4px; object-fit: cover; }
 }
+
+
+
+/* Modal Adicionar Almuerzo - igual al HTML */
+.admin-modal-adicional {
+  width: min(625px, calc(100vw - 8px));
+  border-radius: 7px;
+}
+
+.admin-modal-adicional .admin-modal-header {
+  min-height: 78px;
+  padding: 18px 20px;
+}
+
+.admin-modal-adicional .admin-modal-header h5 {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.admin-modal-adicional .admin-modal-body-adicional {
+  padding: 24px 20px 20px;
+}
+
+.admin-modal-adicional .form-label {
+  font-size: 20px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.admin-modal-adicional .form-control {
+  height: 55px;
+  font-size: 18px;
+  border-radius: 8px;
+  padding: 10px 16px;
+}
+
+.admin-modal-adicional .adicional-resultados {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.admin-modal-adicional .adicional-resultados:empty {
+  display: none;
+}
+
+.admin-modal-adicional .list-group-item {
+  font-size: 16px;
+  padding: 10px 14px;
+}
+
+.admin-modal-adicional .adicional-preview {
+  max-height: 250px;
+  overflow-y: auto;
+  margin-top: 14px;
+}
+
+.admin-modal-adicional .adicional-preview img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.admin-modal-adicional .alert {
+  font-size: 20px;
+  padding: 18px 20px;
+  border-radius: 6px;
+}
+
+.admin-modal-footer-adicional {
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: row !important;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-modal-footer-adicional .btn {
+  width: auto !important;
+  min-width: 112px;
+  height: 48px;
+  font-size: 18px;
+  font-weight: 800;
+  border-radius: 7px;
+}
+
+/* Mobile: mantener botones en fila para este modal */
+@media (max-width: 768px) {
+  .admin-modal-adicional {
+    width: calc(100vw - 8px);
+  }
+
+  .admin-modal-footer-adicional {
+    flex-direction: row !important;
+    justify-content: flex-end;
+  }
+
+  .admin-modal-footer-adicional .btn {
+    width: auto !important;
+  }
+
+  .admin-modal-adicional .admin-modal-header h5 {
+    font-size: 25px;
+  }
+
+  .admin-modal-adicional .form-label {
+    font-size: 20px;
+  }
+
+  .admin-modal-adicional .form-control {
+    font-size: 18px;
+  }
+}

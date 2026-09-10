@@ -64,29 +64,14 @@ function App() {
 
         {/* Rutas protegidas con cabecera */}
         <Route element={<MainLayout />}>
+        
           {/* Menú principal */}
           <Route path="/menu" element={<Menu />} />
-
-          {/* Redirección de ruta antigua del menú */}
-          <Route
-            path="/Menu-Opciones/menu"
-            element={<Navigate to="/menu" replace />}
-          />
 
           {/* Almuerzos */}
           <Route path="/almuerzos/pedidos" element={<Pedidos />} />
           <Route path="/almuerzos/admin" element={<Admin />} />
           <Route path="/almuerzos/lista_platillo" element={<ListaPlatillo />} />
-
-          <Route
-            path="/almuerzos/lista_platillo"
-            element={
-              <PaginaTemporal
-                titulo="Editar Menú"
-                descripcion="Aquí irá la gestión semanal de platillos."
-              />
-            }
-          />
 
           {/* Tarjetas */}
           <Route

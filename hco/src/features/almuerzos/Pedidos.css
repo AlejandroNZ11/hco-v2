@@ -313,3 +313,31 @@
     font-size: 1rem;
   }
 }
+
+/* =========================================
+   ESTILOS DE MENSAJES Y APILAMIENTO
+========================================= */
+.mensajes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* Separación exacta entre la caja verde y amarilla */
+  width: 100%;
+  margin-top: 24px;
+}
+
+.pedido-status {
+  width: 100%;
+  padding: 16px;
+  border-radius: 6px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  margin-top: 0; /* Lo controla el gap del contenedor */
+}
+
+/* Color azul suave para cuando toca elegir pedido */
+.pedido-status-info {
+  background: #cff4fc;
+  border: 1px solid #b6effb;
+  color: #055160;
+}

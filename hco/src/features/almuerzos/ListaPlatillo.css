@@ -1,0 +1,271 @@
+/* =========================================
+   CONTENEDOR PRINCIPAL Y TARJETA
+========================================= */
+.menu-editor-main {
+    width: 96%;
+    max-width: 1800px;
+    margin: 32px auto;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.menu-editor-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+}
+
+/* =========================================
+   CABECERA (TÍTULO Y BOTONES)
+========================================= */
+.editor-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center; 
+    padding: 24px 32px; 
+    border-bottom: 1px solid #e2e8f0;
+    background: #ffffff;
+    gap: 16px;
+}
+
+.editor-title h2 {
+    font-size: 1.6rem; 
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 4px;
+}
+
+.editor-title p {
+    font-size: 1rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* =========================================
+   ALINEACIÓN EXACTA DE BOTONES Y ESTADO
+========================================= */
+.editor-actions {
+    display: flex;
+    align-items: center; /* Centrado vertical estricto */
+    gap: 16px;
+    flex-wrap: nowrap;
+}
+
+/* Animación de movimiento al aparecer (Pop In) */
+@keyframes popIn {
+    0% { opacity: 0; transform: translateY(8px) scale(0.95); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.status-text {
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0 16px; 
+    border-radius: 20px;
+    white-space: nowrap;
+    margin: 0; 
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 44px; /* MISMA ALTURA EXACTA QUE LOS BOTONES */
+    box-sizing: border-box;
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; /* Movimiento fluido con ligero rebote */
+}
+
+.status-text.text-success { background: #dcfce7; color: #166534; }
+.status-text.text-danger { background: #fee2e2; color: #991b1b; }
+.status-text.text-info { background: #e0f2fe; color: #075985; }
+
+.btn-action {
+    padding: 0 24px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 1.05rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    height: 44px; /* MISMA ALTURA EXACTA QUE EL ESTADO */
+    box-sizing: border-box;
+    margin: 0;
+}
+
+.btn-reload {
+    background: #ffffff;
+    color: #495057;
+    border: 1px solid #ced4da;
+}
+
+.btn-reload:hover:not(:disabled) {
+    background: #f8f9fa;
+    color: #212529;
+}
+
+.btn-save {
+    background: #0d6efd; 
+    color: white;
+    border: 1px solid #0d6efd;
+}
+
+.btn-save:hover:not(:disabled) {
+    background: #0b5ed7;
+    border-color: #0a58ca;
+}
+
+.btn-action:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* =========================================
+   TABLA MODERNA
+========================================= */
+.editor-table-wrap {
+    overflow-x: auto; 
+    padding: 0;
+    width: 100%;
+}
+
+.custom-modern-table {
+    width: 100%;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 1500px;
+}
+
+.custom-modern-table thead th {
+    background: #072B5C; /* Azul Marino de tu Navbar */
+    color: #ffffff; 
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    padding: 18px 16px; 
+    border-bottom: 2px solid #041b3b;
+    text-align: left;
+}
+
+.custom-modern-table thead th.text-center {
+    text-align: center;
+}
+
+.custom-modern-table tbody tr {
+    transition: background 0.2s;
+}
+
+.custom-modern-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.custom-modern-table tbody th {
+    background: #fff8cc; /* Amarillo pastel */
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 0.95rem; 
+    padding: 16px 20px; 
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 2px solid #e2e8f0;
+    text-align: left;
+    width: 160px;
+    vertical-align: middle;
+}
+
+.custom-modern-table tbody td {
+    padding: 8px; 
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px dashed #e2e8f0;
+    vertical-align: middle;
+}
+
+.custom-modern-table tbody td:last-child {
+    border-right: none;
+}
+
+/* =========================================
+   INPUTS DE LA TABLA
+========================================= */
+.menu-input {
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 12px 14px; 
+    font-size: 0.95rem; 
+    color: #0f172a;
+    border-radius: 6px;
+    transition: all 0.2s;
+    outline: none;
+}
+
+.input-platillo {
+    text-align: left;
+}
+
+.input-calorias {
+    text-align: center;
+    font-weight: 700;
+    color: #64748b;
+}
+
+.td-cal {
+    background-color: #fafafa;
+}
+
+.menu-input:hover:not(:disabled) {
+    background: #f1f5f9;
+}
+
+.menu-input:focus:not(:disabled) {
+    background: #ffffff;
+    border: 1px solid #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+}
+
+.menu-input:disabled {
+    color: #94a3b8;
+}
+
+.custom-toast-container {
+    z-index: 1055;
+}
+
+/* =========================================
+   DISEÑO RESPONSIVE (MÓVILES Y TABLETS)
+========================================= */
+@media (max-width: 992px) {
+    .menu-editor-main {
+        width: 100%;
+        padding: 0 10px;
+        margin: 16px auto;
+    }
+
+    .editor-header-section {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 20px 16px;
+        gap: 20px;
+    }
+
+    .editor-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 12px;
+    }
+
+    .status-text {
+        width: 100%;
+        text-align: center;
+    }
+
+    .btn-action {
+        width: 100%;
+        height: 48px;
+    }
+
+    .editor-title h2 {
+        font-size: 1.4rem;
+    }
+}

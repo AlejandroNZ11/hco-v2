@@ -5,6 +5,8 @@ import MainLayout from "./layouts/MainLayout";
 import Menu from "./features/dashboard/Menu";
 import Pedidos from "./features/almuerzos/Pedidos";
 import Admin from "./features/almuerzos/Admin";
+import ListaPlatillo from "./features/almuerzos/ListaPlatillo";
+
 
 
 function PaginaTemporal({ titulo, descripcion }) {
@@ -73,10 +75,8 @@ function App() {
 
           {/* Almuerzos */}
           <Route path="/almuerzos/pedidos" element={<Pedidos />} />
-
-
           <Route path="/almuerzos/admin" element={<Admin />} />
-
+          <Route path="/almuerzos/lista_platillo" element={<ListaPlatillo />} />
 
           <Route
             path="/almuerzos/lista_platillo"

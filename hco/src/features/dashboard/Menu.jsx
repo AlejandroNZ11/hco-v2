@@ -9,7 +9,17 @@ import {
   FaPallet,
   FaSignOutAlt,
   FaUtensils,
+  FaClipboardCheck,
+  FaSearch,
+  FaWarehouse,
+  FaRoute,
+  FaMobileAlt,
+  FaBusAlt,
+  FaBus,
+
+
 } from "react-icons/fa";
+
 import "./Menu.css";
 
 const LOGIN_URL = "/";
@@ -199,6 +209,8 @@ export default function Menu() {
 
   const [showRecordatorio, setShowRecordatorio] = useState(false);
   const [recordatorioDia, setRecordatorioDia] = useState("...");
+  const [activeTab, setActiveTab] = useState("excelencia");
+
 
   useEffect(() => {
     if (!authUser) {
@@ -225,92 +237,213 @@ export default function Menu() {
   const rol = String(authUser?.rol || "USUARIO").trim().toUpperCase();
   const esAdmin = rol === "SUPERADMIN" || rol === "SUPERVISOR";
 
-  const apps = useMemo(() => {
-    let items = [
-      {
-        title: "Tarjetas de Anomalía",
-        description: "Crear y dar seguimiento a hallazgos o incidencias.",
-        Icon: FaExclamationTriangle,
-        accent: "accent-blue",
-        buttonText: "Ingresar",
-        image: "/img/ANOMALIA.jpg",
-        url: "/apps-tarjetas/anomalias",
-      },
-      {
-        title: "Gestión de Pedidos",
-        description: "Registrar y revisar pedidos operativos del día.",
-        Icon: FaUtensils,
-        accent: "accent-cyan",
-        buttonText: "Abrir",
-        image: "/img/almuerzo.jpg",
-        url: "/almuerzos/pedidos",
-      },
-      {
-        title: "Tarjetas de Sugerencia",
-        description: "Recolectar y gestionar ideas o propuestas de mejora.",
-        Icon: FaBoxes,
-        accent: "accent-slate",
-        buttonText: "Entrar",
-        image: "/img/SUGERENCIA.jpg",
-        url: "/tarjetas-sugerencias/sugerencias",
-      },
-      {
-        title: "Cuadro Q",
-        description: "Registrar y dar seguimiento a incidencias.",
-        Icon: FaExclamationTriangle,
-        accent: "accent-slate",
-        buttonText: "Entrar",
-        image: "/img/cuadro-Q.jpg",
-        url: "/Cuadro-Q/trackingCuadroQ.html",
-      },
-      {
-        title: "Reporte de discrepancia",
-        description: "Registrar y realizar reportes de discrepancias.",
-        Icon: FaBoxOpen,
-        accent: "accent-slate",
-        buttonText: "Entrar",
-        image: "/img/discrepancia.jpg",
-        url: "#",
-      },
-      {
-        title: "Prestamos de Pallet",
-        description: "Controlar los préstamos de pallets a transportistas.",
-        Icon: FaPallet,
-        accent: "accent-slate",
-        buttonText: "Entrar",
-        image: "/img/palet.jpg",
-        url: "/Prestamos-Pallet/trackingprestamos.html",
-      },
-    ];
+  const menuTabs = useMemo(() => {
+  const tabs = [
+    {
+      key: "excelencia",
+      label: "Excelencia Operativa",
+      shortLabel: "BPE",
+      items: [
+        {
+          title: "Tarjetas de Anomalía",
+          description: "Crear y dar seguimiento a hallazgos o incidencias.",
+          Icon: FaExclamationTriangle,
+          accent: "accent-blue",
+          buttonText: "Ingresar",
+          image: "/img/ANOMALIA.jpg",
+          url: "/apps-tarjetas/anomalias",
+        },
+        {
+          title: "Gestión de Pedidos",
+          description: "Registrar y revisar pedidos operativos del día.",
+          Icon: FaUtensils,
+          accent: "accent-cyan",
+          buttonText: "Abrir",
+          image: "/img/almuerzo.jpg",
+          url: "/almuerzos/pedidos",
+        },
+        {
+          title: "Tarjetas de Sugerencia",
+          description: "Recolectar y gestionar ideas o propuestas de mejora.",
+          Icon: FaBoxes,
+          accent: "accent-slate",
+          buttonText: "Entrar",
+          image: "/img/SUGERENCIA.jpg",
+          url: "/tarjetas-sugerencias/sugerencias",
+        },
+        {
+          title: "Cuadro Q",
+          description: "Registrar y dar seguimiento a incidencias.",
+          Icon: FaExclamationTriangle,
+          accent: "accent-slate",
+          buttonText: "Entrar",
+          image: "/img/cuadro-Q.jpg",
+          url: "/Cuadro-Q/trackingCuadroQ.html",
+        },
+        {
+          title: "Auditoría 5S",
+          description: "Registrar auditorías 5S.",
+          Icon: FaClipboardCheck,
+          accent: "accent-violet",
+          buttonText: "Entrar",
+          image: "/img/5S.jpg",
+          url: "#",
+        },
+        {
+          title: "Gestión de Rutas",
+          description: "Planificar y optimizar rutas de distribución.",
+          Icon: FaBus,
+          accent: "accent-blue", // Puedes cambiar el color según tu paleta
+          buttonText: "Entrar",
+          image: "/img/movil.jpg",
+          url: "#",
+        }
+      ],
+    },
+    {
+      key: "inbound",
+      label: "Inbound",
+      shortLabel: "INB",
+      items: [
+        {
+          title: "Inspección de Contenedores",
+          description: "Registrar inspecciones de contenedores.",
+          Icon: FaSearch,
+          accent: "accent-blue",
+          buttonText: "Entrar",
+          image: "/img/inspecion-contenedor.jpg",
+          url: "#",
+        },
+      ],
+    },
+    {
+      key: "outbound",
+      label: "Outbound",
+      shortLabel: "OUT",
+      items: [
+        {
+          title: "Préstamos de Pallet",
+          description: "Controlar los préstamos de pallets a transportistas.",
+          Icon: FaPallet,
+          accent: "accent-slate",
+          buttonText: "Entrar",
+          image: "/img/palet.jpg",
+          url: "/Prestamos-Pallet/trackingprestamos.html",
+        },
+      ],
+    },
+    {
+      key: "inventario",
+      label: "Logistics Support Inventario",
+      shortLabel: "LSI",
+      items: [
+        {
+          title: "Conteos Cíclico",
+          description: "Gestionar conteos cíclicos de inventario.",
+          Icon: FaWarehouse,
+          accent: "accent-cyan",
+          buttonText: "Entrar",
+          image: "/img/conteo-ciclico.jpg",
+          url: "#",
+        },
+        {
+          title: "Auditoría de Despachos",
+          description: "Registrar auditorías de despachos.",
+          Icon: FaBoxOpen,
+          accent: "accent-violet",
+          buttonText: "Entrar",
+          image: "/img/auditoria-despachos.jpg",
+          url: "#",
+        },
+      ],
+    },
+    {
+      key: "vas",
+      label: "VAS",
+      shortLabel: "VAS",
+      items: [
+        {
+          title: "Reporte de Discrepancia",
+          description: "Gestionar y registrar reportes de Discrepancia.",
+          Icon: FaBoxOpen,
+          accent: "accent-cyan",
+          buttonText: "Entrar",
+          image: "/img/discrepancia.jpg",
+          url: "#",
+        },
+        {
+          title: "Auditoría de Despachos",
+          description: "Registrar auditorías de despachos.",
+          Icon: FaBoxOpen,
+          accent: "accent-violet",
+          buttonText: "Entrar",
+          image: "/img/auditoria-despachos.jpg",
+          url: "#",
+        },
+      ],
+    },
+  ];
 
-    if (rol === "EXTERNO") {
-      items = items.filter((app) => app.title === "Prestamos de Pallet");
-    }
+  let filteredTabs = tabs;
 
-    if (esAdmin) {
-      items.push({
-        title: "Configuración",
-        description: "Administrar parámetros y accesos del sistema.",
-        Icon: FaCog,
-        accent: "accent-violet",
-        buttonText: "Gestionar",
-        image: "/img/conf.jpg",
-        url: "/Configuracion/configuracion.html",
-      });
-    } else {
-      items.push({
-        title: "Cerrar Sesión",
-        description: "Salir de forma segura del sistema.",
-        Icon: FaSignOutAlt,
-        accent: "accent-red",
-        buttonText: "Salir",
-        image: "",
-        action: "logout",
-      });
-    }
+  if (rol === "EXTERNO") {
+    filteredTabs = tabs
+      .map((tab) => ({
+        ...tab,
+        items: tab.items.filter((app) => app.title === "Préstamos de Pallet"),
+      }))
+      .filter((tab) => tab.items.length > 0);
+  }
 
-    return items;
-  }, [rol, esAdmin]);
+  const sistemaTab = {
+    key: "sistema",
+    label: "Sistema",
+    shortLabel: "SIST.",
+    items: esAdmin
+      ? [
+          {
+            title: "Configuración",
+            description: "Administrar parámetros y accesos del sistema.",
+            Icon: FaCog,
+            accent: "accent-violet",
+            buttonText: "Gestionar",
+            image: "/img/conf.jpg",
+            url: "/Configuracion/configuracion.html",
+          },
+        ]
+      : [
+          {
+            title: "Cerrar Sesión",
+            description: "Salir de forma segura del sistema.",
+            Icon: FaSignOutAlt,
+            accent: "accent-red",
+            buttonText: "Salir",
+            image: "",
+            action: "logout",
+          },
+        ],
+  };
+
+
+  return [...filteredTabs, sistemaTab];
+}, [rol, esAdmin]);
+
+const apps = useMemo(() => {
+  return menuTabs.flatMap((tab) => tab.items);
+}, [menuTabs]);
+
+const currentTab = useMemo(() => {
+  return menuTabs.find((tab) => tab.key === activeTab) || menuTabs[0];
+}, [menuTabs, activeTab]);
+
+const visibleApps = currentTab?.items || [];
+
+useEffect(() => {
+  if (menuTabs.length && !menuTabs.some((tab) => tab.key === activeTab)) {
+    setActiveTab(menuTabs[0].key);
+  }
+}, [menuTabs, activeTab]);
+
 
   useEffect(() => {
     if (!authUser) return;
@@ -519,16 +652,33 @@ export default function Menu() {
           </div>
         </section>
 
-        <section className="apps-section">
-          <div className="section-head">
+        <section className="apps-section apps-section-tabs">
+          <div className="app-category-tabs" role="tablist">
+            {menuTabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`app-category-tab ${
+                  currentTab?.key === tab.key ? "active" : ""
+                }`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <span className="tab-label-full">{tab.label}</span>
+                <span className="tab-label-short">{tab.shortLabel || tab.label}</span>
+
+              </button>
+            ))}
+          </div>
+
+          <div className="section-head tabs-section-head">
             <div>
-              <h2>Aplicativos disponibles</h2>
+              <h2>{currentTab?.label}</h2>
               <p>Seleccione un módulo para continuar.</p>
             </div>
           </div>
 
           <div className="apps-grid">
-            {apps.map((app) => {
+            {visibleApps.map((app) => {
               const Icon = app.Icon;
               const imgSrc = app.image || buildFallbackSvg(app.title, app.accent);
 
@@ -574,6 +724,7 @@ export default function Menu() {
             })}
           </div>
         </section>
+
       </main>
 
       {showRecordatorio && (

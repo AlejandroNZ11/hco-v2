@@ -1,0 +1,392 @@
+:root {
+--card: #ffffff;
+--muted: #64748b;
+--text: #334155;
+--title: #0f172a;
+--primary: #0f4c81;
+--primary-2: #1565a7;
+--danger: #dc2626;
+--success: #16a34a;
+--warning: #ca8a04;
+--border: #e2e8f0;
+--shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+.registro-page {
+position: relative;
+width: 100%;
+padding: 20px 24px;
+color: var(--text);
+}
+
+/* =========================================
+
+HERO (TÍTULO PRINCIPAL) - Más elegante y delgado
+========================================= */
+.page-hero {
+background: var(--card);
+border-radius: 16px;
+border: 1px solid var(--border);
+padding: 16px 24px;
+margin-bottom: 20px;
+box-shadow: var(--shadow);
+}
+
+.page-chip {
+display: inline-flex;
+padding: 4px 10px;
+border-radius: 6px;
+background: #f1f5f9;
+color: var(--primary);
+font-size: 11px;
+font-weight: 700;
+text-transform: uppercase;
+margin-bottom: 8px;
+}
+
+.page-hero h1 {
+margin: 0 0 4px;
+font-size: 22px;
+font-weight: 800;
+color: var(--title);
+}
+
+.page-hero p {
+margin: 0;
+color: var(--muted);
+font-size: 14px;
+}
+
+/* =========================================
+2. CONTENEDOR DE LA TABLA Y TOOLBAR
+========================================= */
+.card {
+background: var(--card);
+border-radius: 16px;
+border: 1px solid var(--border);
+padding: 20px 24px;
+box-shadow: var(--shadow);
+}
+
+.toolbar {
+display: flex;
+justify-content: space-between;
+align-items: center;
+flex-wrap: wrap;
+gap: 16px;
+margin-bottom: 20px;
+}
+
+.toolbar-info h2 {
+margin: 0;
+font-size: 18px;
+font-weight: 800;
+color: var(--title);
+line-height: 1.2;
+}
+
+.toolbar-info p {
+margin: 4px 0 0;
+color: var(--muted);
+font-size: 13px;
+}
+
+.toolbar-actions {
+display: flex;
+gap: 10px;
+align-items: center;
+}
+
+/* =========================================
+   BOTONES PRINCIPALES (No se parten en 2 líneas)
+   ========================================= */
+.export-btn { 
+  border: none; 
+  cursor: pointer; 
+  font-weight: 700; 
+  font-size: 13px;
+  height: 40px; 
+  border-radius: 10px; 
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  white-space: nowrap; /* ESTO EVITA QUE "+ Nuevo Usuario" SE ROMPA EN DOS LÍNEAS */
+  transition: all 0.2s ease;
+}
+
+.primary-btn { 
+  background: var(--primary); 
+  color: #fff; 
+  box-shadow: 0 4px 12px rgba(15, 76, 129, 0.15); 
+}
+
+.primary-btn { 
+  border: none; 
+  cursor: pointer; 
+  font-weight: 700; 
+  font-size: 13px;
+  height: 40px; 
+  border-radius: 10px; 
+  
+  /* ESTAS 3 LÍNEAS CENTRAN TODO PERFECTAMENTE */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px; /* Separación entre el + y el texto */
+  
+  padding: 0 18px;
+  white-space: nowrap;
+  background: var(--primary); 
+  color: #fff; 
+  box-shadow: none !important;
+  transition: all 0.2s ease;
+}
+
+.export-btn {
+  background: #217346; 
+  color: white;
+  box-shadow: 0 4px 12px rgba(33, 115, 70, 0.15); 
+}
+
+.excel-icon {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 6px; 
+  padding: 3px 8px; 
+  font-size: 13px;
+  font-weight: 900;
+  margin-right: 8px; 
+}
+
+/* =========================================
+   3. FILTROS Y BOTONES (USANDO GRID PARA UNA SOLA FILA ESTRICTA)
+   ========================================= */
+.filters { 
+  display: grid; 
+  /* 1 input grande, 3 selects medianos, 2 botones al final */
+  grid-template-columns: 2fr 1fr 1fr 1fr auto auto; 
+  align-items: center; /* Centrado vertical estricto */
+  gap: 12px; 
+  margin-bottom: 20px; 
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+/* REGLA MAESTRA: Forzar que TODOS los hijos del filtro midan exactamente 40px y no tengan márgenes ocultos */
+.filters > input, 
+.filters > select, 
+.filters > button { 
+  height: 40px !important; 
+  margin: 0 !important; 
+  box-sizing: border-box !important; 
+}
+
+.filters input, 
+.filters select { 
+  border-radius: 8px; 
+  border: 1px solid #cbd5e1; 
+  padding: 0 12px; 
+  outline: none; 
+  background: #ffffff; 
+  font-size: 13px;
+  color: var(--text);
+  width: 100%;
+}
+
+.filters input:focus, .filters select:focus { 
+  border-color: var(--primary); 
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1); 
+}
+
+/* Botón Actualizar */
+.secondary-btn { 
+  border: none;
+  cursor: pointer;
+  border-radius: 8px; 
+  background: #eef3f8; 
+  color: var(--primary); 
+  font-weight: 700;
+  font-size: 13px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap; 
+  transition: all 0.2s ease;
+}
+
+/* Nuevo Botón Limpiar Filtros - Color Gris/Pizarra */
+.clear-btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 8px; 
+  background: #e2e8f0; /* Color gris elegante en lugar de rosa */
+  color: #475569; /* Ícono gris oscuro */
+  width: 40px; /* Cuadrado perfecto */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+/* Hovers */
+.primary-btn:hover { background: var(--primary-2); transform: translateY(-1px); }
+.export-btn:hover { background: #1a5c38; transform: translateY(-1px); }
+.secondary-btn:hover { background: #e2e8f0; }
+.clear-btn:hover { background: #cbd5e1; color: #0f172a; } /* Oscurece al pasar el mouse */
+
+/* =========================================
+   4. TABLA RESPONSIVA
+   ========================================= */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  /* Escondemos el borde superior para que la cabecera azul fluya limpia */
+  border-top: none; 
+}
+
+.usuarios-table {
+  width: 100%;
+  min-width: 1100px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.usuarios-table thead th {
+  background: var(--primary); /* El azul del botón "Nuevo Usuario" */
+  color: #ffffff; /* Letras blancas para el contraste */
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 14px 10px; /* Un poco de respiro en la cabecera */
+  border-bottom: 2px solid var(--primary-2);
+}
+
+.usuarios-table tbody td {
+  padding: 10px 10px; /* REDUCIDO: De 12px a 10px para adelgazar la fila */
+  font-size: 13px;
+  text-align: center;
+  vertical-align: middle; /* Asegura centrado vertical básico */
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.usuarios-table tbody tr:hover td { 
+  background: #f8fafc; 
+}
+
+.usuarios-table tbody td:nth-child(5),
+.usuarios-table tbody td:nth-child(7),
+.usuarios-table tbody td:nth-child(8),
+.usuarios-table tbody td:nth-child(9) {
+  text-align: left;
+}
+
+/* =========================================
+   5. COMPONENTES PEQUEÑOS (Píldoras y Botones de acción)
+   ========================================= */
+.estado-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.estado-pill.activo { background: #dcfce7; color: #166534; }
+.estado-pill.inactivo { background: #fee2e2; color: #991b1b; }
+
+.foto-status {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  margin: 0 auto;
+}
+
+.foto-status.has { background: var(--success); }
+.foto-status.no { background: var(--danger); }
+
+/* CONTENEDOR DE ACCIONES: Alineación estricta al centro */
+.actions-inline { 
+  display: flex; /* Cambiamos a flexbox estricto */
+  gap: 6px; 
+  align-items: center; /* ESTO CENTRA LOS BOTONES VERTICALMENTE */
+  justify-content: center; /* Centrado horizontal */
+  height: 100%; /* Toma todo el alto de la celda */
+}
+
+.icon-btn {
+  width: 32px; /* Un poco más anchos para mayor área de clic */
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0; /* Eliminamos márgenes que pudieran desalinearlos */
+  padding: 0;
+}
+
+.icon-btn.edit { background: #e0f2fe; color: #0284c7; }
+.icon-btn.status { background: #ffedd5; color: #c2410c; }
+.icon-btn:hover { filter: brightness(0.95); transform: scale(1.05); }
+
+/* =========================================
+   QUITAR SOMBRAS DE TODOS LOS BOTONES
+   ========================================= */
+.primary-btn,
+.export-btn,
+.secondary-btn,
+.clear-btn,
+.icon-btn {
+  box-shadow: none !important;
+}
+
+
+/* =========================================
+   6. RESPONSIVE  A CELULAR 
+   ========================================= */
+@media (max-width: 1150px) {
+  .filters { grid-template-columns: 1fr 1fr auto auto; } /* Mueve los filtros a 2 filas en pantallas medianas */
+  .search-input { grid-column: span 2; }
+}
+
+@media (max-width: 768px) {
+  .registro-page { padding: 12px; }
+  .card, .page-hero { padding: 16px; }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .primary-btn, .export-btn { flex: 1; }
+
+  /* Ajuste correcto de Grid para celulares */
+  .filters { grid-template-columns: 1fr; }
+  .search-input { grid-column: span 1; }
+  
+  /* Permite que los botones ocupen todo el ancho en celular */
+  .filters > button { width: 100% !important; }
+}

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient'; // Importamos tu conexión
+import { supabase } from '../../supabaseClient';
 import './Login.css';
 
 const FOTO_PLACEHOLDER = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
@@ -16,96 +16,106 @@ export default function Login() {
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
   
+  // Aquí guardaremos todos los usuarios en memoria al cargar la página
+  const [usuariosCache, setUsuariosCache] = useState([]);
+
   const [uiState, setUiState] = useState({
     status: 'idle', 
     message: '',
     showPassword: false
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const [userData, setUserData] = useState({ nombre: 'Usuario detectado', rol: '', foto: '' });
   const [alert, setAlert] = useState({ visible: false, title: '', message: '' });
 
-  // Equivalente a tu antiguo 'previewUser'
-  const handleValidacion = async () => {
-    const userTrim = usuario.trim();
+  // Descarga la lista en 2do plano apenas se abre la web
+  useEffect(() => {
+    const cargarUsuarios = async () => {
+      // También traemos el estado por si acaso lo necesitamos luego
+      const { data } = await supabase.from('empleados').select('dni, usuario, nombre, rol, foto_url, estado');
+      if (data) setUsuariosCache(data);
+    };
+    cargarUsuarios();
+  }, []);
+
+  // OPTIMIZADO: Busca en la memoria local (0 milisegundos de latencia)
+  const handleValidacion = () => {
+    const userTrim = usuario.trim().toLowerCase();
     if (userTrim.length < 2) return;
 
-    setUiState({ status: 'loadingUser', message: 'Cargando...', showPassword: false });
+    // Buscamos en la lista descargada en lugar de ir a internet
+    const encontrado = usuariosCache.find(
+      emp => (emp.usuario && emp.usuario.toLowerCase() === userTrim) || emp.dni === userTrim
+    );
 
-    try {
-      // 1. Cambiamos .eq por .ilike (ignora mayúsculas/minúsculas)
-      // 2. Cambiamos .single() por .maybeSingle() (no rompe el código si no encuentra a la persona)
-      const { data, error } = await supabase
-        .from('empleados')
-        .select('nombre, rol, foto_url')
-        .or(`usuario.ilike.${userTrim},dni.eq.${userTrim}`)
-
-        .maybeSingle();
-
-      // Imprimimos el error en la consola oculta para saber exactamente qué pasa
-      if (error) {
-        console.error("Error interno de Supabase:", error);
-      }
-
-      if (data) {
-        setUserData({
-          nombre: data.nombre,
-          rol: data.rol,
-          foto: data.foto_url || FOTO_PLACEHOLDER
-        });
-        setUiState({ status: 'valid', message: '', showPassword: true });
-      } else {
-        console.warn("La consulta no encontró a:", userTrim);
-        setUserData({ nombre: 'Usuario no disponible', rol: 'Verifique el usuario', foto: '' });
-        setUiState({ status: 'error', message: '', showPassword: false });
-      }
-    } catch (error) {
-      console.error("Error de red:", error);
-      setUserData({ nombre: 'Error de conexión', rol: 'Intente nuevamente', foto: '' });
+    if (encontrado) {
+      setUserData({
+        nombre: encontrado.nombre,
+        rol: encontrado.rol,
+        foto: encontrado.foto_url || FOTO_PLACEHOLDER
+      });
+      setUiState({ status: 'valid', message: '', showPassword: true });
+    } else {
+      setUserData({ nombre: 'Usuario no disponible', rol: 'Verifique el usuario', foto: '' });
       setUiState({ status: 'error', message: '', showPassword: false });
     }
   };
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!usuario || !password) {
-      setAlert({ visible: true, title: 'Campos requeridos', message: 'Ingrese usuario y contraseña.' });
-      return;
-    }
-
+    if (!usuario || !password) return;
     setIsSubmitting(true);
 
     try {
-      // 1. Construimos el correo fantasma (Ej: DNUNEZR@hco.com)
       const userTrim = usuario.trim();
-      const emailToLogin = userTrim.includes('@') ? userTrim : `${userTrim}@hco.com`;
+      // Buscamos cuál es su usuario de letras oficial para hacer login
+      const emp = usuariosCache.find(u => u.dni === userTrim || (u.usuario && u.usuario.toLowerCase() === userTrim.toLowerCase()));
+      
+      const codigoLogin = emp && emp.usuario ? emp.usuario : userTrim;
+      const emailToLogin = codigoLogin.includes('@') ? codigoLogin : `${codigoLogin}@hco.com`;
 
-      // 2. Validamos la contraseña con el sistema de seguridad de Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: emailToLogin,
         password: password
       });
 
       if (authError) {
-        setAlert({ visible: true, title: 'Acceso denegado', message: 'Usuario o contraseña incorrectos' });
+        setAlert({ visible: true, title: 'Acceso denegado', message: 'Contraseña incorrecta' });
         setIsSubmitting(false);
         return;
       }
 
-      // 3. Si la clave es correcta, traemos todos los datos de su perfil para guardarlos
-      const { data: perfilData } = await supabase
+      // Traemos el perfil completo para el LocalStorage
+      const { data: perfilData, error: perfilError } = await supabase
         .from('empleados')
         .select('*')
         .eq('id', authData.user.id)
         .single();
 
-      // Mantenemos tu misma lógica de localStorage para que no se rompa tu App
+      if (perfilError) throw perfilError;
+
+      // ==========================================
+      // LÓGICA DE BLOQUEO DE USUARIOS INACTIVOS
+      // ==========================================
+      if (perfilData.estado && perfilData.estado.toLowerCase() === 'inactivo') {
+        await supabase.auth.signOut(); // Cerramos su sesión en la bóveda
+        setAlert({ 
+          visible: true, 
+          title: 'Acceso denegado', 
+          message: 'Tu cuenta ha sido desactivada. Comunícate con el administrador.' 
+        });
+        setIsSubmitting(false); // Volvemos a habilitar el botón
+        return; // Detenemos el proceso aquí, NO entra al sistema
+      }
+      // ==========================================
+
+      // Si pasa la validación y está Activo, lo dejamos entrar
       localStorage.setItem("authUser", JSON.stringify(perfilData));
       navigate('/menu'); 
 
     } catch (error) {
-      setAlert({ visible: true, title: 'Error', message: 'No se pudo iniciar sesión. Intente nuevamente.' });
+      console.error(error);
+      setAlert({ visible: true, title: 'Error', message: 'Error de red al intentar conectar.' });
       setIsSubmitting(false);
     }
   };

@@ -16,6 +16,7 @@ import {
   FaMobileAlt,
   FaBusAlt,
   FaBus,
+  FaUsers,
 
 
 } from "react-icons/fa";
@@ -395,35 +396,44 @@ export default function Menu() {
       .filter((tab) => tab.items.length > 0);
   }
 
-  const sistemaTab = {
-    key: "sistema",
-    label: "Sistema",
-    shortLabel: "SIST.",
-    items: esAdmin
-      ? [
-          {
-            title: "Configuración",
-            description: "Administrar parámetros y accesos del sistema.",
-            Icon: FaCog,
-            accent: "accent-violet",
-            buttonText: "Gestionar",
-            image: "/img/conf.jpg",
-            url: "/Configuracion/configuracion.html",
-          },
-        ]
-      : [
-          {
-            title: "Cerrar Sesión",
-            description: "Salir de forma segura del sistema.",
-            Icon: FaSignOutAlt,
-            accent: "accent-red",
-            buttonText: "Salir",
-            image: "",
-            action: "logout",
-          },
-        ],
-  };
-
+const sistemaTab = {
+  key: "sistema",
+  label: "Sistema",
+  shortLabel: "SIST.",
+  items: esAdmin
+    ? [
+        {
+          title: "Configuración",
+          description: "Administrar parámetros y accesos del sistema.",
+          Icon: FaCog,
+          accent: "accent-violet",
+          buttonText: "Gestionar",
+          image: "/img/conf.jpg",
+          url: "/Configuracion/configuracion.html",
+        },
+        // Nuevo elemento agregado para administradores
+        {
+          title: "Usuarios y Roles",
+          description: "Crear y gestionar usuarios y roles en el sistema.",
+          Icon: FaUsers, 
+          accent: "accent-slate",
+          buttonText: "Entrar",
+          image: "../img/useer.jpg",
+          url: "/usuarios/tracking_usuarios",
+        },
+      ]
+    : [
+        {
+          title: "Cerrar Sesión",
+          description: "Salir de forma segura del sistema.",
+          Icon: FaSignOutAlt,
+          accent: "accent-red",
+          buttonText: "Salir",
+          image: "",
+          action: "logout",
+        },
+      ],
+};
 
   return [...filteredTabs, sistemaTab];
 }, [rol, esAdmin]);

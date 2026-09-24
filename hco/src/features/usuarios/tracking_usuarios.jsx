@@ -43,21 +43,33 @@ export default function TrackingUsuarios() {
     applyFilters();
   }, [filters, allItems]);
 
+  
   const loadUsuarios = async () => {
     setLoading(true);
     setMessage({ text: '', type: '' });
 
     try {
-      // Pedimos todos los empleados a Supabase.
-      // Asegúrate que los nombres de las columnas coincidan con las de tu BD.
       const { data, error } = await supabase
         .from('empleados')
-        .select('*')
+        .select(`
+          *,
+          cargo:cargos(nombre),
+          area:areas(nombre),
+          jefe:jefe_directo_id(nombre) 
+        `)
         .order('nombre', { ascending: true });
 
       if (error) throw error;
 
-      setAllItems(data || []);
+      // Aplanamos la información para la tabla y el buscador
+      const usuariosFormateados = data?.map(emp => ({
+        ...emp,
+        cargo: emp.cargo ? emp.cargo.nombre : '-',
+        area: emp.area ? emp.area.nombre : '-',
+        jefe_directo: emp.jefe ? emp.jefe.nombre : '-'
+      })) || [];
+
+      setAllItems(usuariosFormateados);
     } catch (error) {
       console.error("Error cargando usuarios:", error);
       setMessage({ text: 'Error al consultar la base de datos.', type: 'error' });
@@ -65,6 +77,8 @@ export default function TrackingUsuarios() {
       setLoading(false);
     }
   };
+
+
 
   useEffect(() => {
     const cargarAreasDB = async () => {

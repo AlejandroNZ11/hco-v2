@@ -90,7 +90,9 @@
 }
 
 .legend-dot.auto { background: #cbd5e1; }
-.legend-dot.manual { background: var(--warning, #ca8a04); }
+.legend-dot.manual {
+  background-color: #dc2626 !important;
+}
 
 .section-title {
   font-size: 16px;
@@ -145,8 +147,10 @@
 }
 
 .field-badge.manual {
-  background: #fef3c7;
-  color: #b45309;
+  background-color: #fee2e2 !important; /* Fondo rojo clarito */
+  color: #dc2626 !important; /* Texto rojo intenso */
+  border: 1px solid #f87171 !important; /* Borde rojo sutil */
+  font-weight: bold;
 }
 
 .field input,
@@ -183,36 +187,6 @@
   color: #64748b;
   border-color: #e2e8f0;
   cursor: not-allowed;
-}
-
-.photo-preview {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.photo-preview img {
-  width: 120px;
-  height: 120px;
-  object-fit: cover;
-  border-radius: 12px;
-  border: 2px solid var(--border);
-}
-
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--danger, #dc2626);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
 }
 
 .submit-row {
@@ -281,6 +255,140 @@
   color: #15803d;
   border: 1px solid #bbf7d0;
 }
+
+/* Bordes rojos para validación de errores */
+.input-error {
+  border: 2px solid #e74c3c !important;
+  background-color: #fdf2f2 !important;
+  transition: all 0.3s ease;
+}
+
+.input-error:focus {
+  box-shadow: 0 0 5px rgba(231, 76, 60, 0.5) !important;
+}
+/* =========================================
+   DISEÑO DE LA FILA DE FOTO (HORIZONTAL MODERNO)
+   ========================================= */
+.photo-upload-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 120px; /* Divide el ancho: URL (40%), Archivo (40%), Foto fija (20%) */
+  gap: 24px;
+  align-items: end; /* Alinea la parte inferior de los inputs con la miniatura */
+  background-color: #f8fafc;
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 25px;
+}
+
+.photo-url-field,
+.photo-file-field {
+  width: 100%;
+}
+
+/* Ocultar el input feo por defecto del navegador */
+.custom-file-upload input[type="file"] {
+  display: none;
+}
+
+/* Botón de carga personalizado (reemplaza a "Elegir archivo") */
+.file-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: white;
+  border: 2px dashed #94a3b8;
+  color: #475569;
+  height: 42px; /* Misma altura que tus inputs de texto */
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.file-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background-color: #f1f5f9;
+}
+
+/* Columna de la miniatura */
+.photo-preview-col {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.preview-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.preview-img {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+/* Botón Quitar Foto compacto */
+.remove-photo-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  background-color: #fee2e2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fca5a5 !important;
+  padding: 4px 8px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  width: 90px;
+  height: 28px !important;
+}
+
+.remove-photo-btn:hover {
+  background-color: #fecaca !important;
+}
+
+/* Cuadro gris cuando no hay foto subida */
+.preview-placeholder {
+  width: 90px;
+  height: 90px;
+  background-color: #e2e8f0;
+  border: 2px dashed #94a3b8;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 36px; /* Compensa el espacio del botón "Quitar" */
+}
+
+/* Responsive para pantallas pequeñas */
+@media (max-width: 768px) {
+  .photo-upload-row {
+    grid-template-columns: 1fr;
+    align-items: center;
+  }
+  .preview-placeholder {
+    margin-bottom: 0;
+  }
+}
+
+
 
 /* =========================================
     RESPONCI

@@ -22,6 +22,7 @@ const UBIGEO = {
   }
 };
 
+
 const normalize = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
 export default function RegistrarUsuario() {
@@ -32,14 +33,15 @@ export default function RegistrarUsuario() {
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("Cargando datos...");
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [formErrors, setFormErrors] = useState([]);
 
   // Listas dinámicas para los selects
   const [listaAreas, setListaAreas] = useState([]);
   const [listaCargos, setListaCargos] = useState([]);
   const [listaJefes, setListaJefes] = useState([]);
 
-  const TIPOS_USUARIO = ["White", "Blue"];
-  const SEXOS = ["F", "M"];
+  const TIPOS_USUARIO = ["white", "blue"];
+  const SEXOS = ['Masculino', 'Femenino', 'Otro'];
   const ROLES = ["USUARIO", "SUPERVISOR", "ADMIN", "SUPERADMIN"];
   const RUTAS = ["RUTA 1", "RUTA 2", "RUTA 3", "RUTA 4", "RUTA 5", "RUTA 6"];
 
@@ -90,22 +92,8 @@ export default function RegistrarUsuario() {
 
 
   const generarSiguienteId = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('empleados')
-        .select('id')
-        .order('id', { ascending: false })
-        .limit(1);
-
-      if (!error && data && data.length > 0) {
-        const ultimoId = parseInt(data[0].id || 0, 10);
-        setFormData(prev => ({ ...prev, id: String(ultimoId + 1) }));
-      } else {
-        setFormData(prev => ({ ...prev, id: "1" }));
-      }
-    } catch (err) {
-      setFormData(prev => ({ ...prev, id: "1" }));
-    }
+    // Al ser UUIDs, simplemente mostramos un texto hasta que se guarde
+    setFormData(prev => ({ ...prev, id: "Auto-generado al guardar" }));
   };
 
   const cargarUsuarioEditar = async (id) => {
@@ -235,6 +223,11 @@ export default function RegistrarUsuario() {
       if (id === 'provincia') { next.distrito = ""; }
       return next;
     });
+
+    // Limpia el borde rojo del campo tan pronto como el usuario interactúe con él
+    if (formErrors.includes(id)) {
+      setFormErrors(prev => prev.filter(field => field !== id));
+    }
   };
 
   const handlePhotoSelected = async (e) => {
@@ -281,22 +274,35 @@ export default function RegistrarUsuario() {
     });
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ text: '', type: '' });
+    setFormErrors([]); // Limpiamos errores previos al intentar guardar
 
     const requiredFields = [
-      { key: 'dni', label: 'DNI' }, { key: 'nombre', label: 'Nombre' },
-      { key: 'sexo', label: 'Sexo' }, { key: 'tipo', label: 'Tipo' },
-      { key: 'cargo', label: 'Cargo' }, { key: 'area', label: 'Área' },
+      { key: 'dni', label: 'DNI' }, 
+      { key: 'nombre', label: 'Nombre' },
+      { key: 'sexo', label: 'Sexo' }, 
+      { key: 'tipo', label: 'Tipo' },
+      { key: 'cargo', label: 'Cargo' }, 
+      { key: 'area', label: 'Área' },
+      { key: 'jefeDirecto', label: 'Jefe directo' }, 
       { key: 'rol', label: 'Rol' }
     ];
 
+    // Recolectar todos los campos obligatorios que estén vacíos
+    const erroresEncontrados = [];
     for (let field of requiredFields) {
       if (!formData[field.key]) {
-        setMessage({ text: `${field.label} es obligatorio.`, type: 'error' });
-        return;
+        erroresEncontrados.push(field.key);
       }
+    }
+
+    // Si faltan campos, pintamos de rojo y detenemos el proceso
+    if (erroresEncontrados.length > 0) {
+      setFormErrors(erroresEncontrados);
+      setMessage({ text: 'Por favor, complete todos los campos resaltados en rojo.', type: 'error' });
+      return;
     }
 
     setLoading(true);
@@ -360,7 +366,7 @@ export default function RegistrarUsuario() {
         coordenadas: formData.coordenadas.trim(),
         grupo_sanguineo: formData.grupoSanguineo.trim(),
         contacto_emergencia: formData.contactoEmergencia.trim(),
-        ruta_movilidad: formData.rutaMovilidad,
+        ruta_movilidad: formData.ruta_movilidad || null,
         motivo_salida: formData.motivoSalida.trim()
       };
 
@@ -405,7 +411,8 @@ export default function RegistrarUsuario() {
       <section className="page-hero">
         <span className="page-chip">Administración</span>
         <h1>{editingId ? "Editar usuario" : "Nuevo usuario"}</h1>
-        <p>Complete los datos principales del usuario. Los campos obligatorios están marcados como EDITAR.</p>
+        <p>Complete los datos principales del usuario. Los campos obligatorios están marcados como * OBLIGATORIO.</p>
+
       </section>
 
       <section className="card">
@@ -422,7 +429,7 @@ export default function RegistrarUsuario() {
           
           <div className="section-title">Datos principales</div>
 
-          {/* FILA 1 */}
+                   {/* FILA 1 */}
           <div className="form-grid cols-4">
             <div className="field field-auto">
               <label>ID <span className="field-badge auto">AUTO</span></label>
@@ -433,12 +440,12 @@ export default function RegistrarUsuario() {
               <input type="text" value={formData.estado} readOnly />
             </div>
             <div className="field field-manual">
-              <label>DNI <span className="field-badge manual">EDITAR</span></label>
-              <input type="text" id="dni" value={formData.dni} onChange={handleChange} maxLength="20" required />
+              <label>DNI <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <input type="text" id="dni" className={formErrors.includes('dni') ? 'input-error' : ''} value={formData.dni} onChange={handleChange} maxLength="20" required />
             </div>
             <div className="field field-manual">
-              <label>Área <span className="field-badge manual">EDITAR</span></label>
-              <select id="area" value={formData.area} onChange={handleChange} required>
+              <label>Área <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <select id="area" className={formErrors.includes('area') ? 'input-error' : ''} value={formData.area} onChange={handleChange} required>
                 <option value="">Seleccione área</option>
                 {listaAreas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
             </select>
@@ -449,26 +456,26 @@ export default function RegistrarUsuario() {
           {/* FILA 2 */}
           <div className="form-grid cols-4">
             <div className="field field-manual">
-              <label>Nombre <span className="field-badge manual">EDITAR</span></label>
-              <input type="text" id="nombre" placeholder="Apellidos, Nombres" value={formData.nombre} onChange={handleChange} required />
+              <label>Nombre <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <input type="text" id="nombre" className={formErrors.includes('nombre') ? 'input-error' : ''} placeholder="Apellidos, Nombres" value={formData.nombre} onChange={handleChange} required />
             </div>
             <div className="field field-manual">
-              <label>Sexo <span className="field-badge manual">EDITAR</span></label>
-              <select id="sexo" value={formData.sexo} onChange={handleChange} required>
+              <label>Sexo <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <select id="sexo" className={formErrors.includes('sexo') ? 'input-error' : ''} value={formData.sexo} onChange={handleChange} required>
                 <option value="">Seleccione sexo</option>
                 {SEXOS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div className="field field-manual">
-              <label>Tipo <span className="field-badge manual">EDITAR</span></label>
-              <select id="tipo" value={formData.tipo} onChange={handleChange} required>
+              <label>Tipo <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <select id="tipo" className={formErrors.includes('tipo') ? 'input-error' : ''} value={formData.tipo} onChange={handleChange} required>
                 <option value="">Seleccione tipo</option>
                 {TIPOS_USUARIO.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="field field-manual">
-              <label>Cargo <span className="field-badge manual">EDITAR</span></label>
-                <select id="cargo" value={formData.cargo} onChange={handleChange} required>
+              <label>Cargo <span className="field-badge manual">* OBLIGATORIO</span></label>
+                <select id="cargo" className={formErrors.includes('cargo') ? 'input-error' : ''} value={formData.cargo} onChange={handleChange} required>
                     <option value="">Seleccione cargo</option>
                     {listaCargos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
@@ -478,15 +485,15 @@ export default function RegistrarUsuario() {
           {/* FILA 3 */}
           <div className="form-grid cols-4">
             <div className="field field-manual">
-              <label>Jefe directo <span className="field-badge manual">EDITAR</span></label>
-                <select id="jefeDirecto" value={formData.jefeDirecto} onChange={handleChange} required>
+              <label>Jefe directo <span className="field-badge manual">* OBLIGATORIO</span></label>
+                <select id="jefeDirecto" className={formErrors.includes('jefeDirecto') ? 'input-error' : ''} value={formData.jefeDirecto} onChange={handleChange} required>
                     <option value="">Seleccione jefe directo</option>
                     {listaJefes.map(j => <option key={j.id} value={j.id}>{j.nombre}</option>)}
                 </select>
             </div>
             <div className="field field-manual">
-              <label>Rol <span className="field-badge manual">EDITAR</span></label>
-              <select id="rol" value={formData.rol} onChange={handleChange} required>
+              <label>Rol <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <select id="rol" className={formErrors.includes('rol') ? 'input-error' : ''} value={formData.rol} onChange={handleChange} required>
                 <option value="">Seleccione rol</option>
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
@@ -501,24 +508,48 @@ export default function RegistrarUsuario() {
             </div>
           </div>
 
-          <div className="section-title">Foto</div>
-          <div className="form-grid cols-2">
-            <div className="field field-manual">
-              <label>URL foto <span className="field-badge manual">EDITAR</span></label>
-              <input type="url" id="foto" placeholder="URL de imagen" value={formData.foto} onChange={handleChange} />
+                    <div className="section-title">Foto</div>
+          
+          <div className="photo-upload-row">
+            {/* Columna 1: URL */}
+            <div className="field photo-url-field">
+              <label>URL de la foto</label>
+              <input type="url" id="foto" placeholder="Ej: https://mi-imagen.com/foto.jpg" value={formData.foto} onChange={handleChange} />
             </div>
-            <div className="field field-manual">
-              <label>Cargar foto <span className="field-badge manual">EDITAR</span></label>
-              <input type="file" accept="image/*" onChange={handlePhotoSelected} />
+
+            {/* Columna 2: Cargar Archivo (Diseño personalizado ocultando el feo input nativo) */}
+            <div className="field photo-file-field">
+              <label>O Cargar desde PC</label>
+              <div className="custom-file-upload">
+                {/* El input real está invisible */}
+                <input type="file" id="file-upload" accept="image/*" onChange={handlePhotoSelected} />
+                {/* Este label actúa como el nuevo botón */}
+                <label htmlFor="file-upload" className="file-btn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  Seleccionar archivo
+                </label>
+              </div>
+            </div>
+
+            {/* Columna 3: Miniatura */}
+            <div className="photo-preview-col">
+              {photoPreview ? (
+                <div className="preview-card">
+                  <img src={photoPreview} alt="Vista previa" className="preview-img" />
+                  <button type="button" onClick={clearPhoto} className="remove-photo-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    Quitar
+                  </button>
+                </div>
+              ) : (
+                <div className="preview-placeholder">
+                  <span>Sin foto</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {photoPreview && (
-            <div className="photo-preview">
-              <img src={photoPreview} alt="Vista previa" />
-              <button type="button" onClick={clearPhoto} className="link-btn">Quitar foto cargada</button>
-            </div>
-          )}
+
 
           <div className="section-title">Datos personales</div>
           <div className="form-grid cols-4">

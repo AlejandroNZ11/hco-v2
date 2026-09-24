@@ -50,7 +50,8 @@ export default function RegistrarUsuario() {
     id: "", estado: "Activo", dni: "", nombre: "", sexo: "", tipo: "", cargo: "",
     area: "", jefeDirecto: "", rol: "", usuario: "", clave: "", fechaNacimiento: "", edad: "",
     hijos: "", celular: "", departamento: "", provincia: "", distrito: "", direccion: "",
-    urlCasa: "", coordenadas: "", grupoSanguineo: "", contactoEmergencia: "", correo: "",
+    urlCasa: "", coordenadas: "", grupoSanguineo: "", contactoEmergencia: "", 
+    correo: "", correoCeva: "", correo3m: "", codMainchart: "", // <-- CAMPOS AGREGADOS
     fechaIngreso: "", rutaMovilidad: "", fechaSalida: "", permanencia: "", motivoSalida: "", foto: ""
   });
 
@@ -109,6 +110,29 @@ export default function RegistrarUsuario() {
       if (error) throw error;
 
       if (data) {
+        // ==========================================
+        // CÁLCULO INMEDIATO USANDO fch_nacimiento y fch_salida
+        // ==========================================
+        let edadCalculada = "";
+        if (data.fch_nacimiento) {
+          const nacimiento = new Date(data.fch_nacimiento + "T00:00:00");
+          const hoy = new Date();
+          let edad = hoy.getFullYear() - nacimiento.getFullYear();
+          const mes = hoy.getMonth() - nacimiento.getMonth();
+          if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) edad--;
+          edadCalculada = String(Math.max(0, edad));
+        }
+
+        let permanenciaCalculada = "";
+        if (data.fecha_ingreso) {
+          const inicio = new Date(data.fecha_ingreso + "T00:00:00");
+          const fin = data.fch_salida ? new Date(data.fch_salida + "T00:00:00") : new Date();
+          inicio.setHours(0, 0, 0, 0);
+          fin.setHours(0, 0, 0, 0);
+          const diff = Math.floor((fin.getTime() - inicio.getTime()) / 86400000);
+          permanenciaCalculada = String(Math.max(0, diff));
+        }
+
         setFormData({
           id: data.id || "",
           estado: data.estado || "Activo",
@@ -121,10 +145,14 @@ export default function RegistrarUsuario() {
           jefeDirecto: data.jefe_directo_id || "",
           rol: data.rol || "",
           usuario: data.usuario || "",
-          clave: data.clave || "",
-          fechaNacimiento: data.fecha_nacimiento || "",
-          edad: data.edad || "",
-          hijos: data.hijos || "",
+          clave: data.clave || "", 
+          
+          // --- AQUÍ ESTÁ LA CORRECCIÓN: fch_nacimiento y fch_salida ---
+          fechaNacimiento: data.fch_nacimiento || "", 
+          fechaSalida: data.fch_salida || "",
+          fechaIngreso: data.fecha_ingreso || "",
+
+          hijos: data.hijos !== null && data.hijos !== undefined ? data.hijos : "", 
           celular: data.celular || "",
           departamento: data.departamento || "",
           provincia: data.provincia || "",
@@ -134,13 +162,16 @@ export default function RegistrarUsuario() {
           coordenadas: data.coordenadas || "",
           grupoSanguineo: data.grupo_sanguineo || "",
           contactoEmergencia: data.contacto_emergencia || "",
-          correo: data.correo || "",
-          fechaIngreso: data.fecha_ingreso || "",
+          correo: data.correo_personal || "", 
+          correoCeva: data.correo_ceva || "",
+          correo3m: data.correo_3m || "",
+          codMainchart: data.cod_mainchart || "",
           rutaMovilidad: data.ruta_movilidad || "",
-          fechaSalida: data.fecha_salida || "",
-          permanencia: data.permanencia || "",
           motivoSalida: data.motivo_salida || "",
-          foto: data.foto_url || ""
+          foto: data.foto_url || "",
+          
+          edad: edadCalculada, 
+          permanencia: permanenciaCalculada
         });
 
         if (data.foto_url) {
@@ -154,6 +185,8 @@ export default function RegistrarUsuario() {
       setLoading(false);
     }
   };
+
+
 
   // ================= CÁLCULOS Y EFECTOS =================
   useEffect(() => {
@@ -274,10 +307,10 @@ export default function RegistrarUsuario() {
     });
   };
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ text: '', type: '' });
-    setFormErrors([]); // Limpiamos errores previos al intentar guardar
+    setFormErrors([]); 
 
     const requiredFields = [
       { key: 'dni', label: 'DNI' }, 
@@ -290,7 +323,6 @@ const handleSubmit = async (e) => {
       { key: 'rol', label: 'Rol' }
     ];
 
-    // Recolectar todos los campos obligatorios que estén vacíos
     const erroresEncontrados = [];
     for (let field of requiredFields) {
       if (!formData[field.key]) {
@@ -298,7 +330,6 @@ const handleSubmit = async (e) => {
       }
     }
 
-    // Si faltan campos, pintamos de rojo y detenemos el proceso
     if (erroresEncontrados.length > 0) {
       setFormErrors(erroresEncontrados);
       setMessage({ text: 'Por favor, complete todos los campos resaltados en rojo.', type: 'error' });
@@ -311,29 +342,19 @@ const handleSubmit = async (e) => {
     try {
       let finalUserId = editingId;
 
-      // ==========================================
-      // PASO 1: CREAR USUARIO EN SUPABASE AUTH (Solo si es nuevo)
-      // ==========================================
       if (!editingId) {
-        // Tomamos el usuario que ya viene con @hco.com en minúsculas
         const emailLogin = formData.usuario.trim();
-        
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: emailLogin,
-          password: formData.clave.trim(), // Por defecto es su DNI
+          password: formData.clave.trim(),
         });
 
         if (authError) throw new Error(`Error en Autenticación: ${authError.message}`);
         if (!authData.user) throw new Error("No se pudo obtener el ID del usuario creado.");
 
-        finalUserId = authData.user.id; // Capturamos el UUID generado
+        finalUserId = authData.user.id;
       }
 
-
-      // ==========================================
-      // PASO 2: GUARDAR PERFIL EN TABLA EMPLEADOS
-      // ==========================================
-      // Mapeamos los campos exactamente a como están en tu código SQL
       const recordData = {
         id: finalUserId,
         estado: formData.estado,
@@ -342,21 +363,24 @@ const handleSubmit = async (e) => {
         sexo: formData.sexo,
         tipo: formData.tipo,
         
-        // Llaves foráneas (Enviamos números o UUIDs, no textos)
         cargo_id: formData.cargo ? parseInt(formData.cargo) : null,
         area_id: formData.area ? parseInt(formData.area) : null,
         jefe_directo_id: formData.jefeDirecto || null, 
-        
         rol: formData.rol,
         usuario: formData.usuario.trim(),
         
-        // Nombres de columnas corregidos según tu SQL
+        // --- AQUÍ ESTÁ LA CORRECCIÓN: fch_nacimiento y fch_salida ---
         fch_nacimiento: formData.fechaNacimiento || null,
         fch_salida: formData.fechaSalida || null,
         fecha_ingreso: formData.fechaIngreso || null,
-        correo_personal: formData.correo.trim(),
         
-        hijos: formData.hijos ? parseInt(formData.hijos) : 0,
+        correo_personal: formData.correo.trim(),
+        correo_ceva: formData.correoCeva.trim(),
+        correo_3m: formData.correo3m.trim(),
+        cod_mainchart: formData.codMainchart.trim(),        
+        
+        hijos: formData.hijos !== "" ? parseInt(formData.hijos) : 0, 
+        
         celular: formData.celular.trim(),
         departamento: formData.departamento,
         provincia: formData.provincia,
@@ -366,7 +390,7 @@ const handleSubmit = async (e) => {
         coordenadas: formData.coordenadas.trim(),
         grupo_sanguineo: formData.grupoSanguineo.trim(),
         contacto_emergencia: formData.contactoEmergencia.trim(),
-        ruta_movilidad: formData.ruta_movilidad || null,
+        ruta_movilidad: formData.rutaMovilidad || null, 
         motivo_salida: formData.motivoSalida.trim()
       };
 
@@ -397,6 +421,7 @@ const handleSubmit = async (e) => {
       setLoading(false);
     }
   };
+
 
 
   const departamentos = Object.keys(UBIGEO).sort();
@@ -508,47 +533,76 @@ const handleSubmit = async (e) => {
             </div>
           </div>
 
-                    <div className="section-title">Foto</div>
+          {/* TÍTULOS SUPERIORES */}
+          <div className="dual-titles">
+            <div className="section-title">FOTO</div>
+            <div className="section-title">CORREOS</div>
+          </div>
           
-          <div className="photo-upload-row">
-            {/* Columna 1: URL */}
-            <div className="field photo-url-field">
-              <label>URL de la foto</label>
-              <input type="url" id="foto" placeholder="Ej: https://mi-imagen.com/foto.jpg" value={formData.foto} onChange={handleChange} />
-            </div>
+          <div className="split-layout">
+            
+            {/* MITAD IZQUIERDA: FOTO */}
+            <div className="split-panel">
+              <div className="photo-content-split">
+                
+                {/* Inputs de foto apilados */}
+                <div className="photo-inputs-split">
+                  <div className="field">
+                    <label>URL de la foto</label>
+                    <input type="url" id="foto" placeholder="Ej: https://..." value={formData.foto} onChange={handleChange} />
+                  </div>
+                  <div className="field">
+                    <label>O Cargar foto</label>
+                    <div className="custom-file-upload">
+                      <input type="file" id="file-upload" accept="image/*" onChange={handlePhotoSelected} />
+                      <label htmlFor="file-upload" className="file-btn-centered">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        <span>Seleccionar foto</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Columna 2: Cargar Archivo (Diseño personalizado ocultando el feo input nativo) */}
-            <div className="field photo-file-field">
-              <label>O Cargar desde PC</label>
-              <div className="custom-file-upload">
-                {/* El input real está invisible */}
-                <input type="file" id="file-upload" accept="image/*" onChange={handlePhotoSelected} />
-                {/* Este label actúa como el nuevo botón */}
-                <label htmlFor="file-upload" className="file-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                  Seleccionar archivo
-                </label>
+                {/* Miniatura cuadrada a la derecha */}
+                <div className="photo-preview-split">
+                  {photoPreview ? (
+                    <div className="preview-card-split">
+                      <img src={photoPreview} alt="Vista previa" />
+                      <button type="button" onClick={clearPhoto} className="btn-quitar-foto-force">
+                        Quitar
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="placeholder-split">Sin foto</div>
+                  )}
+                </div>
+
               </div>
             </div>
 
-            {/* Columna 3: Miniatura */}
-            <div className="photo-preview-col">
-              {photoPreview ? (
-                <div className="preview-card">
-                  <img src={photoPreview} alt="Vista previa" className="preview-img" />
-                  <button type="button" onClick={clearPhoto} className="remove-photo-btn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    Quitar
-                  </button>
+            {/* MITAD DERECHA: CORREOS Y CODIGO */}
+            <div className="split-panel">
+              <div className="form-grid cols-2">
+                <div className="field">
+                  <label>Correo Personal</label>
+                  <input type="email" id="correo" value={formData.correo} onChange={handleChange} />
                 </div>
-              ) : (
-                <div className="preview-placeholder">
-                  <span>Sin foto</span>
+                <div className="field">
+                  <label>Código MYHR</label>
+                  <input type="text" id="codMainchart" value={formData.codMainchart} onChange={handleChange} />
                 </div>
-              )}
+                <div className="field">
+                  <label>Correo CEVA</label>
+                  <input type="email" id="correoCeva" value={formData.correoCeva} onChange={handleChange} />
+                </div>
+                <div className="field">
+                  <label>Correo 3M</label>
+                  <input type="email" id="correo3m" value={formData.correo3m} onChange={handleChange} />
+                </div>
+              </div>
             </div>
-          </div>
 
+          </div>
 
 
           <div className="section-title">Datos personales</div>
@@ -604,7 +658,7 @@ const handleSubmit = async (e) => {
           <div className="form-grid cols-3">
             <div className="field field-manual"><label>Grupo sanguíneo</label><input type="text" id="grupoSanguineo" value={formData.grupoSanguineo} onChange={handleChange} /></div>
             <div className="field field-manual"><label>Contacto emergencia</label><input type="tel" id="contactoEmergencia" value={formData.contactoEmergencia} onChange={handleChange} /></div>
-            <div className="field field-manual"><label>Correo corporativo</label><input type="email" id="correo" value={formData.correo} onChange={handleChange} /></div>
+            
           </div>
 
           <div className="section-title">Datos laborales</div>

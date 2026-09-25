@@ -641,21 +641,22 @@
   }
 
   .app-category-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    overflow-x: hidden;
+    padding: 12px 16px;
+    gap: 8px;
+    flex-wrap: nowrap; /* Mantenemos todo en una línea */
+    overflow-x: auto; /* Habilitamos scroll horizontal táctil */
+    -webkit-overflow-scrolling: touch;
   }
 
   .app-category-tab {
-    flex: 0 0 50%;
-    width: 50%;
+    flex: 0 0 auto; /* Los botones toman solo el espacio que necesitan */
+    width: auto;
     min-width: 0;
-    min-height: 58px;
-    padding: 12px 8px;
+    min-height: auto;
+    padding: 10px 18px;
     font-size: 14px;
     text-align: center;
-    white-space: normal;
-    line-height: 1.2;
+    border-radius: 8px !important;
   }
 
   .app-category-tab.active {
@@ -666,58 +667,84 @@
   .apps-section-tabs .apps-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
-    padding: 0 12px 18px;
+    padding: 0 16px 20px;
   }
 }
-
-
-/* PESTAÑAS MANTENIENDO DISEÑO DE CARDS */
+/* =========================================
+   PESTAÑAS - DISEÑO CORPORATIVO (LÍNEA INDICADORA)
+   ========================================= */
 
 .apps-section-tabs {
   background: #ffffff;
-  border: 1px solid #dbe5ef;
-  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 4px 14px rgba(18, 56, 91, 0.04);
 }
 
 .app-category-tabs {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #dbe5ef;
   background: #ffffff;
-  overflow: hidden;
+  /* Línea base sutil para anclar las pestañas */
+  border-bottom: 2px solid #e2e8f0; 
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none; /* Oculta scrollbar en Firefox */
+}
+
+.app-category-tabs::-webkit-scrollbar {
+  display: none; /* Oculta scrollbar en Chrome/Safari */
 }
 
 .app-category-tab {
   all: unset;
   box-sizing: border-box;
-  padding: 18px 30px;
+  position: relative;
+  padding: 20px 24px;
   cursor: pointer;
-  color: #005cff;
-  font-size: 17px;
-  font-weight: 900;
+  color: #717E8C; /* Gris pizarra de la paleta para inactivos */
+  font-size: 15px;
+  font-weight: 600;
   white-space: nowrap;
-  border: 1px solid transparent;
-  border-bottom: none;
+  transition: color 0.2s ease, background 0.2s ease;
 }
 
 .app-category-tab:hover {
-  background: #f8fbff;
+  color: #12385B; /* Azul oscuro corporativo */
+  background: linear-gradient(to top, rgba(18, 56, 91, 0.03) 0%, transparent 100%);
 }
 
 .app-category-tab.active {
-  color: #0f172a;
-  background: #ffffff;
-  border-color: #dbe5ef;
-  border-radius: 9px 9px 0 0;
-  margin-bottom: -1px;
+  color: #12385B;
+  font-weight: 700;
+}
+
+/* El secreto del diseño corporativo: el indicador inferior animado */
+.app-category-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -2px; /* Se superpone exactamente al border-bottom del contenedor */
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: #12385B;
+  border-radius: 3px 3px 0 0;
+  opacity: 0;
+  transform: scaleX(0.5); /* Inicia más pequeño */
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-category-tab.active::after {
+  opacity: 1;
+  transform: scaleX(1); /* Se expande al ancho total de la palabra */
 }
 
 .tabs-section-head {
-  padding: 18px 20px 0;
-  margin-bottom: 14px;
+  padding: 24px 24px 0;
+  margin-bottom: 16px;
 }
+
 
 /* 5 CARDS POR FILA */
 .apps-section-tabs .apps-grid {
@@ -726,7 +753,9 @@
   padding: 0 20px 24px;
 }
 
-/* Responsive */
+/* =========================================
+Responsive  movil celular 
+========================================= */
 @media (max-width: 1200px) {
   .apps-section-tabs .apps-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -744,8 +773,38 @@
   }
 }
 
+@media (max-width: 600px) {
+  .app-category-tabs {
+    padding: 0 4px;
+    flex-wrap: nowrap; /* Mantiene una sola línea */
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-category-tab {
+    flex: 0 0 auto;
+    padding: 16px 18px; /* Padding ligeramente menor para móviles */
+    font-size: 14px;
+    text-align: center;
+  }
+
+  /* El indicador debe ser un poco más delgado en móviles */
+  .app-category-tab::after {
+    height: 2px; 
+    bottom: -2px;
+  }
+
+  .apps-section-tabs .apps-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0 16px 20px;
+  }
+}
+
+
 @media (max-width: 480px) {
   .apps-section-tabs .apps-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+

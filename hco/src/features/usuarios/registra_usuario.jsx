@@ -605,7 +605,7 @@ export default function RegistrarUsuario() {
           </div>
 
 
-          <div className="section-title">Datos personales</div>
+          <div className="section-title">Datos personales</div> 
           <div className="form-grid cols-4">
             <div className="field field-manual">
               <label>Fch. Nacimiento</label>

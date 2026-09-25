@@ -391,7 +391,7 @@ export default function Menu() {
       shortLabel: "VAS",
       items: [
         {
-          title: "Reporte de Discrepancia",
+          title: "Reporte de Discrepancia Labeling",
           description: "Gestionar y registrar reportes de Discrepancia.",
           Icon: FaBoxOpen,
           accent: "accent-cyan",
@@ -400,12 +400,12 @@ export default function Menu() {
           url: "#",
         },
         {
-          title: "Auditoría de Despachos",
+          title: "Auditoría de Despachos Laboratorio",
           description: "Registrar auditorías de despachos.",
           Icon: FaBoxOpen,
           accent: "accent-violet",
           buttonText: "Entrar",
-          image: "/img/auditoria-despachos.jpg",
+          image: "/img/discrepancia.jpg",
           url: "#",
         },
       ],
@@ -435,8 +435,8 @@ export default function Menu() {
         },
         {
           title: "Inspección de casilleros",
-          description: "Inspeccionar la limpieza y orden de casilleros.",
-          Icon: FaBoxOpen,
+          description: "Inspeccionar la limpieza y orden de casilleros.", 
+          Icon: FaBoxOpen,  
           accent: "accent-violet",
           buttonText: "Entrar",
           image: "/img/casilleros.jpg",

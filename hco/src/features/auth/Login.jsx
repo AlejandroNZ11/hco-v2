@@ -85,14 +85,25 @@ export default function Login() {
         return;
       }
 
-      // Traemos el perfil completo para el LocalStorage
+      // ==========================================
+      // CORRECCIÓN: Traemos el perfil completo cruzando con la tabla cargos
+      // ==========================================
       const { data: perfilData, error: perfilError } = await supabase
         .from('empleados')
-        .select('*')
+        .select(`
+          *,
+          cargos (nombre)
+        `)
         .eq('id', authData.user.id)
         .single();
 
       if (perfilError) throw perfilError;
+
+      // Aplanamos el dato para que guarde el texto del cargo directamente 
+      // y la cabecera (MainLayout) lo pueda leer sin problemas.
+      if (perfilData && perfilData.cargos) {
+        perfilData.cargo = perfilData.cargos.nombre;
+      }
 
       // ==========================================
       // LÓGICA DE BLOQUEO DE USUARIOS INACTIVOS
@@ -119,6 +130,7 @@ export default function Login() {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="login-container-global">

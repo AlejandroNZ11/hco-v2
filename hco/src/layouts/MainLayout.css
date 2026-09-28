@@ -642,7 +642,7 @@
   justify-content: center !important;
 }
 
-/* RESPONSIVE */
+/* RESPONSIVE movil celular */
 
 @media (max-width: 768px) {
   :root {
@@ -858,16 +858,47 @@
 }
 
 /* Si estás en móvil */
+/* Si estás en móvil */
 @media (max-width: 768px) {
   .header-container .topbar-left {
     height: 62px !important;
   }
 
+  /* 1. Ajuste del botón ATRÁS (Solo icono) */
   .header-container .btn-atras {
     height: 38px !important;
     min-height: 38px !important;
-    width: 105px !important;
-    min-width: 105px !important;
+    width: 38px !important; /* Hacemos el botón cuadrado */
+    min-width: 38px !important;
+    padding: 0 !important; /* Quitamos el relleno sobrante */
+  }
+
+  /* Ocultamos el texto "Atrás" */
+  .header-container .btn-atras .back-text {
+    display: none !important;
+  }
+  
+  /* Centramos perfectamente la flechita */
+  .header-container .btn-atras .back-icon-svg {
+    font-size: 16px !important;
+    margin: 0 auto !important;
+  }
+
+  /* 2. Ajuste del botón ADMINISTRAR (Solo icono) */
+  .header-container .btn-administrar {
+    width: 30px !important; /* Botón cuadrado pequeño */
+    min-width: 30px !important;
+    padding: 0 !important;
+  }
+
+  /* Ocultamos el texto "Administrar" */
+  .header-container .btn-administrar span:not(.layout-icon) {
+    display: none !important;
+  }
+
+  /* Centramos perfectamente el engranaje */
+  .header-container .btn-administrar .layout-icon {
+    margin: 0 auto !important;
     font-size: 15px !important;
   }
 }

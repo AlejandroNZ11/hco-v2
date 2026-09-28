@@ -10,19 +10,13 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 
+// IMPORTANTE: Importamos Supabase para el cambio de contraseña real
+import { supabase } from "../supabaseClient";
 import "./MainLayout.css";
 
 const LOGIN_URL = "/";
 const MENU_URL = "/menu";
 const ADMIN_URL = "/almuerzos/admin";
-
-const APP_SCRIPT_URL_PASSWORD =
-  import.meta.env.VITE_APP_SCRIPT_URL_PASSWORD ||
-  "https://script.google.com/macros/s/AKfycbw4EHmCBr5HKvZ1S2ugMD_FFNj5g5PGmF8Y8iZVEZQz9YmQZug85CjKzA8Wc8uEquBz/exec";
-
-const APP_SCRIPT_URL_ANOMALIAS =
-  import.meta.env.VITE_APP_SCRIPT_URL_ANOMALIAS ||
-  "https://script.google.com/macros/s/AKfycbyLDzIgbgG_4st1XAqQfAVxoOqxhZPeU5MEl_tjSxr4c2YJh0mXNk2l9kC05ea2TBkNSQ/exec";
 
 function getStoredAuthUser() {
   const local = localStorage.getItem("authUser");
@@ -55,38 +49,30 @@ function obtenerIniciales(nombre) {
 
 function convertirGoogleDriveUrl(url) {
   if (!url || typeof url !== "string") return "";
-
   const cleanUrl = url.trim();
-
   const matchFile = cleanUrl.match(/\/file\/d\/([^/]+)/);
   if (matchFile?.[1]) {
     return `https://drive.google.com/thumbnail?id=${matchFile[1]}&sz=w200`;
   }
-
   const matchId = cleanUrl.match(/[?&]id=([^&]+)/);
   if (matchId?.[1]) {
     return `https://drive.google.com/thumbnail?id=${matchId[1]}&sz=w200`;
   }
-
   return cleanUrl;
 }
 
 function obtenerFuentesFoto(user) {
   return [
+    user?.foto_url, // <-- AGREGADO: Nombre exacto de tu columna en Supabase
     user?.fotoDataUrl,
     user?.fotoWeb,
     user?.foto,
     user?.fotoUrl,
     user?.urlFoto,
     user?.imagen,
-    user?.imagenUrl,
     user?.avatar,
-    user?.avatarUrl,
     user?.photo,
-    user?.photoUrl,
-    user?.photoURL,
     user?.picture,
-    user?.pictureUrl,
   ]
     .map((v) => (typeof v === "string" ? convertirGoogleDriveUrl(v) : ""))
     .filter(Boolean);
@@ -125,71 +111,37 @@ export default function MainLayout() {
       .replace(/\.html$/, "");
   }, [location.pathname]);
 
-  const isMenuPage =
-    currentPage === "/menu" || currentPage.includes("/menu-opciones/menu");
-
+  const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opciones/menu");
   const isPedidosPage = currentPage.includes("/almuerzos/pedidos");
   const isAdminPage = currentPage.includes("/almuerzos/admin");
   const isListaPage = currentPage.includes("/almuerzos/lista_platillo");
 
   const { tituloCabecera, subtituloCabecera } = useMemo(() => {
-    if (isMenuPage) {
-      return {
-        tituloCabecera: "Menú Principal",
-        subtituloCabecera: "Opciones del sistema",
-      };
-    }
-
-    if (isPedidosPage) {
-      return {
-        tituloCabecera: "Almuerzo",
-        subtituloCabecera: "Registro de almuerzos",
-      };
-    }
-
-    if (isAdminPage) {
-      return {
-        tituloCabecera: "Administración Global",
-        subtituloCabecera: "Supervisión de pedidos y reportes",
-      };
-    }
-
-    if (isListaPage) {
-      return {
-        tituloCabecera: "Editar Menú",
-        subtituloCabecera: "Gestión semanal de platillos",
-      };
-    }
-
-    return {
-      tituloCabecera: "Sistema de Control",
-      subtituloCabecera: "Panel principal de operaciones",
-    };
+    if (isMenuPage) return { tituloCabecera: "Menú Principal", subtituloCabecera: "Opciones del sistema" };
+    if (isPedidosPage) return { tituloCabecera: "Almuerzo", subtituloCabecera: "Registro de almuerzos" };
+    if (isAdminPage) return { tituloCabecera: "Administración Global", subtituloCabecera: "Supervisión de pedidos y reportes" };
+    if (isListaPage) return { tituloCabecera: "Editar Menú", subtituloCabecera: "Gestión semanal de platillos" };
+    return { tituloCabecera: "Sistema de Control", subtituloCabecera: "Panel principal de operaciones" };
   }, [isMenuPage, isPedidosPage, isAdminPage, isListaPage]);
 
+  // --- CORRECCIÓN EN LA EXTRACCIÓN DE DATOS DE SUPABASE ---
   const nombreUsuario = String(authUser?.nombre || "Usuario").trim();
-  const cargoUsuario = String(authUser?.cargo || "Sin cargo asignado").trim();
+  // Extraemos el nombre del cargo si viene como objeto relacional, sino usamos el texto plano
+  const cargoRaw = authUser?.cargo?.nombre || authUser?.cargo || "Sin cargo asignado";
+  const cargoUsuario = String(cargoRaw).trim();
   const rolUsuario = String(authUser?.rol || "").trim().toUpperCase();
-
-  const identificadorUsuario = String(
-    authUser?.email || authUser?.dni || authUser?.usuario || ""
-  ).trim();
-
+  
   const inicialesUsuario = obtenerIniciales(nombreUsuario);
-
   const fuentesFoto = useMemo(() => obtenerFuentesFoto(authUser), [authUser]);
   const photoSrc = fuentesFoto[photoIndex] || "";
 
-  const puedeAdministrar =
-    (rolUsuario === "SUPERADMIN" || rolUsuario === "SUPERVISOR") &&
-    isPedidosPage;
+  const puedeAdministrar = (rolUsuario === "SUPERADMIN" || rolUsuario === "SUPERVISOR") && isPedidosPage;
 
   useEffect(() => {
     if (!authUser) {
       navigate(LOGIN_URL, { replace: true });
       return;
     }
-
     syncSessionFromLocal(authUser);
   }, [authUser, navigate]);
 
@@ -203,73 +155,31 @@ export default function MainLayout() {
   }, [photoSrc]);
 
   useEffect(() => {
-  if (!authUser) return;
-
-  if (window.__pushFirebaseScriptsLoaded) return;
-  window.__pushFirebaseScriptsLoaded = true;
-
-  const scripts = [
-    "/vendor/firebase/firebase-app-compat.js",
-    "/vendor/firebase/firebase-messaging-compat.js",
-    "/part/firebaseConfig.js",
-    "/part/pushAlmuerzo.js",
-  ];
-
-  function loadNext(index) {
-    if (index >= scripts.length) return;
-
-    const script = document.createElement("script");
-    script.src = `${scripts[index]}?v=3`;
-    script.defer = true;
-
-    script.onload = () => {
-      loadNext(index + 1);
-    };
-
-    script.onerror = () => {
-      console.error("No se pudo cargar:", scripts[index]);
-    };
-
-    document.head.appendChild(script);
-  }
-
-  loadNext(0);
-}, [authUser]);
-
-
-
-  useEffect(() => {
     if (!dropdownOpen) return;
-
     function handleClickOutside(event) {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setDropdownOpen(false);
-      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) setDropdownOpen(false);
     }
-
     function handleEscape(event) {
       if (event.key === "Escape") setDropdownOpen(false);
     }
-
     document.addEventListener("click", handleClickOutside);
     document.addEventListener("keydown", handleEscape);
-
     return () => {
       document.removeEventListener("click", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [dropdownOpen]);
 
+  // ========================================================
+  // FUNCIONES DE SINCRONIZACIÓN (Pendientes de migrar API)
+  // ========================================================
   const actualizarBadgePendientes = useCallback((count) => {
     setPendingCount(Number(count || 0));
   }, []);
 
   const refrescarPendientesCabecera = useCallback(async () => {
     try {
-      if (
-        window.offlineQueue &&
-        typeof window.offlineQueue.refreshPendingCount === "function"
-      ) {
+      if (window.offlineQueue && typeof window.offlineQueue.refreshPendingCount === "function") {
         const count = await window.offlineQueue.refreshPendingCount();
         actualizarBadgePendientes(count);
         return;
@@ -277,84 +187,57 @@ export default function MainLayout() {
     } catch (error) {
       console.error("No se pudo refrescar pendientes:", error);
     }
-
     actualizarBadgePendientes(leerCountLocal());
   }, [actualizarBadgePendientes]);
 
-  const sincronizarPendientesDesdeCabecera = useCallback(
-    async (esAutomatico = false) => {
-      if (
-        !window.offlineQueue ||
-        typeof window.offlineQueue.syncPendingAnomalias !== "function"
-      ) {
-        actualizarBadgePendientes(leerCountLocal());
-        return;
+  const sincronizarPendientesDesdeCabecera = useCallback(async (esAutomatico = false) => {
+    // Mantenemos la lógica de anomalías hasta que migres ese módulo específico
+    if (!window.offlineQueue || typeof window.offlineQueue.syncPendingAnomalias !== "function") {
+      actualizarBadgePendientes(leerCountLocal());
+      return;
+    }
+    if (!navigator.onLine) {
+      if (!esAutomatico) alert("No hay conexión a internet.");
+      return;
+    }
+    setSyncLoading(true);
+    try {
+      // Reemplazar URL por la de Supabase cuando migres Anomalías
+      const result = await window.offlineQueue.syncPendingAnomalias("PENDIENTE_DE_MIGRAR_API");
+      actualizarBadgePendientes(result.pending);
+      if (!esAutomatico) {
+        if (result.synced > 0 && result.failed === 0) alert(`Se sincronizaron ${result.synced} registros pendientes.`);
+        else if (result.synced > 0 || result.failed > 0) alert(`Sincronizados: ${result.synced} | Pendientes: ${result.pending}`);
+        else alert("No hay registros pendientes por sincronizar.");
       }
-
-      if (!navigator.onLine) {
-        if (!esAutomatico) alert("No hay conexión a internet.");
-        return;
-      }
-
-      setSyncLoading(true);
-
-      try {
-        const result = await window.offlineQueue.syncPendingAnomalias(
-          APP_SCRIPT_URL_ANOMALIAS
-        );
-
-        actualizarBadgePendientes(result.pending);
-
-        if (!esAutomatico) {
-          if (result.synced > 0 && result.failed === 0) {
-            alert(`Se sincronizaron ${result.synced} registros pendientes.`);
-          } else if (result.synced > 0 || result.failed > 0) {
-            alert(`Sincronizados: ${result.synced} | Pendientes: ${result.pending}`);
-          } else {
-            alert("No hay registros pendientes por sincronizar.");
-          }
-        }
-      } catch (error) {
-        console.error("Error sincronizando pendientes:", error);
-        if (!esAutomatico) alert("No se pudo sincronizar en este momento.");
-      } finally {
-        setSyncLoading(false);
-      }
-    },
-    [actualizarBadgePendientes]
-  );
+    } catch (error) {
+      console.error("Error sincronizando pendientes:", error);
+      if (!esAutomatico) alert("No se pudo sincronizar en este momento.");
+    } finally {
+      setSyncLoading(false);
+    }
+  }, [actualizarBadgePendientes]);
 
   useEffect(() => {
     if (!authUser) return;
-
     refrescarPendientesCabecera();
-
-    function handleQueueCount(event) {
-      const detail = event?.detail || {};
-      actualizarBadgePendientes(Number(detail.count || 0));
-    }
-
-    function handleOnline() {
-      sincronizarPendientesDesdeCabecera(true);
-    }
-
+    function handleQueueCount(event) { actualizarBadgePendientes(Number(event?.detail?.count || 0)); }
+    function handleOnline() { sincronizarPendientesDesdeCabecera(true); }
     window.addEventListener("offline-queue-count", handleQueueCount);
     window.addEventListener("online", handleOnline);
-
     return () => {
       window.removeEventListener("offline-queue-count", handleQueueCount);
       window.removeEventListener("online", handleOnline);
     };
-  }, [
-    authUser,
-    refrescarPendientesCabecera,
-    actualizarBadgePendientes,
-    sincronizarPendientesDesdeCabecera,
-  ]);
+  }, [authUser, refrescarPendientesCabecera, actualizarBadgePendientes, sincronizarPendientesDesdeCabecera]);
 
+  // ========================================================
+  // ACCIONES DE USUARIO
+  // ========================================================
   function ejecutarCierreSesion() {
     localStorage.removeItem("authUser");
     sessionStorage.removeItem("authUser");
+    supabase.auth.signOut(); // Cierra sesión oficial en Supabase
     navigate(LOGIN_URL, { replace: true });
   }
 
@@ -365,20 +248,13 @@ export default function MainLayout() {
     setShowPasswordModal(true);
   }
 
+  // NUEVA FUNCIÓN: Usa Supabase Auth en lugar de Apps Script
   async function guardarPassword() {
     const nuevaPass = String(nuevaPassword || "").trim();
 
-    if (!identificadorUsuario) {
+    if (!nuevaPass || nuevaPass.length < 6) { // Supabase pide mín 6 caracteres
       setPasswordAlert({
-        message: "No se encontró identificador del usuario.",
-        type: "alert-danger",
-      });
-      return;
-    }
-
-    if (!nuevaPass || nuevaPass.length < 4) {
-      setPasswordAlert({
-        message: "La contraseña debe tener al menos 4 caracteres.",
+        message: "La contraseña debe tener al menos 6 caracteres.",
         type: "alert-danger",
       });
       return;
@@ -387,43 +263,27 @@ export default function MainLayout() {
     setPasswordLoading(true);
 
     try {
-      const response = await fetch(APP_SCRIPT_URL_PASSWORD, {
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8",
-        },
-        body: JSON.stringify({
-          action: "cambiarPassword",
-          usuario: identificadorUsuario,
-          nuevaPassword: nuevaPass,
-        }),
+      const { error } = await supabase.auth.updateUser({
+        password: nuevaPass
       });
 
-      const data = await response.json();
-      const ok = data.ok === true || data.status === "success";
+      if (error) throw error;
 
-      if (ok) {
-        setPasswordAlert({
-          message: "¡Contraseña actualizada exitosamente!",
-          type: "alert-success",
-        });
+      setPasswordAlert({
+        message: "¡Contraseña actualizada exitosamente!",
+        type: "alert-success",
+      });
 
-        setTimeout(() => {
-          setShowPasswordModal(false);
-          setPasswordLoading(false);
-          setNuevaPassword("");
-        }, 1500);
-      } else {
-        setPasswordAlert({
-          message: data.message || "Error al cambiar la contraseña.",
-          type: "alert-danger",
-        });
+      setTimeout(() => {
+        setShowPasswordModal(false);
         setPasswordLoading(false);
-      }
+        setNuevaPassword("");
+      }, 1500);
+
     } catch (error) {
       console.error("Error al cambiar contraseña:", error);
       setPasswordAlert({
-        message: "Error de conexión con el servidor.",
+        message: error.message || "Error al cambiar la contraseña.",
         type: "alert-danger",
       });
       setPasswordLoading(false);
@@ -439,23 +299,15 @@ export default function MainLayout() {
           <header className="topbar">
             <div className="topbar-left">
               {!isMenuPage && (
-                <button
-                type="button"
-                id="backBtn"
-                className="btn-atras"
-                onClick={() => navigate(-1)}
-                >
-                <FaArrowLeft className="back-icon-svg" />
-                <span className="back-text">Atrás</span>
+                <button type="button" id="backBtn" className="btn-atras" onClick={() => navigate(-1)}>
+                  <FaArrowLeft className="back-icon-svg" />
+                  <span className="back-text">Atrás</span>
                 </button>
-
               )}
-
               <div className="brand-block">
                 <div className="brand-mark">
                   <img src="/img/logo.png" alt="Logo" />
                 </div>
-
                 <div className="brand-text">
                   <h1>{tituloCabecera}</h1>
                   <p>{subtituloCabecera}</p>
@@ -491,80 +343,42 @@ export default function MainLayout() {
                         onLoad={() => setPhotoLoaded(true)}
                         onError={() => {
                             setPhotoLoaded(false);
-                            setPhotoIndex((prev) =>
-                            prev + 1 < fuentesFoto.length ? prev + 1 : prev
-                            );
+                            setPhotoIndex((prev) => prev + 1 < fuentesFoto.length ? prev + 1 : prev);
                         }}
                         />
                     )}
-
                     {(!photoSrc || !photoLoaded) && (
                         <div id="topUserInitials" className="session-avatar-fallback">
                         {inicialesUsuario}
                         </div>
                     )}
                 </div>
-
                 </button>
 
-                <div
-                    className={`user-dropdown-card ${dropdownOpen ? "active" : ""}`}
-                    id="dropdownMenu"
-                    >
+                <div className={`user-dropdown-card ${dropdownOpen ? "active" : ""}`} id="dropdownMenu">
                     <div className="user-dropdown-info">
                         <span className="user-dropdown-name">{nombreUsuario}</span>
                         <span className="user-dropdown-role">{cargoUsuario}</span>
                     </div>
-
                     <div className="user-dropdown-divider"></div>
-
-                    <button
-                        type="button"
-                        id="btnCambiarCuenta"
-                        className="user-dropdown-item"
-                        onClick={ejecutarCierreSesion}
-                    >
+                    <button type="button" className="user-dropdown-item" onClick={ejecutarCierreSesion}>
                         <FaExchangeAlt className="user-dropdown-icon" />
                         <span>Cambiar Cuenta</span>
                     </button>
-
-                    <button
-                        type="button"
-                        id="btnAbrirModalPassword"
-                        className="user-dropdown-item"
-                        onClick={abrirModalPassword}
-                    >
+                    <button type="button" className="user-dropdown-item" onClick={abrirModalPassword}>
                         <FaKey className="user-dropdown-icon" />
                         <span>Cambiar Contraseña</span>
                     </button>
-
-                    <button
-                        type="button"
-                        id="logoutBtnDropdown"
-                        className="user-dropdown-item user-dropdown-danger"
-                        onClick={() => {
-                        setDropdownOpen(false);
-                        setShowLogoutModal(true);
-                        }}
-                    >
+                    <button type="button" className="user-dropdown-item user-dropdown-danger" onClick={() => { setDropdownOpen(false); setShowLogoutModal(true); }}>
                         <FaSignOutAlt className="user-dropdown-icon" />
                         <span>Cerrar sesión</span>
                     </button>
                     </div>
-
               </div>
 
-                <button
-                type="button"
-                id="logoutBtnDesktop"
-                className="logout-btn-desktop header-logout-button"
-                onClick={() => setShowLogoutModal(true)}
-                >
+                <button type="button" id="logoutBtnDesktop" className="logout-btn-desktop header-logout-button" onClick={() => setShowLogoutModal(true)}>
                 Cerrar sesión
                 </button>
-
-
-
             </div>
           </header>
 
@@ -575,37 +389,22 @@ export default function MainLayout() {
                 <span>PE / 3M</span>
               </Link>
             </div>
-
             <div className="sub-right">
               <button
                 type="button"
-                id="btnSyncPendientes"
-                className={`btn-sync-pendientes ${
-                  pendingCount > 0 ? "has-pending" : ""
-                } ${syncLoading ? "is-loading" : ""}`}
+                className={`btn-sync-pendientes ${pendingCount > 0 ? "has-pending" : ""} ${syncLoading ? "is-loading" : ""}`}
                 title="Sincronizar registros pendientes"
                 disabled={syncLoading}
                 onClick={() => sincronizarPendientesDesdeCabecera(false)}
               >
                 <FaSyncAlt className="layout-icon" />
                 <span className="btn-sync-text">Sincronizar</span>
-                <span
-                  id="pendingSyncBadge"
-                  className={`sync-badge ${
-                    pendingCount <= 0 ? "is-hidden" : ""
-                  }`}
-                >
+                <span className={`sync-badge ${pendingCount <= 0 ? "is-hidden" : ""}`}>
                   {pendingCount}
                 </span>
               </button>
-
               {puedeAdministrar && (
-                <button
-                  type="button"
-                  id="btnAdministrarGlobal"
-                  className="btn-administrar"
-                  onClick={() => navigate(ADMIN_URL)}
-                >
+                <button type="button" className="btn-administrar" onClick={() => navigate(ADMIN_URL)}>
                   <FaCog className="layout-icon" />
                   <span>Administrar</span>
                 </button>
@@ -620,60 +419,26 @@ export default function MainLayout() {
       </main>
 
       {showLogoutModal && (
-        <>
-            <div className="custom-modal-overlay">
+        <div className="custom-modal-overlay">
             <div className="custom-logout-modal">
                 <div className="custom-modal-header custom-modal-danger">
-                <h5>
-                    <FaSignOutAlt />
-                    Cerrar Sesión
-                </h5>
-
-                <button
-                    type="button"
-                    className="custom-modal-close"
-                    onClick={() => setShowLogoutModal(false)}
-                    aria-label="Cerrar"
-                >
-                    ×
-                </button>
+                <h5><FaSignOutAlt /> Cerrar Sesión</h5>
+                <button type="button" className="custom-modal-close" onClick={() => setShowLogoutModal(false)}>×</button>
                 </div>
-
                 <div className="custom-modal-body">
                 ¿Estás seguro que deseas cerrar tu sesión?
                 </div>
-
                 <div className="custom-modal-footer">
-                <button
-                    type="button"
-                    className="custom-btn custom-btn-cancel"
-                    onClick={() => setShowLogoutModal(false)}
-                >
-                    Cancelar
-                </button>
-
-                <button
-                    type="button"
-                    className="custom-btn custom-btn-danger"
-                    onClick={ejecutarCierreSesion}
-                >
-                    Sí, salir
-                </button>
+                <button type="button" className="custom-btn custom-btn-cancel" onClick={() => setShowLogoutModal(false)}>Cancelar</button>
+                <button type="button" className="custom-btn custom-btn-danger" onClick={ejecutarCierreSesion}>Sí, salir</button>
                 </div>
             </div>
-            </div>
-        </>
+        </div>
         )}
-
 
       {showPasswordModal && (
         <>
-          <div
-            className="modal fade show d-block cabecera-modal"
-            tabIndex="-1"
-            role="dialog"
-            aria-modal="true"
-          >
+          <div className="modal fade show d-block cabecera-modal" tabIndex="-1">
             <div className="modal-dialog modal-dialog-centered">
               <div className="modal-content border-0 shadow">
                 <div className="modal-header bg-primary text-white border-0">
@@ -681,44 +446,20 @@ export default function MainLayout() {
                     <FaKey className="modal-title-icon" />
                     Cambiar Contraseña
                   </h5>
-
-                  <button
-                    type="button"
-                    className="btn-close btn-close-white"
-                    aria-label="Cerrar"
-                    onClick={() => setShowPasswordModal(false)}
-                  ></button>
+                  <button type="button" className="btn-close btn-close-white" onClick={() => setShowPasswordModal(false)}></button>
                 </div>
-
                 <div className="modal-body py-4">
                   {passwordAlert && (
-                    <div
-                      className={`alert ${passwordAlert.type} text-center fw-bold`}
-                      role="alert"
-                    >
+                    <div className={`alert ${passwordAlert.type} text-center fw-bold`}>
                       {passwordAlert.message}
                     </div>
                   )}
-
-                  <form
-                    id="formPassword"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      guardarPassword();
-                    }}
-                  >
+                  <form onSubmit={(e) => { e.preventDefault(); guardarPassword(); }}>
                     <div className="mb-3">
-                      <label
-                        htmlFor="nuevaPassword"
-                        className="form-label fw-bold"
-                      >
-                        Ingrese nueva contraseña
-                      </label>
-
+                      <label className="form-label fw-bold">Ingrese nueva contraseña (Mín. 6)</label>
                       <input
                         type="password"
                         className="form-control text-center"
-                        id="nuevaPassword"
                         placeholder="••••••••"
                         required
                         value={nuevaPassword}
@@ -727,30 +468,15 @@ export default function MainLayout() {
                     </div>
                   </form>
                 </div>
-
                 <div className="modal-footer border-0 justify-content-center bg-light">
-                  <button
-                    type="button"
-                    className="btn btn-secondary px-4 fw-bold"
-                    onClick={() => setShowPasswordModal(false)}
-                  >
-                    Cancelar
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-primary px-4 fw-bold"
-                    id="btnGuardarPassword"
-                    disabled={passwordLoading}
-                    onClick={guardarPassword}
-                  >
+                  <button type="button" className="btn btn-secondary px-4 fw-bold" onClick={() => setShowPasswordModal(false)}>Cancelar</button>
+                  <button type="button" className="btn btn-primary px-4 fw-bold" disabled={passwordLoading} onClick={guardarPassword}>
                     {passwordLoading ? "Actualizando..." : "Actualizar"}
                   </button>
                 </div>
               </div>
             </div>
           </div>
-
           <div className="modal-backdrop fade show cabecera-modal-backdrop"></div>
         </>
       )}

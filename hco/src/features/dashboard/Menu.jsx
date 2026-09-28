@@ -81,13 +81,13 @@ function getRoleLabel(role) {
 function toTitleCase(value) {
   return String(value || "")
     .toLowerCase()
-    .replace(/\b([a-záéíóúñ])/g, (m) => m.toUpperCase());
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function capitalizeWords(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/\b([a-záéíóúñ])/g, (m) => m.toUpperCase());
+  return toTitleCase(value);
 }
 
 function getTimeTheme(date) {
@@ -247,7 +247,7 @@ export default function Menu() {
       items: [
         {
           title: "Tarjetas de Anomalía",
-          description: "Crear y dar seguimiento a hallazgos o incidencias.",
+          description: "Crear y dar seguimiento a incidencias.",
           Icon: FaExclamationTriangle,
           accent: "accent-blue",
           buttonText: "Ingresar",
@@ -344,7 +344,7 @@ export default function Menu() {
     },
     {
       key: "inventario",
-      label: "Logistics Support Inventario",
+      label: "Logistics Support - Inventario",
       shortLabel: "LSI",
       items: [
         {

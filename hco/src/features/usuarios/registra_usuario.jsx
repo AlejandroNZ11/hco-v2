@@ -22,8 +22,41 @@ const UBIGEO = {
   }
 };
 
+// ==========================================
+// NUEVAS FUNCIONES DE FORMATO Y CONVERSIÓN
+// ==========================================
+const formatearNombre = (text) => {
+  if (!text) return "";
+  return text.toLowerCase().split(',').map(parte => 
+    parte.trim().split(/\s+/).map(palabra => 
+      palabra.charAt(0).toUpperCase() + palabra.slice(1)
+    ).join(" ")
+  ).join(", ");
+};
 
-const normalize = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+// --- NUEVO SISTEMA DE FOTOS PARA GOOGLE DRIVE ---
+const extraerIdDrive = (url) => {
+  if (!url) return null;
+  const match =
+    url.match(/\/file\/d\/([^/]+)/) ||
+    url.match(/[?&]id=([^&]+)/) ||
+    url.match(/thumbnail\?id=([^&]+)/);
+  return match ? match[1] : null;
+};
+
+const convertirDriveUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("data:image/")) return url;
+  const driveId = extraerIdDrive(url);
+
+  if (driveId) {
+    return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
+  }
+  return url;
+};
+
+
+// ==========================================
 
 export default function RegistrarUsuario() {
   const navigate = useNavigate();
@@ -34,8 +67,7 @@ export default function RegistrarUsuario() {
   const [loadingText, setLoadingText] = useState("Cargando datos...");
   const [message, setMessage] = useState({ text: '', type: '' });
   const [formErrors, setFormErrors] = useState([]);
-
-  // Listas dinámicas para los selects
+  const normalize = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   const [listaAreas, setListaAreas] = useState([]);
   const [listaCargos, setListaCargos] = useState([]);
   const [listaJefes, setListaJefes] = useState([]);
@@ -45,20 +77,18 @@ export default function RegistrarUsuario() {
   const ROLES = ["USUARIO", "SUPERVISOR", "ADMIN", "SUPERADMIN"];
   const RUTAS = ["RUTA 1", "RUTA 2", "RUTA 3", "RUTA 4", "RUTA 5", "RUTA 6"];
 
-  // Estado del formulario
   const [formData, setFormData] = useState({
     id: "", estado: "Activo", dni: "", nombre: "", sexo: "", tipo: "", cargo: "",
     area: "", jefeDirecto: "", rol: "", usuario: "", clave: "", fechaNacimiento: "", edad: "",
     hijos: "", celular: "", departamento: "", provincia: "", distrito: "", direccion: "",
     urlCasa: "", coordenadas: "", grupoSanguineo: "", contactoEmergencia: "", 
-    correo: "", correoCeva: "", correo3m: "", codMainchart: "", // <-- CAMPOS AGREGADOS
+    correo: "", correoCeva: "", correo3m: "", codMainchart: "", 
     fechaIngreso: "", rutaMovilidad: "", fechaSalida: "", permanencia: "", motivoSalida: "", foto: ""
   });
 
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoDataUrl, setPhotoDataUrl] = useState("");
 
-  // ================= INICIALIZACIÓN Y CARGA DE DATOS =================
   useEffect(() => {
     cargarCatalogosSupabase();
     if (editingId) {
@@ -70,30 +100,20 @@ export default function RegistrarUsuario() {
 
   const cargarCatalogosSupabase = async () => {
     try {
-      // 1. Cargar Áreas (Traemos id y nombre)
       const { data: areasData } = await supabase.from('areas').select('id, nombre').order('nombre');
       if (areasData) setListaAreas(areasData);
 
-      // 2. Cargar Cargos
       const { data: cargosData } = await supabase.from('cargos').select('id, nombre').order('nombre');
       if (cargosData) setListaCargos(cargosData);
 
-      // 3. Cargar Jefes Directos (Traemos id y nombre)
-      const { data: jefesData } = await supabase
-        .from('empleados')
-        .select('id, nombre')
-        .ilike('tipo', 'white')
-        .order('nombre');
+      const { data: jefesData } = await supabase.from('empleados').select('id, nombre').ilike('tipo', 'white').order('nombre');
       if (jefesData) setListaJefes(jefesData);
-
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
     }
   };
 
-
   const generarSiguienteId = async () => {
-    // Al ser UUIDs, simplemente mostramos un texto hasta que se guarde
     setFormData(prev => ({ ...prev, id: "Auto-generado al guardar" }));
   };
 
@@ -101,18 +121,10 @@ export default function RegistrarUsuario() {
     setLoading(true);
     setLoadingText("Cargando usuario...");
     try {
-      const { data, error } = await supabase
-        .from('empleados')
-        .select('*')
-        .eq('id', id)
-        .single();
-
+      const { data, error } = await supabase.from('empleados').select('*').eq('id', id).single();
       if (error) throw error;
 
       if (data) {
-        // ==========================================
-        // CÁLCULO INMEDIATO USANDO fch_nacimiento y fch_salida
-        // ==========================================
         let edadCalculada = "";
         if (data.fch_nacimiento) {
           const nacimiento = new Date(data.fch_nacimiento + "T00:00:00");
@@ -146,12 +158,9 @@ export default function RegistrarUsuario() {
           rol: data.rol || "",
           usuario: data.usuario || "",
           clave: data.clave || "", 
-          
-          // --- AQUÍ ESTÁ LA CORRECCIÓN: fch_nacimiento y fch_salida ---
           fechaNacimiento: data.fch_nacimiento || "", 
           fechaSalida: data.fch_salida || "",
           fechaIngreso: data.fecha_ingreso || "",
-
           hijos: data.hijos !== null && data.hijos !== undefined ? data.hijos : "", 
           celular: data.celular || "",
           departamento: data.departamento || "",
@@ -169,13 +178,12 @@ export default function RegistrarUsuario() {
           rutaMovilidad: data.ruta_movilidad || "",
           motivoSalida: data.motivo_salida || "",
           foto: data.foto_url || "",
-          
           edad: edadCalculada, 
           permanencia: permanenciaCalculada
         });
 
         if (data.foto_url) {
-          setPhotoPreview(data.foto_url);
+          setPhotoPreview(convertirDriveUrl(data.foto_url)); // Convierte si es de Drive
         }
       }
     } catch (err) {
@@ -186,9 +194,6 @@ export default function RegistrarUsuario() {
     }
   };
 
-
-
-  // ================= CÁLCULOS Y EFECTOS =================
   useEffect(() => {
     if (!editingId || !formData.usuario) {
       const generatedUser = generarUsuarioDesdeNombre(formData.nombre);
@@ -222,45 +227,62 @@ export default function RegistrarUsuario() {
     }
   }, [formData.fechaIngreso, formData.fechaSalida]);
 
-    const generarUsuarioDesdeNombre = (nombreCompleto) => {
-        const text = String(nombreCompleto || "").trim();
-        if (!text) return "";
-        const parts = text.split(",");
-        let apellidos = [], nombres = [];
-        if (parts.length >= 2) {
-        apellidos = parts[0].trim().split(/\s+/).filter(Boolean);
-        nombres = parts.slice(1).join(" ").trim().split(/\s+/).filter(Boolean);
-        } else {
-        const tokens = text.split(/\s+/).filter(Boolean);
-        apellidos = tokens.slice(0, 2);
-        nombres = tokens.slice(2);
-        }
-        const primerNombre = nombres[0] || "";
-        const primerApellido = apellidos[0] || "";
-        const segundoApellido = apellidos[1] || "";
-        
-        // Generamos la base limpia (sin tildes, sin eñes, todo minúscula)
-        const base = normalize(primerNombre.substring(0, 1) + primerApellido + segundoApellido.substring(0, 1)).replace(/[^a-z0-9]/g, "");
-        
-        // Retornamos directamente con el dominio hco.com
-        return `${base}@hco.com`.toLowerCase();
-    };
+  const generarUsuarioDesdeNombre = (nombreCompleto) => {
+    const text = String(nombreCompleto || "").trim();
+    if (!text) return "";
+    const parts = text.split(",");
+    let apellidos = [], nombres = [];
+    if (parts.length >= 2) {
+      apellidos = parts[0].trim().split(/\s+/).filter(Boolean);
+      nombres = parts.slice(1).join(" ").trim().split(/\s+/).filter(Boolean);
+    } else {
+      const tokens = text.split(/\s+/).filter(Boolean);
+      apellidos = tokens.slice(0, 2);
+      nombres = tokens.slice(2);
+    }
+    const primerNombre = nombres[0] || "";
+    const primerApellido = apellidos[0] || "";
+    const segundoApellido = apellidos[1] || "";
+    
+    const base = normalize(primerNombre.substring(0, 1) + primerApellido + segundoApellido.substring(0, 1)).replace(/[^a-z0-9]/g, "");
+    return `${base}@hco.com`.toLowerCase();
+  };
 
-
-  // ================= MANEJADORES DE EVENTOS =================
   const handleChange = (e) => {
     const { id, value } = e.target;
+
     setFormData(prev => {
       const next = { ...prev, [id]: value };
-      if (id === 'departamento') { next.provincia = ""; next.distrito = ""; }
-      if (id === 'provincia') { next.distrito = ""; }
+
+      if (id === 'departamento') {
+        next.provincia = "";
+        next.distrito = "";
+      }
+
+      if (id === 'provincia') {
+        next.distrito = "";
+      }
+
       return next;
     });
 
-    // Limpia el borde rojo del campo tan pronto como el usuario interactúe con él
+    if (id === "foto") {
+      setPhotoDataUrl("");
+      setPhotoPreview(convertirDriveUrl(value));
+    }
+
     if (formErrors.includes(id)) {
       setFormErrors(prev => prev.filter(field => field !== id));
     }
+  };
+
+
+  // NUEVA FUNCIÓN: Se activa cuando dejas de escribir en el Nombre
+  const handleNombreBlur = () => {
+    setFormData(prev => ({
+      ...prev,
+      nombre: formatearNombre(prev.nombre)
+    }));
   };
 
   const handlePhotoSelected = async (e) => {
@@ -270,6 +292,8 @@ export default function RegistrarUsuario() {
       const dataUrl = await compressImage(file, 900, 0.72);
       setPhotoDataUrl(dataUrl);
       setPhotoPreview(dataUrl);
+      // Limpiamos el campo URL si subió archivo
+      setFormData(prev => ({ ...prev, foto: "" }));
     } catch (error) {
       setMessage({ text: "No se pudo procesar la foto.", type: "error" });
     }
@@ -279,6 +303,7 @@ export default function RegistrarUsuario() {
   const clearPhoto = () => {
     setPhotoDataUrl("");
     setPhotoPreview("");
+    setFormData(prev => ({ ...prev, foto: "" }));
   };
 
   const compressImage = (file, maxWidth, quality) => {
@@ -340,6 +365,34 @@ export default function RegistrarUsuario() {
     setLoadingText("Guardando usuario...");
 
     try {
+      // ==========================================
+      // VALIDACIONES EN BASE DE DATOS (DNI Y USUARIO)
+      // ==========================================
+      let queryDni = supabase.from('empleados').select('id').eq('dni', formData.dni.trim());
+      if (editingId) queryDni = queryDni.neq('id', editingId);
+      const { data: dniExist } = await queryDni;
+      
+      if (dniExist && dniExist.length > 0) {
+        setFormErrors(prev => [...prev, 'dni']);
+        setMessage({ text: '⚠️ ERROR: El DNI ingresado ya existe en la base de datos.', type: 'error' });
+        setLoading(false);
+        return;
+      }
+
+      let queryUser = supabase.from('empleados').select('id').eq('usuario', formData.usuario.trim());
+      if (editingId) queryUser = queryUser.neq('id', editingId);
+      const { data: userExist } = await queryUser;
+
+      if (userExist && userExist.length > 0) {
+        setFormErrors(prev => [...prev, 'nombre']);
+        setMessage({ text: `⚠️ ERROR: El Usuario / Email (${formData.usuario}) ya está ocupado. Modifique el nombre para generar uno distinto.`, type: 'error' });
+        setLoading(false);
+        return;
+      }
+
+      // ==========================================
+      // GUARDADO DE USUARIO
+      // ==========================================
       let finalUserId = editingId;
 
       if (!editingId) {
@@ -362,25 +415,19 @@ export default function RegistrarUsuario() {
         nombre: formData.nombre.trim(),
         sexo: formData.sexo,
         tipo: formData.tipo,
-        
         cargo_id: formData.cargo ? parseInt(formData.cargo) : null,
         area_id: formData.area ? parseInt(formData.area) : null,
         jefe_directo_id: formData.jefeDirecto || null, 
         rol: formData.rol,
         usuario: formData.usuario.trim(),
-        
-        // --- AQUÍ ESTÁ LA CORRECCIÓN: fch_nacimiento y fch_salida ---
         fch_nacimiento: formData.fechaNacimiento || null,
         fch_salida: formData.fechaSalida || null,
         fecha_ingreso: formData.fechaIngreso || null,
-        
         correo_personal: formData.correo.trim(),
         correo_ceva: formData.correoCeva.trim(),
         correo_3m: formData.correo3m.trim(),
         cod_mainchart: formData.codMainchart.trim(),        
-        
         hijos: formData.hijos !== "" ? parseInt(formData.hijos) : 0, 
-        
         celular: formData.celular.trim(),
         departamento: formData.departamento,
         provincia: formData.provincia,
@@ -397,7 +444,8 @@ export default function RegistrarUsuario() {
       if (photoDataUrl) {
         recordData.foto_url = photoDataUrl;
       } else if (formData.foto) {
-        recordData.foto_url = formData.foto;
+        // Guardamos la URL de Google Drive ya convertida para que no de problemas después
+        recordData.foto_url = convertirDriveUrl(formData.foto);
       }
 
       let errorInsertUpdate;
@@ -422,22 +470,18 @@ export default function RegistrarUsuario() {
     }
   };
 
-
-
   const departamentos = Object.keys(UBIGEO).sort();
   const provincias = formData.departamento ? Object.keys(UBIGEO[formData.departamento] || {}).sort() : [];
   const distritos = formData.departamento && formData.provincia ? (UBIGEO[formData.departamento][formData.provincia] || []) : [];
 
   return (
     <div className="registro-page" style={{ position: 'relative' }}>
-      
       {loading && <Loading />}
 
       <section className="page-hero">
         <span className="page-chip">Administración</span>
         <h1>{editingId ? "Editar usuario" : "Nuevo usuario"}</h1>
         <p>Complete los datos principales del usuario. Los campos obligatorios están marcados como * OBLIGATORIO.</p>
-
       </section>
 
       <section className="card">
@@ -451,10 +495,8 @@ export default function RegistrarUsuario() {
         </div>
 
         <form className="usuario-form" onSubmit={handleSubmit} noValidate>
-          
           <div className="section-title">Datos principales</div>
 
-                   {/* FILA 1 */}
           <div className="form-grid cols-4">
             <div className="field field-auto">
               <label>ID <span className="field-badge auto">AUTO</span></label>
@@ -474,15 +516,23 @@ export default function RegistrarUsuario() {
                 <option value="">Seleccione área</option>
                 {listaAreas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
             </select>
-
             </div>
           </div>
 
-          {/* FILA 2 */}
           <div className="form-grid cols-4">
             <div className="field field-manual">
               <label>Nombre <span className="field-badge manual">* OBLIGATORIO</span></label>
-              <input type="text" id="nombre" className={formErrors.includes('nombre') ? 'input-error' : ''} placeholder="Apellidos, Nombres" value={formData.nombre} onChange={handleChange} required />
+              {/* OJO: Agregué el onBlur para que al soltar el campo, se arreglen las mayúsculas */}
+              <input 
+                type="text" 
+                id="nombre" 
+                className={formErrors.includes('nombre') ? 'input-error' : ''} 
+                placeholder="Apellido Apellido, Nombre Nombre" 
+                value={formData.nombre} 
+                onChange={handleChange} 
+                onBlur={handleNombreBlur} 
+                required 
+              />
             </div>
             <div className="field field-manual">
               <label>Sexo <span className="field-badge manual">* OBLIGATORIO</span></label>
@@ -507,7 +557,6 @@ export default function RegistrarUsuario() {
             </div>
           </div>
 
-          {/* FILA 3 */}
           <div className="form-grid cols-4">
             <div className="field field-manual">
               <label>Jefe directo <span className="field-badge manual">* OBLIGATORIO</span></label>
@@ -525,7 +574,7 @@ export default function RegistrarUsuario() {
             </div>
             <div className="field field-auto">
               <label>Usuario / Email login <span className="field-badge auto">AUTO</span></label>
-              <input type="text" id="usuario" value={formData.usuario} readOnly />
+              <input type="text" id="usuario" className={formErrors.includes('nombre') ? 'input-error' : ''} value={formData.usuario} readOnly />
             </div>
             <div className="field field-auto">
               <label>Clave <span className="field-badge auto">AUTO</span></label>
@@ -533,23 +582,18 @@ export default function RegistrarUsuario() {
             </div>
           </div>
 
-          {/* TÍTULOS SUPERIORES */}
           <div className="dual-titles">
             <div className="section-title">FOTO</div>
             <div className="section-title">CORREOS</div>
           </div>
           
           <div className="split-layout">
-            
-            {/* MITAD IZQUIERDA: FOTO */}
             <div className="split-panel">
               <div className="photo-content-split">
-                
-                {/* Inputs de foto apilados */}
                 <div className="photo-inputs-split">
                   <div className="field">
-                    <label>URL de la foto</label>
-                    <input type="url" id="foto" placeholder="Ej: https://..." value={formData.foto} onChange={handleChange} />
+                    <label>URL de la foto (Drive o Web)</label>
+                    <input type="url" id="foto" placeholder="Pegar enlace aquí" value={formData.foto} onChange={handleChange} />
                   </div>
                   <div className="field">
                     <label>O Cargar foto</label>
@@ -563,24 +607,35 @@ export default function RegistrarUsuario() {
                   </div>
                 </div>
 
-                {/* Miniatura cuadrada a la derecha */}
                 <div className="photo-preview-split">
                   {photoPreview ? (
                     <div className="preview-card-split">
-                      <img src={photoPreview} alt="Vista previa" />
+                      <img 
+                        src={photoPreview} 
+                        alt="Vista previa" 
+                        onError={(e) => {
+                          // Si el formato principal es bloqueado por el navegador, usamos el visor de respaldo
+                          if (!e.target.dataset.retried) {
+                            e.target.dataset.retried = "true";
+                            const driveId = extraerIdDrive(formData.foto);
+                            if (driveId) {
+                              e.target.src = `https://docs.google.com/thumbnail?id=${driveId}&sz=w800`;
+                            }
+                          }
+                        }}
+                      />
                       <button type="button" onClick={clearPhoto} className="btn-quitar-foto-force">
                         Quitar
                       </button>
                     </div>
+
                   ) : (
                     <div className="placeholder-split">Sin foto</div>
                   )}
                 </div>
-
               </div>
             </div>
 
-            {/* MITAD DERECHA: CORREOS Y CODIGO */}
             <div className="split-panel">
               <div className="form-grid cols-2">
                 <div className="field">
@@ -601,9 +656,7 @@ export default function RegistrarUsuario() {
                 </div>
               </div>
             </div>
-
           </div>
-
 
           <div className="section-title">Datos personales</div> 
           <div className="form-grid cols-4">
@@ -658,7 +711,6 @@ export default function RegistrarUsuario() {
           <div className="form-grid cols-3">
             <div className="field field-manual"><label>Grupo sanguíneo</label><input type="text" id="grupoSanguineo" value={formData.grupoSanguineo} onChange={handleChange} /></div>
             <div className="field field-manual"><label>Contacto emergencia</label><input type="tel" id="contactoEmergencia" value={formData.contactoEmergencia} onChange={handleChange} /></div>
-            
           </div>
 
           <div className="section-title">Datos laborales</div>

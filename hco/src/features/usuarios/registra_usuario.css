@@ -433,6 +433,30 @@
 @media (max-width: 768px) {
   .cols-4, .cols-2 { grid-template-columns: 1fr; }
   .form-legend { float: none; margin-bottom: 16px; }
-  .submit-row { flex-direction: column-reverse; }
-  .submit-row button { width: 100%; }
+  
+  /* --- FORZADO ABSOLUTO DE LOS BOTONES GUARDAR/VOLVER EN MÓVIL --- */
+  .submit-row { 
+    display: flex !important;
+    flex-direction: column !important; /* Guardar arriba, Volver abajo */
+    gap: 16px !important;
+    padding-top: 24px !important;
+    margin-top: 24px !important;
+    border-top: 1px solid var(--line) !important;
+  }
+  
+  /* Forzamos el grosor y tamaño interno sin importar clases externas */
+  .submit-row button.primary-btn,
+  .submit-row button.secondary-btn { 
+    width: 100% !important; 
+    height: auto !important; /* Quitamos altura fija para usar padding */
+    min-height: 52px !important; /* Mínimo 52px de grosor */
+    padding: 16px 20px !important; /* Relleno gordo para que no se aplaste */
+    margin: 0 !important;
+    font-size: 16px !important; /* Letra un poco más grande */
+    line-height: 1 !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
 }

@@ -1,31 +1,29 @@
 // src/features/usuarios/tracking_usuarios.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient'; // Asegúrate que esta ruta es correcta
+import { supabase } from '../../supabaseClient';
 import Loading from "../../layouts/Loading";
-
 import './tracking_usuarios.css';
+import * as XLSX from "xlsx-js-style";
 
-// Constantes globales de tu sistema original
 const TIPOS_USUARIO = ["White", "Blue"];
 
-
-// Funciones utilitarias
-const normalize = (text) => 
-  String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+const normalize = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 
 export default function TrackingUsuarios() {
   const navigate = useNavigate();
-  
-  // Estados de la tabla
+
   const [allItems, setAllItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState({ text: '', type: '' }); // type: 'error' | 'success'
+  const [message, setMessage] = useState({ text: '', type: '' });
   const [listaAreas, setListaAreas] = useState([]);
-  
 
-  // Estados de los filtros
   const [filters, setFilters] = useState({
     search: '',
     estado: '',
@@ -33,17 +31,25 @@ export default function TrackingUsuarios() {
     area: ''
   });
 
-  // Cargar usuarios al iniciar
   useEffect(() => {
     loadUsuarios();
   }, []);
 
-  // Efecto para aplicar filtros cada vez que el usuario escribe o cambia un select
   useEffect(() => {
     applyFilters();
   }, [filters, allItems]);
 
-  
+  useEffect(() => {
+    if (!message.text) return;
+
+    const timer = setTimeout(() => {
+      setMessage({ text: '', type: '' });
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [message]);
+
+
   const loadUsuarios = async () => {
     setLoading(true);
     setMessage({ text: '', type: '' });
@@ -55,13 +61,12 @@ export default function TrackingUsuarios() {
           *,
           cargo:cargos(nombre),
           area:areas(nombre),
-          jefe:jefe_directo_id(nombre) 
+          jefe:jefe_directo_id(nombre)
         `)
         .order('nombre', { ascending: true });
 
       if (error) throw error;
 
-      // Aplanamos la información para la tabla y el buscador
       const usuariosFormateados = data?.map(emp => ({
         ...emp,
         cargo: emp.cargo ? emp.cargo.nombre : '-',
@@ -78,15 +83,12 @@ export default function TrackingUsuarios() {
     }
   };
 
-
-
   useEffect(() => {
     const cargarAreasDB = async () => {
-      // Reemplaza 'areas' por el nombre exacto de tu tabla y 'nombre' por la columna
       const { data, error } = await supabase
         .from('areas')
         .select('nombre')
-        .order('nombre', { ascending: true }); // Los ordena de la A a la Z
+        .order('nombre', { ascending: true });
 
       if (data) {
         setListaAreas(data);
@@ -98,7 +100,6 @@ export default function TrackingUsuarios() {
     cargarAreasDB();
   }, []);
 
-
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({ ...prev, [name]: value }));
@@ -106,27 +107,31 @@ export default function TrackingUsuarios() {
 
   const applyFilters = () => {
     const { search, estado, tipo, area } = filters;
+
     const searchNorm = normalize(search);
     const estadoNorm = normalize(estado);
     const tipoNorm = normalize(tipo);
     const areaNorm = normalize(area);
 
     const filtered = allItems.filter(item => {
-      // 1. Filtros exactos (Selects)
       if (estadoNorm && normalize(item.estado) !== estadoNorm) return false;
       if (tipoNorm && normalize(item.tipo) !== tipoNorm) return false;
       if (areaNorm && normalize(item.area) !== areaNorm) return false;
 
-      // 2. Filtro de búsqueda de texto (Input)
       if (searchNorm) {
-        // Concatenamos todos los campos clave en un solo texto para buscar rápido
         const blob = normalize([
-          item.dni, item.cod_mainchart, item.usuario, item.nombre, 
-          item.cargo, item.area, item.jefe_directo
+          item.dni,
+          item.cod_mainchart,
+          item.usuario,
+          item.nombre,
+          item.cargo,
+          item.area,
+          item.jefe_directo
         ].join(" "));
-        
+
         if (!blob.includes(searchNorm)) return false;
       }
+
       return true;
     });
 
@@ -145,8 +150,9 @@ export default function TrackingUsuarios() {
   const cambiarEstado = async (item) => {
     const nuevoEstado = (item.estado || "").toLowerCase() === "activo" ? "Inactivo" : "Activo";
     const ok = window.confirm(`¿Desea cambiar el estado de ${item.nombre} a ${nuevoEstado}?`);
-    
+
     if (!ok) return;
+
     setLoading(true);
 
     try {
@@ -158,8 +164,7 @@ export default function TrackingUsuarios() {
       if (error) throw error;
 
       setMessage({ text: 'Estado actualizado correctamente.', type: 'success' });
-      // Recargamos la lista para ver el cambio
-      await loadUsuarios(); 
+      await loadUsuarios();
     } catch (error) {
       console.error(error);
       setMessage({ text: 'No se pudo actualizar el estado.', type: 'error' });
@@ -168,13 +173,125 @@ export default function TrackingUsuarios() {
   };
 
   const handleNuevoUsuario = () => {
-    navigate('/usuarios/registra_usuario'); // <--- Actualizado aquí
+    navigate('/usuarios/registra_usuario');
   };
 
   const handleEditarUsuario = (id) => {
-    navigate(`/usuarios/registra_usuario?id=${id}`); // <--- Actualizado aquí
+    navigate(`/usuarios/registra_usuario?id=${id}`);
   };
 
+  const obtenerFechaArchivo = () => {
+    const hoy = new Date();
+    const dia = String(hoy.getDate()).padStart(2, "0");
+    const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+    const anio = hoy.getFullYear();
+
+    return `${dia}-${mes}-${anio}`;
+  };
+
+  const exportarExcelUsuarios = () => {
+    try {
+      if (!filteredItems || filteredItems.length === 0) {
+        setMessage({
+          text: "No hay usuarios para exportar.",
+          type: "error"
+        });
+        return;
+      }
+
+      setLoading(true);
+
+      const rows = filteredItems.map((item, index) => ({
+        "N°": index + 1,
+        "estado": item.estado || "",
+        "dni": item.dni || "",
+        "cod_mainchart": item.cod_mainchart || "",
+        "nombre": item.nombre || "",
+        "sexo": item.sexo || "",
+        "tipo": item.tipo || "",
+        "cargo": item.cargo || "",
+        "area": item.area || "",
+        "jefe_directo": item.jefe_directo || "",
+        "correo_ceva": item.correo_ceva || "",
+        "correo_3m": item.correo_3m || "",
+        "usuario": item.usuario || "",
+        "rubrica": item.rubrica || ""
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+
+      worksheet["!cols"] = [
+        { wch: 6 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 35 },
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 28 },
+        { wch: 28 },
+        { wch: 35 },
+        { wch: 30 },
+        { wch: 30 },
+        { wch: 30 },
+        { wch: 25 }
+      ];
+
+      const headerStyle = {
+        fill: {
+          patternType: "solid",
+          fgColor: { rgb: "002060" }
+        },
+        font: {
+          color: { rgb: "FFFFFF" },
+          bold: true
+        },
+        alignment: {
+          horizontal: "center",
+          vertical: "center"
+        }
+      };
+
+      const range = XLSX.utils.decode_range(worksheet["!ref"]);
+
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+
+        if (worksheet[cellAddress]) {
+          worksheet[cellAddress].s = headerStyle;
+        }
+      }
+
+      worksheet["!rows"] = [
+        { hpt: 22 }
+      ];
+
+      worksheet["!autofilter"] = {
+        ref: worksheet["!ref"]
+      };
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Usuarios");
+
+      const nombreArchivo = `usuarios ${obtenerFechaArchivo()}.xlsx`;
+
+      XLSX.writeFile(workbook, nombreArchivo);
+
+      setMessage({
+        text: "Excel exportado correctamente.",
+        type: "success"
+      });
+
+    } catch (error) {
+      console.error("Error exportando Excel:", error);
+      setMessage({
+        text: "No se pudo exportar el Excel.",
+        type: "error"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="registro-page">
@@ -184,65 +301,72 @@ export default function TrackingUsuarios() {
         <p>Consulte, filtre, edite, active o inactive usuarios registrados en la planilla operativa.</p>
       </section>
 
-        <section className="card">
-        {/* NUEVO TOOLBAR ORDENADO */}
+      <section className="card">
         <div className="toolbar">
           <div className="toolbar-info">
             <h2>Usuarios</h2>
             <p>{filteredItems.length} usuario(s) encontrado(s)</p>
           </div>
-            <div className="toolbar-actions">
-                <button className="export-btn">
-                {/* Aquí creamos el cuadrito semi-transparente para la X */}
-                <span className="excel-icon">X</span> Exportar
-                </button>
-              <button onClick={handleNuevoUsuario} className="primary-btn">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="3.5" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  style={{ transform: 'translateY(-1px)' }}
-                >
-                  <path d="M12 5v14M5 12h14"/>
-                </svg>
-                Nuevo Usuario
-              </button>
 
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="export-btn"
+              onClick={exportarExcelUsuarios}
+              disabled={loading}
+            >
+              <span className="excel-icon">X</span>
+              {loading ? "Exportando..." : "Exportar"}
+            </button>
 
-            </div>
-
+            <button
+              type="button"
+              onClick={handleNuevoUsuario}
+              className="primary-btn"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ transform: 'translateY(-1px)' }}
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Nuevo Usuario
+            </button>
+          </div>
         </div>
 
-                {/* NUEVOS FILTROS FLEXIBLES */}
         <div className="filters">
-          <input 
-            type="search" 
+          <input
+            type="search"
             name="search"
             className="search-input"
-            placeholder="Buscar por DNI, nombre, usuario o cargo..." 
+            placeholder="Buscar por DNI, nombre, usuario o cargo..."
             value={filters.search}
             onChange={handleFilterChange}
           />
+
           <select name="estado" value={filters.estado} onChange={handleFilterChange}>
             <option value="">Todos los estados</option>
             <option value="Activo">Activo</option>
             <option value="Inactivo">Inactivo</option>
           </select>
+
           <select name="tipo" value={filters.tipo} onChange={handleFilterChange}>
             <option value="">Todos los tipos</option>
-            {TIPOS_USUARIO.map(t => <option key={t} value={t}>{t}</option>)}
+            {TIPOS_USUARIO.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
           </select>
-                    <select 
-            name="area" 
-            value={filters.area} 
-            onChange={handleFilterChange}
-          >
+
+          <select name="area" value={filters.area} onChange={handleFilterChange}>
             <option value="">Todas las áreas</option>
             {listaAreas.map((area, index) => (
               <option key={index} value={area.nombre}>
@@ -251,26 +375,20 @@ export default function TrackingUsuarios() {
             ))}
           </select>
 
-
-          
-          <button onClick={loadUsuarios} className="secondary-btn" title="Actualizar Datos">
+          <button type="button" onClick={loadUsuarios} className="secondary-btn" title="Actualizar Datos">
             Actualizar
           </button>
-          
-          <button onClick={limpiarFiltros} className="clear-btn" title="Limpiar Filtros">
-            {/* Ícono SVG nativo de "Refrescar/Limpiar" (No necesita FontAwesome) */}
+
+          <button type="button" onClick={limpiarFiltros} className="clear-btn" title="Limpiar Filtros">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
             </svg>
           </button>
         </div>
-
-
-
-        {/* MENSAJES Y TABLA SIGUEN IGUAL */}
+        
         {message.text && (
-          <div className={`form-message ${message.type}`}>
+          <div className={`toast-message ${message.type}`}>
             {message.text}
           </div>
         )}
@@ -294,6 +412,7 @@ export default function TrackingUsuarios() {
                 <th>Acciones</th>
               </tr>
             </thead>
+
             <tbody>
               {filteredItems.length === 0 && !loading ? (
                 <tr>
@@ -303,15 +422,17 @@ export default function TrackingUsuarios() {
                 filteredItems.map((item, index) => {
                   const isActive = (item.estado || "").toLowerCase() === "activo";
                   const hasPhoto = !!item.foto_url;
-                  
+
                   return (
                     <tr key={item.id}>
                       <td>{index + 1}</td>
+
                       <td>
                         <span className={`estado-pill ${isActive ? "activo" : "inactivo"}`}>
                           {item.estado || 'Inactivo'}
                         </span>
                       </td>
+
                       <td>{item.dni}</td>
                       <td>{item.cod_mainchart || '-'}</td>
                       <td>{item.nombre}</td>
@@ -320,23 +441,39 @@ export default function TrackingUsuarios() {
                       <td>{item.area || '-'}</td>
                       <td>{item.jefe_directo || '-'}</td>
                       <td>{item.usuario || '-'}</td>
+
                       <td>
-                        <span className={`foto-status ${hasPhoto ? "has" : "no"}`} title={hasPhoto ? "Tiene foto" : "No tiene foto"}>
+                        <span
+                          className={`foto-status ${hasPhoto ? "has" : "no"}`}
+                          title={hasPhoto ? "Tiene foto" : "No tiene foto"}
+                        >
                           {hasPhoto ? "✓" : "!"}
                         </span>
                       </td>
+
                       <td>
                         <div className="actions-inline">
-                          <button onClick={() => handleEditarUsuario(item.id)} className="icon-btn edit" title="Editar">
+                          <button
+                            type="button"
+                            onClick={() => handleEditarUsuario(item.id)}
+                            className="icon-btn edit"
+                            title="Editar"
+                          >
                             ✎
                           </button>
-                          <button onClick={() => cambiarEstado(item)} className="icon-btn status" title={isActive ? 'Desactivar' : 'Activar'}>
+
+                          <button
+                            type="button"
+                            onClick={() => cambiarEstado(item)}
+                            className="icon-btn status"
+                            title={isActive ? 'Desactivar' : 'Activar'}
+                          >
                             ⏻
                           </button>
                         </div>
                       </td>
                     </tr>
-                  )
+                  );
                 })
               )}
             </tbody>
@@ -344,9 +481,7 @@ export default function TrackingUsuarios() {
         </div>
       </section>
 
-      {/* Llamada al componente global de Carga */}
       {loading && <Loading />}
-
     </div>
   );
 }

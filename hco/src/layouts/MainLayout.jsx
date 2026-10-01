@@ -248,7 +248,7 @@ export default function MainLayout() {
     setShowPasswordModal(true);
   }
 
-  // NUEVA FUNCIÓN: Usa Supabase Auth en lugar de Apps Script
+    // NUEVA FUNCIÓN: Usa Supabase Auth y actualiza la tabla empleados
   async function guardarPassword() {
     const nuevaPass = String(nuevaPassword || "").trim();
 
@@ -263,12 +263,28 @@ export default function MainLayout() {
     setPasswordLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
+      // 1. ACTUALIZA LA BÓVEDA DE SEGURIDAD (Supabase Auth)
+      const { error: authError } = await supabase.auth.updateUser({
         password: nuevaPass
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
 
+      // 2. ACTUALIZA LA TABLA VISUAL 'EMPLEADOS'
+      if (authUser?.id) {
+        const { error: dbError } = await supabase.from('empleados')
+          .update({ clave: nuevaPass })
+          .eq('id', authUser.id);
+        
+        // Si hay error en la tabla, lo capturamos
+        if (dbError) throw new Error("Auth actualizado, pero falló la tabla: " + dbError.message);
+        
+        // Actualizamos la memoria del navegador
+        const sessionActual = { ...authUser, clave: nuevaPass };
+        localStorage.setItem("authUser", JSON.stringify(sessionActual));
+        sessionStorage.setItem("authUser", JSON.stringify(sessionActual));
+      }
+      
       setPasswordAlert({
         message: "¡Contraseña actualizada exitosamente!",
         type: "alert-success",
@@ -460,7 +476,7 @@ export default function MainLayout() {
                       <input
                         type="password"
                         className="form-control text-center"
-                        placeholder="••••••••"
+                        placeholder=""
                         required
                         value={nuevaPassword}
                         onChange={(e) => setNuevaPassword(e.target.value)}

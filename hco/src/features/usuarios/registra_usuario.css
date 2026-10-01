@@ -414,6 +414,90 @@
   margin-bottom: 44px; /* Compensa la altura del botón quitar para que no se descuadre */
 }
 
+/* =========================================
+   CABECERA MODERNA (TODO EN 1 SOLA LÍNEA)
+   ========================================= */
+.card-head-modern {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line, #d8e1ea);
+  padding-bottom: 16px;
+  width: 100%;
+}
+
+.card-head-left h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--title, #0f172a);
+}
+
+.card-head-left p {
+  margin: 0;
+  color: var(--muted, #64748b);
+  font-size: 14px;
+}
+
+.card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: nowrap; /* ESTO FUERZA A QUE TODO ESTÉ EN 1 SOLA LÍNEA */
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  white-space: nowrap; /* Evita que el texto de la leyenda se parta */
+}
+
+/* =========================================
+   BOTÓN MINI ELEGANTE Y SUTIL
+   ========================================= */
+.btn-restablecer-mini {
+  all: unset !important; /* Limpia cualquier azul global que tenga el sistema */
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  background-color: #f8fafc !important; /* Plomo clarito casi blanco */
+  color: #475569 !important; /* Gris oscuro elegante */
+  border: 1px solid #cbd5e1 !important; /* Borde sutil */
+  border-radius: 6px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  height: 28px !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.2s ease !important;
+}
+
+.btn-restablecer-mini:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+/* En celular, lo pasamos a 2 filas limpias para que no colapse la pantalla */
+@media (max-width: 768px) {
+  .card-head-modern {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .card-head-right {
+    flex-wrap: wrap; 
+  }
+}
+
+
+
 /* Responsive para tablets y celulares */
 @media (max-width: 992px) {
   .dual-titles { display: none; } /* Oculta títulos dobles en móvil */

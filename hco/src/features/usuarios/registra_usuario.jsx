@@ -4,6 +4,13 @@ import { supabase } from '../../supabaseClient';
 import Loading from '../../layouts/Loading';
 import './registra_usuario.css';
 
+// --- NUEVA FUNCIÓN PARA LEER EL USUARIO ACTUAL ---
+function getStoredAuthUser() {
+  const raw = localStorage.getItem("authUser") || sessionStorage.getItem("authUser");
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
 const UBIGEO = {
   "LIMA": {
     "BARRANCA": ["BARRANCA", "PARAMONGA", "PATIVILCA", "SUPE", "SUPE PUERTO"],
@@ -62,6 +69,9 @@ export default function RegistrarUsuario() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editingId = searchParams.get("id");
+  // --- OBTENEMOS EL USUARIO ACTUAL Y SU ROL ---
+  const [currentUser] = useState(() => getStoredAuthUser());
+  const isSuperAdmin = String(currentUser?.rol || "").toUpperCase() === "SUPERADMIN";
 
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("Cargando datos...");
@@ -474,6 +484,47 @@ export default function RegistrarUsuario() {
   const provincias = formData.departamento ? Object.keys(UBIGEO[formData.departamento] || {}).sort() : [];
   const distritos = formData.departamento && formData.provincia ? (UBIGEO[formData.departamento][formData.provincia] || []) : [];
 
+// ==========================================
+  // FUNCIÓN PARA RESTABLECER CONTRASEÑA REAL
+  // ==========================================
+  const handleRestablecerClave = async () => {
+    if (!formData.dni) {
+      setMessage({ text: "Falta el DNI para poder restablecer la clave.", type: "error" });
+      return;
+    }
+    
+    const confirmar = window.confirm(`¿Estás seguro de restablecer la contraseña de este usuario a su DNI (${formData.dni})?`);
+    if (!confirmar) return;
+
+    setLoading(true);
+    setLoadingText("Restableciendo contraseña en el sistema...");
+
+    try {
+      // 1. Forzamos el cambio en la bóveda secreta de Supabase Auth (Llama a la función SQL)
+      const { error: authError } = await supabase.rpc('restablecer_clave_admin', {
+        user_id: editingId,
+        nueva_clave: formData.dni
+      });
+
+      if (authError) throw new Error("Error Auth: " + authError.message);
+
+      // 2. Actualizamos la tabla visual 'empleados' para que el SUPERADMIN pueda verla
+      const { error: dbError } = await supabase.from('empleados').update({ clave: formData.dni }).eq('id', editingId);
+      if (dbError) throw new Error("Error BD: " + dbError.message);
+
+      setFormData(prev => ({ ...prev, clave: formData.dni }));
+      setMessage({ text: "¡Éxito! Contraseña restablecida al DNI. El usuario ya puede iniciar sesión.", type: "success" });
+      
+    } catch (error) {
+      console.error("Error al restablecer:", error);
+      setMessage({ text: "Error al restablecer: " + error.message, type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
   return (
     <div className="registro-page" style={{ position: 'relative' }}>
       {loading && <Loading />}
@@ -485,13 +536,27 @@ export default function RegistrarUsuario() {
       </section>
 
       <section className="card">
-        <div className="card-head">
-          <div className="form-legend">
+        <div className="card-head-modern">
+          <div className="card-head-left">
+            <h2>{editingId ? "Actualizar usuario" : "Registrar usuario"}</h2>
+            <p>El estado inicial será Activo y la clave inicial será el DNI.</p>
+          </div>
+
+          <div className="card-head-right">
+            {editingId && isSuperAdmin && (
+              <button 
+                type="button" 
+                className="btn-restablecer-mini"
+                onClick={handleRestablecerClave}
+                title="Restablecer clave al DNI"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                Restablecer Clave
+              </button>
+            )}
             <div className="legend-item"><span className="legend-dot auto"></span><span>Llenado automático</span></div>
             <div className="legend-item"><span className="legend-dot manual"></span><span>Debe completar</span></div>
           </div>
-          <h2>{editingId ? "Actualizar usuario" : "Registrar usuario"}</h2>
-          <p>El estado inicial será Activo y la clave inicial será el DNI.</p>
         </div>
 
         <form className="usuario-form" onSubmit={handleSubmit} noValidate>
@@ -577,9 +642,23 @@ export default function RegistrarUsuario() {
               <input type="text" id="usuario" className={formErrors.includes('nombre') ? 'input-error' : ''} value={formData.usuario} readOnly />
             </div>
             <div className="field field-auto">
-              <label>Clave <span className="field-badge auto">AUTO</span></label>
-              <input type="text" id="clave" value={formData.clave} readOnly />
+              <label>
+                Clave 
+                {isSuperAdmin 
+                  ? <span className="field-badge" style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>VISIBLE (SUPERADMIN)</span> 
+                  : <span className="field-badge auto">OCULTO</span>
+                }
+              </label>
+              <input 
+                type="text" 
+                id="clave" 
+                value={isSuperAdmin ? (formData.clave || "Sin clave registrada") : "••••••••••••"} 
+                readOnly 
+                style={!isSuperAdmin ? { letterSpacing: '3px', color: '#94a3b8', fontWeight: 'bold' } : {}}
+              />
             </div>
+
+            
           </div>
 
           <div className="dual-titles">

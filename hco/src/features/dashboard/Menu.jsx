@@ -288,7 +288,7 @@ export default function Menu() {
           accent: "accent-violet",
           buttonText: "Entrar",
           image: "/img/insp_piv.jpg",
-          url: "#",
+          url: "/mhe/tracking_mhe",
         },
         {
           title: "Auditoría 5S",

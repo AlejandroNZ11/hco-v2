@@ -1,0 +1,103 @@
+/* =========================================
+   ESTILOS - TRACKING MHE (PIV)
+   ========================================= */
+
+.tracking-page {
+  width: 100%;
+  padding: 20px 24px;
+  color: var(--text, #102033);
+}
+
+.page-hero,
+.card {
+  background: var(--card, #ffffff);
+  border-radius: 16px;
+  border: 1px solid var(--border, #e2e8f0);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.page-hero {
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hero-titles h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--title, #0f172a);
+}
+
+.hero-titles p {
+  margin: 0;
+  color: var(--muted, #64748b);
+  font-size: 14px;
+}
+
+.btn-nuevo {
+  background: var(--primary, #0f4c81);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-nuevo:hover {
+  background: var(--primary-2, #1565a7);
+  transform: translateY(-2px);
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+
+.table-container table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px !important;
+}
+
+.table-container th {
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11px;
+  padding: 12px 16px !important;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.table-container td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+/* Badges de Estado */
+.badge-estado {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.badge-estado.operativo { background: #dcfce7; color: #166534; }
+.badge-estado.observado { background: #fef08a; color: #854d0e; }
+.badge-estado.inoperativo { background: #fee2e2; color: #991b1b; }
+
+@media (max-width: 768px) {
+  .page-hero { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .btn-nuevo { width: 100%; justify-content: center; }
+}

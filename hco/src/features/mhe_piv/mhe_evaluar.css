@@ -194,6 +194,40 @@
   border-radius: 6px;
 }
 
+/* =========================================
+   INPUT CON ICONO DINÁMICO (BATERÍA)
+   ========================================= */
+.input-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Le damos espacio a la derecha para que el texto no pise el icono */
+.input-icon-wrapper input {
+  width: 100%;
+  padding-right: 44px !important; 
+}
+
+/* Posicionamos el icono flotando a la derecha */
+.input-icon-wrapper .icon-suffix {
+  position: absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease;
+}
+
+/* Colores condicionales */
+.bat-default { color: #94a3b8; } /* Gris cuando está vacío */
+.bat-rojo { color: #ef4444; }    /* Rojo <= 30% */
+.bat-verde { color: #22c55e; }   /* Verde > 30% */
+.bat-rojo { font-weight: bold; }  
+
+/* =========================================
+   CELULARES: DISEÑO RESPONSIVO 
+   ========================================= */
 
 /* Celulares (pasa a 1 columna automáticamente) */
 @media (max-width: 768px) {
@@ -214,5 +248,15 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+
+  /* 1. Reducir el espacio gris a los lados de la pantalla */
+  .registro-page {
+    padding: 12px 12px !important; 
+  }
+
+  /* 2. Reducir el espacio blanco adentro de la tarjeta principal */
+  .card {
+    padding: 16px 12px !important; 
   }
 }

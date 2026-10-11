@@ -30,7 +30,13 @@ export default function MheEvaluar() {
   const [currentUser] = useState(() => getStoredAuthUser());
 
   const [loading, setLoading] = useState(false);
+  
+  // Variables maestras que guardan toda la BD al inicio
   const [categorias, setCategorias] = useState([]);
+  const [todosEquipos, setTodosEquipos] = useState([]);
+  const [todasPreguntas, setTodasPreguntas] = useState([]);
+  
+  // Variables que se muestran en pantalla (filtradas)
   const [equipos, setEquipos] = useState([]);
   const [preguntas, setPreguntas] = useState([]);
   
@@ -42,61 +48,73 @@ export default function MheEvaluar() {
   });
 
   const [respuestas, setRespuestas] = useState({});
-  const [equipoSeleccionado, setEquipoSeleccionado] = useState(null); // Para mostrar la foto[cite: 13]
-  const [checklistAnterior, setChecklistAnterior] = useState(null);   // Para el historial
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState(null);
+  const [checklistAnterior, setChecklistAnterior] = useState(null);
 
-  // 1. Cargar categorías al inicio
+  // 1. Cargar TODOS los datos maestros de golpe al abrir la pantalla
   useEffect(() => {
     if (!currentUser) {
       alert("Inicie sesión para continuar.");
       navigate('/');
       return;
     }
-    cargarCategorias();
+    cargarDatosMaestros();
   }, [currentUser, navigate]);
 
-  const cargarCategorias = async () => {
-    try {
-      const { data, error } = await supabase.from('categorias_equipos').select('*').order('nombre');
-      if (error) throw error;
-      if (data) setCategorias(data);
-    } catch (error) {
-      alert("No se pudieron cargar las categorías: " + error.message);
-    }
-  };
-
-  // 2. Al cambiar la categoría, cargar sus equipos y preguntas
-  const handleCategoriaChange = async (e) => {
-    const catId = e.target.value;
-    setFormData({ ...formData, categoria_id: catId, equipo_id: "" });
-    setEquipos([]);
-    setPreguntas([]);
-    setRespuestas({});
-    setEquipoSeleccionado(null);
-    setChecklistAnterior(null);
-
-    if (!catId) return;
-
+  const cargarDatosMaestros = async () => {
     setLoading(true);
     try {
-      const { data: eqData } = await supabase.from('equipos').select('*').eq('categoria_id', catId);
-      if (eqData) setEquipos(eqData);
+      // Descargamos todo al mismo tiempo para máxima velocidad
+      const [resCat, resEq, resPreg] = await Promise.all([
+        supabase.from('categorias_equipos').select('*').order('nombre'),
+        supabase.from('equipos').select('*'),
+        supabase.from('items_checklist').select('*')
+      ]);
 
-      const { data: pregData } = await supabase.from('items_checklist').select('*').eq('categoria_id', catId);
-      if (pregData) {
-        setPreguntas(pregData);
-        const initResp = {};
-        pregData.forEach(p => {
-          initResp[p.id] = { valor_estado: "", respuesta_texto: "" };
-        });
-        setRespuestas(initResp);
-      }
+      if (resCat.error) throw resCat.error;
+      
+      if (resCat.data) setCategorias(resCat.data);
+      if (resEq.data) setTodosEquipos(resEq.data);
+      if (resPreg.data) setTodasPreguntas(resPreg.data);
+      
     } catch (error) {
-      console.error(error);
+      alert("Error al conectar con la base de datos: " + error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  // 2. Al cambiar categoría, se filtra localmente (¡INSTANTÁNEO!)
+  const handleCategoriaChange = (e) => {
+    const catId = e.target.value;
+    
+    // Limpiamos los datos de la pantalla
+    setFormData({ ...formData, categoria_id: catId, equipo_id: "" });
+    setEquipoSeleccionado(null);
+    setChecklistAnterior(null);
+
+    if (!catId) {
+      setEquipos([]);
+      setPreguntas([]);
+      setRespuestas({});
+      return;
+    }
+
+    // Filtramos directamente de la memoria (sin usar internet)
+    const eqFiltrados = todosEquipos.filter(eq => eq.categoria_id === catId);
+    setEquipos(eqFiltrados);
+
+    const pregFiltradas = todasPreguntas.filter(p => p.categoria_id === catId);
+    setPreguntas(pregFiltradas);
+
+    // Inicializamos las respuestas vacías
+    const initResp = {};
+    pregFiltradas.forEach(p => {
+      initResp[p.id] = { valor_estado: "", respuesta_texto: "" };
+    });
+    setRespuestas(initResp);
+  };
+
 
   // 3. Al seleccionar un equipo, cargar su foto y su último checklist
   const handleEquipoChange = async (e) => {
@@ -304,17 +322,58 @@ export default function MheEvaluar() {
               {/* ======================================= */}
               {(pregBateria.length > 0 || pregContador.length > 0) && (
                 <div className="form-grid cols-2" style={{marginTop: '24px'}}>
+                  
                   {pregBateria.length > 0 && (
                     <div>
                       <div className="section-title" style={{marginTop: 0}}>2. Carga de Batería</div>
-                      {pregBateria.map(p => (
-                        <div className="field" key={p.id}>
-                          <label>{p.descripcion}</label>
-                          <input type="number" placeholder="Ej: 80" value={respuestas[p.id].respuesta_texto} onChange={(e) => handleTextoExtra(p.id, e.target.value)} required />
-                        </div>
-                      ))}
+                      {pregBateria.map(p => {
+                        // LÓGICA DE BATERÍA: Detectamos el valor y asignamos color
+                        const valorTxt = respuestas[p.id].respuesta_texto;
+                        const numero = parseInt(valorTxt, 10);
+                        let colorClase = 'bat-default';
+                        let anchoBarra = 0;
+
+                        if (valorTxt !== '' && !isNaN(numero)) {
+                          // Si es <= 30 se pone rojo, si es mayor se pone verde
+                          colorClase = numero <= 30 ? 'bat-rojo' : 'bat-verde';
+                          
+                          // Calculamos el llenado del icono (El ancho máximo interno es 12px)
+                          const porcentajeReal = Math.min(Math.max(numero, 0), 100); 
+                          anchoBarra = (15 * porcentajeReal) / 100;
+                        }
+
+                        return (
+                          <div className="field" key={p.id}>
+                            <label>{p.descripcion}</label>
+                            <div className="input-icon-wrapper">
+                              <input 
+                                type="number" 
+                                placeholder="Ej: 80" 
+                                min="0" 
+                                max="100"
+                                value={valorTxt} 
+                                onChange={(e) => handleTextoExtra(p.id, e.target.value)} 
+                                required 
+                              />
+                              <span className={`icon-suffix ${colorClase}`}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  {/* Contorno de la batería */}
+                                  <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
+                                  <line x1="22" y1="11" x2="22" y2="13"></line>
+                                  {/* Relleno dinámico: Crece según el % */}
+                                  {valorTxt !== '' && !isNaN(numero) && (
+                                    <rect x="4" y="9" width={anchoBarra} height="6" fill="currentColor" stroke="none"></rect>
+                                  )}
+                                </svg>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
+
+                  {/* CONTADOR SE MANTIENE IGUAL */}
                   {pregContador.length > 0 && (
                     <div>
                       <div className="section-title" style={{marginTop: 0}}>3. Contador</div>
@@ -328,6 +387,7 @@ export default function MheEvaluar() {
                   )}
                 </div>
               )}
+
 
               {/* ======================================= */}
               {/* 4. INSPECCIÓN VISUAL */}

@@ -50,3 +50,15 @@ export const cerrarSesion = async () => {
   if (error) throw new Error(`Error al cerrar sesión: ${error.message}`);
   return true;
 };
+
+
+/**
+ * Obtiene la sesión activa actual en Supabase
+ */
+export const obtenerSesionActiva = async () => {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  if (error) throw new Error(`Error al verificar la sesión: ${error.message}`);
+  
+  return session;
+};

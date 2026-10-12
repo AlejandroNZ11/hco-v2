@@ -1,0 +1,1 @@
+para funciones reutilizables, como formateo de fechas, cálculos, exportaciones a Excel

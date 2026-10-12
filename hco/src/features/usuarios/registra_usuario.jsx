@@ -8,9 +8,13 @@ import { useNetwork } from '../../hooks/useNetwork';
 import { localDb } from '../../services/localDb';
 import { useLiveQuery } from 'dexie-react-hooks';
 
-// Importamos supabase para Auth y RPC (Solo cuando haya internet)
+// Importamos supabase para Auth y RPC
 import { supabase } from '../../config/supabaseClient';
-import { crearEmpleado, actualizarEmpleado } from '../../services/empleadosService';
+// ¡NUEVO!: Importamos las funciones para traer los catálogos
+import { 
+  crearEmpleado, actualizarEmpleado, 
+  obtenerAreas, obtenerCargos, obtenerJefes, obtenerRoles 
+} from '../../services/empleadosService';
 
 function getStoredAuthUser() {
   const raw = localStorage.getItem("authUser") || sessionStorage.getItem("authUser");
@@ -66,30 +70,58 @@ export default function RegistrarUsuario() {
   const isOnline = useNetwork();
 
   const [loading, setLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState("Cargando datos...");
   const [message, setMessage] = useState({ text: '', type: '' });
   const [formErrors, setFormErrors] = useState([]);
   const normalize = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
+  // =========================================================
+  // NUEVO: Sincronización de Catálogos (Independientes)
+  // =========================================================
+  useEffect(() => {
+    const sincronizarCatalogos = async () => {
+      if (isOnline) {
+        // Ejecutamos cada uno en su propio try-catch.
+        // Así, si 'cargos' falla, igual se guardan 'jefes' y 'roles'.
+        try { 
+          const areas = await obtenerAreas(); 
+          if (areas) await localDb.areas.bulkPut(areas); 
+        } catch (e) { console.error("Error áreas", e); }
+
+        try { 
+          const cargos = await obtenerCargos(); 
+          if (cargos) await localDb.cargos.bulkPut(cargos); 
+        } catch (e) { console.error("Error cargos", e); }
+
+        try { 
+          const jefes = await obtenerJefes(); 
+          if (jefes) await localDb.jefes.bulkPut(jefes); 
+        } catch (e) { console.error("Error jefes", e); }
+
+        try { 
+          const roles = await obtenerRoles(); 
+          if (roles) await localDb.roles.bulkPut(roles); 
+        } catch (e) { console.error("Error roles", e); }
+      }
+    };
+    sincronizarCatalogos();
+  }, [isOnline]);
+
+
+  // 1. OBTENEMOS LOS CATÁLOGOS DIRECTO DE DEXIE (Dinámicos y Offline)
   const listaAreas = useLiveQuery(() => localDb.areas.toArray()) || [];
   const listaCargos = useLiveQuery(() => localDb.cargos.toArray()) || [];
   const listaJefes = useLiveQuery(() => localDb.jefes.toArray()) || [];
+  const listaRoles = useLiveQuery(() => localDb.roles.toArray()) || [];
 
   const TIPOS_USUARIO = ["white", "blue"];
   const SEXOS = ['Masculino', 'Femenino', 'Otro'];
-  const ROLES = ["USUARIO", "SUPERVISOR", "ADMIN", "SUPERADMIN"];
   const RUTAS = ["RUTA 1", "RUTA 2", "RUTA 3", "RUTA 4", "RUTA 5", "RUTA 6"];
 
   const [formData, setFormData] = useState({
     id: "", estado: "Activo", dni: "", nombre: "", sexo: "", tipo: "", cargo: "",
-    area: "", jefeDirecto: "", rol: "", usuario: "", 
-    // CAMBIO 1: El estado interno sigue siendo 'clave' por comodidad, pero se mapeará a 'cl' en la BD
-    clave: "", 
-    fechaNacimiento: "", edad: "",
+    area: "", jefeDirecto: "", rol: "", usuario: "", clave: "", fechaNacimiento: "", edad: "",
     hijos: "", celular: "", departamento: "", provincia: "", distrito: "", direccion: "",
-    urlCasa: "", coordenadas: "", grupoSanguineo: "", contactoEmergencia: "", 
-    // CAMBIO 2: Agregamos rubrica al estado inicial
-    rubrica: "",
+    urlCasa: "", coordenadas: "", grupoSanguineo: "", contactoEmergencia: "", rubrica: "",
     correo: "", correoCeva: "", correo3m: "", codMainchart: "", 
     fechaIngreso: "", rutaMovilidad: "", fechaSalida: "", permanencia: "", motivoSalida: "", foto: ""
   });
@@ -128,19 +160,14 @@ export default function RegistrarUsuario() {
           id: data.id || "", estado: data.estado || "Activo", dni: data.dni || "",
           nombre: data.nombre || "", sexo: data.sexo || "", tipo: data.tipo || "",
           cargo: data.cargo_id || "", area: data.area_id || "", jefeDirecto: data.jefe_directo_id || "",
-          rol: data.rol || "", usuario: data.usuario || "", 
-          // CAMBIO 3: Leer de la columna 'cl' en lugar de 'clave'
-          clave: data.cl || "", 
+          rol: data.rol || "", usuario: data.usuario || "", clave: data.cl || "", 
           fechaNacimiento: data.fch_nacimiento || "", fechaSalida: data.fch_salida || "",
           fechaIngreso: data.fecha_ingreso || "", hijos: data.hijos !== null && data.hijos !== undefined ? data.hijos : "", 
           celular: data.celular || "", departamento: data.departamento || "", provincia: data.provincia || "",
           distrito: data.distrito || "", direccion: data.direccion || "", urlCasa: data.url_casa || "",
           coordenadas: data.coordenadas || "", grupoSanguineo: data.grupo_sanguineo || "",
-          contactoEmergencia: data.contacto_emergencia || "", 
-          // CAMBIO 4: Leer la rúbrica
-          rubrica: data.rubrica || "",
-          correo: data.correo_personal || "", 
-          correoCeva: data.correo_ceva || "", correo3m: data.correo_3m || "", codMainchart: data.cod_mainchart || "",
+          contactoEmergencia: data.contacto_emergencia || "", rubrica: data.rubrica || "",
+          correo: data.correo_personal || "", correoCeva: data.correo_ceva || "", correo3m: data.correo_3m || "", codMainchart: data.cod_mainchart || "",
           rutaMovilidad: data.ruta_movilidad || "", motivoSalida: data.motivo_salida || "", foto: data.foto_url || "",
           edad: edadCalculada, permanencia: permanenciaCalculada
         });
@@ -305,9 +332,7 @@ export default function RegistrarUsuario() {
         id: finalUserId, estado: formData.estado, dni: formData.dni.trim(), nombre: formData.nombre.trim(),
         sexo: formData.sexo, tipo: formData.tipo, cargo_id: formData.cargo ? parseInt(formData.cargo) : null,
         area_id: formData.area ? parseInt(formData.area) : null, jefe_directo_id: formData.jefeDirecto || null, 
-        rol: formData.rol, usuario: formData.usuario.trim(), 
-        // CAMBIO 5: Mapear el estado 'clave' a la columna 'cl' al guardar
-        cl: formData.clave.trim(), 
+        rol: formData.rol, usuario: formData.usuario.trim(), cl: formData.clave.trim(), 
         fch_nacimiento: formData.fechaNacimiento || null, fch_salida: formData.fechaSalida || null,
         fecha_ingreso: formData.fechaIngreso || null, correo_personal: formData.correo.trim(),
         correo_ceva: formData.correoCeva.trim(), correo_3m: formData.correo3m.trim(),
@@ -315,11 +340,8 @@ export default function RegistrarUsuario() {
         celular: formData.celular.trim(), departamento: formData.departamento, provincia: formData.provincia,
         distrito: formData.distrito, direccion: formData.direccion.trim(), url_casa: formData.urlCasa.trim(),
         coordenadas: formData.coordenadas.trim(), grupo_sanguineo: formData.grupoSanguineo.trim(),
-        contacto_emergencia: formData.contactoEmergencia.trim(), 
-        // CAMBIO 6: Incluir rubrica al guardar
-        rubrica: formData.rubrica.trim(),
-        ruta_movilidad: formData.rutaMovilidad || null, 
-        motivo_salida: formData.motivoSalida.trim(),
+        contacto_emergencia: formData.contactoEmergencia.trim(), rubrica: formData.rubrica.trim(),
+        ruta_movilidad: formData.rutaMovilidad || null, motivo_salida: formData.motivoSalida.trim(),
         foto_url: photoDataUrl ? photoDataUrl : (formData.foto ? convertirDriveUrl(formData.foto) : null)
       };
 
@@ -332,10 +354,7 @@ export default function RegistrarUsuario() {
         setMessage({ text: "Usuario guardado correctamente en el servidor.", type: "success" });
       } else {
         await localDb.sync_queue.add({
-          tabla: 'usuarios',
-          operacion: editingId ? 'UPDATE' : 'INSERT',
-          needsAuth: needsAuthCreation,
-          payload: recordData
+          tabla: 'usuarios', operacion: editingId ? 'UPDATE' : 'INSERT', needsAuth: needsAuthCreation, payload: recordData
         });
         setMessage({ text: "Modo Offline: Guardado localmente, se sincronizará luego.", type: "warning" });
       }
@@ -360,7 +379,6 @@ export default function RegistrarUsuario() {
       return;
     }
     if (!formData.dni) return setMessage({ text: "Falta DNI.", type: "error" });
-    
     if (!window.confirm(`¿Estás seguro de restablecer la contraseña a su DNI (${formData.dni})?`)) return;
 
     setLoading(true);
@@ -368,7 +386,6 @@ export default function RegistrarUsuario() {
       const { error: authError } = await supabase.rpc('restablecer_clave_admin', { user_id: editingId, nueva_clave: formData.dni });
       if (authError) throw authError;
 
-      // CAMBIO 7: Actualizar la columna 'cl' al restablecer la contraseña
       await actualizarEmpleado(editingId, { cl: formData.dni });
       await localDb.usuarios.update(editingId, { cl: formData.dni });
       
@@ -394,15 +411,9 @@ export default function RegistrarUsuario() {
             <h2>{editingId ? "Actualizar usuario" : "Registrar usuario"}</h2>
             <p>El estado inicial será Activo y la clave inicial será el DNI.</p>
           </div>
-
           <div className="card-head-right">
             {editingId && isSuperAdmin && isOnline && (
-              <button 
-                type="button" 
-                className="btn-restablecer-mini"
-                onClick={handleRestablecerClave}
-                title="Restablecer clave al DNI"
-              >
+              <button type="button" className="btn-restablecer-mini" onClick={handleRestablecerClave} title="Restablecer clave al DNI">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
                 Restablecer Clave
               </button>
@@ -440,11 +451,7 @@ export default function RegistrarUsuario() {
           <div className="form-grid cols-4">
             <div className="field field-manual">
               <label>Nombre <span className="field-badge manual">OBLIGATORIO</span></label>
-              <input 
-                type="text" id="nombre" className={formErrors.includes('nombre') ? 'input-error' : ''} 
-                placeholder="Apellido Apellido, Nombre Nombre" 
-                value={formData.nombre} onChange={handleChange} onBlur={handleNombreBlur} required 
-              />
+              <input type="text" id="nombre" className={formErrors.includes('nombre') ? 'input-error' : ''} placeholder="Apellido Apellido, Nombre Nombre" value={formData.nombre} onChange={handleChange} onBlur={handleNombreBlur} required />
             </div>
             <div className="field field-manual">
               <label>Sexo <span className="field-badge manual">OBLIGATORIO</span></label>
@@ -481,27 +488,22 @@ export default function RegistrarUsuario() {
               <label>Rol <span className="field-badge manual">OBLIGATORIO</span></label>
               <select id="rol" className={formErrors.includes('rol') ? 'input-error' : ''} value={formData.rol} onChange={handleChange} required>
                 <option value="">Seleccione rol</option>
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                {/* CAMBIO AQUÍ: Intenta leer r.nombre, y si no existe, intenta leer r.rol */}
+                {listaRoles.map(r => (
+                  <option key={r.id} value={r.nombre || r.rol}>
+                    {r.nombre || r.rol}
+                  </option>
+                ))}
               </select>
             </div>
+
             <div className="field field-auto">
               <label>Usuario / Email login <span className="field-badge auto">AUTO</span></label>
               <input type="text" id="usuario" className={formErrors.includes('nombre') ? 'input-error' : ''} value={formData.usuario} readOnly />
             </div>
             <div className="field field-auto">
-              <label>
-                Clave 
-                {isSuperAdmin 
-                  ? <span className="field-badge" style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>VISIBLE (SUPERADMIN)</span> 
-                  : <span className="field-badge auto">OCULTO</span>
-                }
-              </label>
-              <input 
-                type="text" id="clave" 
-                value={isSuperAdmin ? (formData.clave || "Sin clave registrada") : "••••••••••••"} 
-                readOnly 
-                style={!isSuperAdmin ? { letterSpacing: '3px', color: '#94a3b8', fontWeight: 'bold' } : {}}
-              />
+              <label>Clave {isSuperAdmin ? <span className="field-badge" style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>VISIBLE</span> : <span className="field-badge auto">OCULTO</span>}</label>
+              <input type="text" id="clave" value={isSuperAdmin ? (formData.clave || "Sin clave") : "••••••••••••"} readOnly style={!isSuperAdmin ? { letterSpacing: '3px', color: '#94a3b8', fontWeight: 'bold' } : {}} />
             </div>
           </div>
 
@@ -533,21 +535,8 @@ export default function RegistrarUsuario() {
                 <div className="photo-preview-split">
                   {photoPreview ? (
                     <div className="preview-card-split">
-                      <img 
-                        src={photoPreview} alt="Vista previa" 
-                        onError={(e) => {
-                          if (!e.target.dataset.retried) {
-                            e.target.dataset.retried = "true";
-                            const driveId = extraerIdDrive(formData.foto);
-                            if (driveId) {
-                              e.target.src = `https://docs.google.com/thumbnail?id=${driveId}&sz=w800`;
-                            }
-                          }
-                        }}
-                      />
-                      <button type="button" onClick={clearPhoto} className="btn-quitar-foto-force">
-                        Quitar
-                      </button>
+                      <img src={photoPreview} alt="Vista previa" onError={(e) => { if (!e.target.dataset.retried) { e.target.dataset.retried = "true"; const driveId = extraerIdDrive(formData.foto); if (driveId) { e.target.src = `https://docs.google.com/thumbnail?id=${driveId}&sz=w800`; } } }} />
+                      <button type="button" onClick={clearPhoto} className="btn-quitar-foto-force">Quitar</button>
                     </div>
                   ) : (
                     <div className="placeholder-split">Sin foto</div>
@@ -558,44 +547,20 @@ export default function RegistrarUsuario() {
 
             <div className="split-panel">
               <div className="form-grid cols-2">
-                <div className="field">
-                  <label>Correo Personal</label>
-                  <input type="email" id="correo" value={formData.correo} onChange={handleChange} />
-                </div>
-                <div className="field">
-                  <label>Código MYHR</label>
-                  <input type="text" id="codMainchart" value={formData.codMainchart} onChange={handleChange} />
-                </div>
-                <div className="field">
-                  <label>Correo CEVA</label>
-                  <input type="email" id="correoCeva" value={formData.correoCeva} onChange={handleChange} />
-                </div>
-                <div className="field">
-                  <label>Correo 3M</label>
-                  <input type="email" id="correo3m" value={formData.correo3m} onChange={handleChange} />
-                </div>
+                <div className="field"><label>Correo Personal</label><input type="email" id="correo" value={formData.correo} onChange={handleChange} /></div>
+                <div className="field"><label>Código MYHR</label><input type="text" id="codMainchart" value={formData.codMainchart} onChange={handleChange} /></div>
+                <div className="field"><label>Correo CEVA</label><input type="email" id="correoCeva" value={formData.correoCeva} onChange={handleChange} /></div>
+                <div className="field"><label>Correo 3M</label><input type="email" id="correo3m" value={formData.correo3m} onChange={handleChange} /></div>
               </div>
             </div>
           </div>
 
           <div className="section-title">Datos personales</div> 
           <div className="form-grid cols-4">
-            <div className="field field-manual">
-              <label>Fch. Nacimiento</label>
-              <input type="date" id="fechaNacimiento" value={formData.fechaNacimiento} onChange={handleChange} />
-            </div>
-            <div className="field field-auto">
-              <label>Edad <span className="field-badge auto">AUTO</span></label>
-              <input type="text" value={formData.edad} readOnly />
-            </div>
-            <div className="field field-manual">
-              <label>Hijos</label>
-              <input type="number" id="hijos" min="0" max="99" value={formData.hijos} onChange={handleChange} />
-            </div>
-            <div className="field field-manual">
-              <label>Celular</label>
-              <input type="tel" id="celular" value={formData.celular} onChange={handleChange} />
-            </div>
+            <div className="field field-manual"><label>Fch. Nacimiento</label><input type="date" id="fechaNacimiento" value={formData.fechaNacimiento} onChange={handleChange} /></div>
+            <div className="field field-auto"><label>Edad <span className="field-badge auto">AUTO</span></label><input type="text" value={formData.edad} readOnly /></div>
+            <div className="field field-manual"><label>Hijos</label><input type="number" id="hijos" min="0" max="99" value={formData.hijos} onChange={handleChange} /></div>
+            <div className="field field-manual"><label>Celular</label><input type="tel" id="celular" value={formData.celular} onChange={handleChange} /></div>
           </div>
 
           <div className="form-grid cols-3">
@@ -628,7 +593,6 @@ export default function RegistrarUsuario() {
             <div className="field field-manual"><label>Coordenadas</label><input type="text" id="coordenadas" placeholder="-12.000000, -77.000000" value={formData.coordenadas} onChange={handleChange} /></div>
           </div>
 
-          {/* CAMBIO 8: Actualizada esta grid para incluir Rúbrica */}
           <div className="form-grid cols-3">
             <div className="field field-manual"><label>Grupo sanguíneo</label><input type="text" id="grupoSanguineo" value={formData.grupoSanguineo} onChange={handleChange} /></div>
             <div className="field field-manual"><label>Contacto emergencia</label><input type="tel" id="contactoEmergencia" value={formData.contactoEmergencia} onChange={handleChange} /></div>

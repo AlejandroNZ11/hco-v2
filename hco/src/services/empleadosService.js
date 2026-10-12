@@ -90,3 +90,15 @@ export const obtenerJefes = async () => {
   if (error) throw new Error(`Error al cargar jefes: ${error.message}`);
   return data;
 };
+
+
+// En empleadosService.js
+export const obtenerRoles = async () => {
+  const { data, error } = await supabase
+    .from('rol') // Tu tabla se llama 'rol' (singular)
+    .select('*') // <-- CAMBIO IMPORTANTE: Usamos '*'
+    .order('id'); // Ordenamos por ID, ya que no estamos seguros de si existe la columna 'nombre'
+    
+  if (error) throw new Error(`Error al cargar rol: ${error.message}`);
+  return data;
+};

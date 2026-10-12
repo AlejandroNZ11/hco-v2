@@ -1,6 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Source+Serif+4:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Quicksand:wght@700&display=swap');
 
-@import url('https://fonts.googleapis.com/css2?family=Fira+Sans:wght@700&family=Inter:wght@700&family=Lato:wght@700&family=Montserrat:wght@700&family=Nunito:wght@700&family=Oswald:wght@700&family=Poppins:wght@700&family=Quicksand:wght@700&family=Raleway:wght@700&family=Ubuntu:wght@700&display=swap');
+
 /* Todo va dentro de .login-container-global para no afectar
    los input/button/label del resto de tu app */
 .login-container-global,
@@ -25,7 +25,9 @@
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  overflow: hidden;
+  /* Permitimos scroll vertical si el celular es muy bajito */
+  overflow-y: auto; 
+  overflow-x: hidden;
   font-family: 'Roboto', 'Segoe UI', Arial, sans-serif;
   color: var(--text);
 }
@@ -445,81 +447,81 @@
   }
 }
 
+
+/* ---------- Adaptación de Fondo y Altura para Celular ---------- */
 /* ---------- Adaptación de Fondo y Altura para Celular ---------- */
 @media (max-width: 999px) {
   .fondo {
-    background: url('/img/fondo-mobile.png') no-repeat center bottom;
+    background: url('/img/fondo-mobile.png') no-repeat center top;
     background-size: cover;
+    background-attachment: fixed; /* Fija el fondo si hay scroll */
   }
 
-  /* Ocultamos las curvas hechas por código */
   .fondo::before,
   .fondo::after,
   .fondo-blanco {
     display: none;
   }
 
-  /* Ajustamos el layout principal para que use el 100% de la pantalla real (svh) 
-     y distribuya el espacio libre automáticamente sin empujar nada hacia abajo */
-  .login-container-global, 
   .login-layout {
-    min-height: 100vh;
-    min-height: 100svh; /* Evita el scroll causado por la barra del navegador */
+    justify-content: center;
+    padding: 6vh 18px 4vh; /* Más espacio arriba, menos abajo */
+    gap: 3vh; /* Espacio flexible entre logo y tarjeta */
   }
 
-  .login-layout {
-    justify-content: space-evenly; /* Reparte el espacio disponible */
-    padding: 3vh 18px; /* Márgenes superior/inferior dinámicos */
-    gap: 1vh; /* Espacio dinámico entre el logo y la tarjeta */
-  }
-
-  /* Achicamos ligeramente el logo y el título para ahorrar espacio vertical */
+  /* Reducimos el logo y el texto principal para dar respiro */
   .logo {
-    width: min(160px, 40vw);
-    margin: 0 auto 1vh;
+    width: min(140px, 35vw);
+    margin: 0 auto 5px;
   }
   .marca h1 {
-    font-size: clamp(18px, 4.5vw, 22px);
+    font-size: clamp(16px, 4vw, 20px);
   }
 
-  /* Comprimimos la tarjeta y sus elementos internos */
+  /* Ajustes de la tarjeta y perfil */
   .tarjeta-login {
-    padding: 14px;
-    margin-bottom: 2vh; /* Levanta un poco la tarjeta para que encaje en el fondo */
+    padding: 18px 14px;
   }
-
   .vista-usuario {
-    min-height: 110px;
-    padding: 12px;
+    min-height: auto;
+    padding: 14px 10px;
+    gap: 4px;
   }
   .foto-box {
-    width: 60px; height: 60px;
+    width: 56px; height: 56px;
   }
-  
-  /* Reducimos la altura de los inputs y botones fijos (de 58px a 48px) */
-  .campo input {
-    height: 48px;
+  .nombre-usuario {
     font-size: 16px;
   }
+
+  /* Reducimos la altura de los campos a un estándar móvil (46px) */
+  .campo { margin-top: 12px; }
+  .campo input {
+    height: 46px;
+    font-size: 15px;
+    padding: 0 46px;
+  }
+  .icono { left: 14px; width: 22px; height: 22px; }
+  .ojo { width: 36px; height: 36px; right: 4px; }
+  .ojo svg { width: 22px; height: 22px; }
+
+  /* Reducimos los botones */
+  .acciones { margin-top: 16px; }
   .btn-ingresar {
     height: 48px;
-    font-size: 16px;
+    font-size: 15px;
   }
   .btn-bio {
-    flex: 0 0 54px;
-    width: 54px; height: 54px;
+    flex: 0 0 52px;
+    width: 52px; height: 52px;
+    margin-left: -26px; /* Ajuste para que se superponga correctamente */
   }
-  .btn-bio svg {
-    width: 28px; height: 28px;
-  }
-  .ojo {
-    width: 36px; height: 36px;
-  }
-  
-  /* Reducimos márgenes internos */
-  .campo { margin-top: 10px; }
-  .acciones { margin-top: 14px; }
-  .recordar { margin-top: 12px; }
+  .btn-bio svg { width: 26px; height: 26px; }
+
+  /* Ajustes del checkbox */
+  .recordar { margin-top: 12px; font-size: 15px; gap: 10px; }
+  .recordar input { flex: 0 0 24px; width: 24px; height: 24px; border-radius: 6px; }
+  .ayuda-bio { margin: 4px 2px 0 34px; font-size: 12px; }
 }
 
 

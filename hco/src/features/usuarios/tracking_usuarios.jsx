@@ -1,10 +1,10 @@
-// src/features/usuarios/tracking_usuarios.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
 import Loading from "../../layouts/Loading";
 import './tracking_usuarios.css';
 import * as XLSX from "xlsx-js-style";
+
+import { obtenerTodosLosEmpleados, cambiarEstadoEmpleado, obtenerAreas } from '../../services/empleadosService';
 
 const TIPOS_USUARIO = ["White", "Blue"];
 
@@ -49,23 +49,12 @@ export default function TrackingUsuarios() {
     return () => clearTimeout(timer);
   }, [message]);
 
-
   const loadUsuarios = async () => {
     setLoading(true);
     setMessage({ text: '', type: '' });
 
     try {
-      const { data, error } = await supabase
-        .from('empleados')
-        .select(`
-          *,
-          cargo:cargos(nombre),
-          area:areas(nombre),
-          jefe:jefe_directo_id(nombre)
-        `)
-        .order('nombre', { ascending: true });
-
-      if (error) throw error;
+      const data = await obtenerTodosLosEmpleados();
 
       const usuariosFormateados = data?.map(emp => ({
         ...emp,
@@ -85,14 +74,10 @@ export default function TrackingUsuarios() {
 
   useEffect(() => {
     const cargarAreasDB = async () => {
-      const { data, error } = await supabase
-        .from('areas')
-        .select('nombre')
-        .order('nombre', { ascending: true });
-
-      if (data) {
-        setListaAreas(data);
-      } else {
+      try {
+        const data = await obtenerAreas();
+        if (data) setListaAreas(data);
+      } catch (error) {
         console.error("Error cargando áreas:", error);
       }
     };
@@ -156,13 +141,7 @@ export default function TrackingUsuarios() {
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('empleados')
-        .update({ estado: nuevoEstado })
-        .eq('id', item.id);
-
-      if (error) throw error;
-
+      await cambiarEstadoEmpleado(item.id, nuevoEstado);
       setMessage({ text: 'Estado actualizado correctamente.', type: 'success' });
       await loadUsuarios();
     } catch (error) {
@@ -361,9 +340,8 @@ export default function TrackingUsuarios() {
 
           <select name="tipo" value={filters.tipo} onChange={handleFilterChange}>
             <option value="">Todos los tipos</option>
-            {TIPOS_USUARIO.map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
+            <option value="White">White</option>
+            <option value="Blue">Blue</option>
           </select>
 
           <select name="area" value={filters.area} onChange={handleFilterChange}>
@@ -392,7 +370,6 @@ export default function TrackingUsuarios() {
             {message.text}
           </div>
         )}
-
 
         <div className="table-wrap">
           <table className="usuarios-table">

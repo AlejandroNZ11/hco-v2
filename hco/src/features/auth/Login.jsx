@@ -1,6 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
+
+// Importamos las funciones del nuevo servicio
+import { 
+  obtenerUsuariosParaCache, 
+  iniciarSesion, 
+  obtenerPerfilCompleto, 
+  cerrarSesion 
+} from '../../services/authService';
+
 import './Login.css';
 
 const FOTO_PLACEHOLDER = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(`
@@ -31,9 +39,13 @@ export default function Login() {
   // Descarga la lista en 2do plano apenas se abre la web
   useEffect(() => {
     const cargarUsuarios = async () => {
-      // También traemos el estado por si acaso lo necesitamos luego
-      const { data } = await supabase.from('empleados').select('dni, usuario, nombre, rol, foto_url, estado');
-      if (data) setUsuariosCache(data);
+      try {
+        // USANDO EL SERVICIO
+        const data = await obtenerUsuariosParaCache();
+        setUsuariosCache(data);
+      } catch (error) {
+        console.error("Error al cargar caché visual:", error);
+      }
     };
     cargarUsuarios();
   }, []);
@@ -74,30 +86,11 @@ export default function Login() {
       const codigoLogin = emp && emp.usuario ? emp.usuario : userTrim;
       const emailToLogin = codigoLogin.includes('@') ? codigoLogin : `${codigoLogin}@hco.com`;
 
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: emailToLogin,
-        password: password
-      });
+      // 1. INICIAR SESIÓN CON EL SERVICIO
+      const authData = await iniciarSesion(emailToLogin, password);
 
-      if (authError) {
-        setAlert({ visible: true, title: 'Acceso denegado', message: 'Contraseña incorrecta' });
-        setIsSubmitting(false);
-        return;
-      }
-
-      // ==========================================
-      // CORRECCIÓN: Traemos el perfil completo cruzando con la tabla cargos
-      // ==========================================
-      const { data: perfilData, error: perfilError } = await supabase
-        .from('empleados')
-        .select(`
-          *,
-          cargos (nombre)
-        `)
-        .eq('id', authData.user.id)
-        .single();
-
-      if (perfilError) throw perfilError;
+      // 2. TRAER PERFIL COMPLETO CON EL SERVICIO
+      const perfilData = await obtenerPerfilCompleto(authData.user.id);
 
       // Aplanamos el dato para que guarde el texto del cargo directamente 
       // y la cabecera (MainLayout) lo pueda leer sin problemas.
@@ -109,7 +102,7 @@ export default function Login() {
       // LÓGICA DE BLOQUEO DE USUARIOS INACTIVOS
       // ==========================================
       if (perfilData.estado && perfilData.estado.toLowerCase() === 'inactivo') {
-        await supabase.auth.signOut(); // Cerramos su sesión en la bóveda
+        await cerrarSesion(); // Cerramos su sesión con el servicio
         setAlert({ 
           visible: true, 
           title: 'Acceso denegado', 
@@ -126,11 +119,14 @@ export default function Login() {
 
     } catch (error) {
       console.error(error);
-      setAlert({ visible: true, title: 'Error', message: 'Error de red al intentar conectar.' });
+      setAlert({ 
+        visible: true, 
+        title: 'Error de Acceso', 
+        message: error.message || 'Error de red al intentar conectar.' 
+      });
       setIsSubmitting(false);
     }
   };
-
 
   return (
     <div className="login-container-global">

@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
 import Loading from '../../layouts/Loading';
 import './registra_usuario.css';
 
-// --- NUEVA FUNCIÓN PARA LEER EL USUARIO ACTUAL ---
+// Importamos supabase desde config para Auth y RPC
+import { supabase } from '../../config/supabaseClient';
+// Importamos los servicios de base de datos
+import { 
+  obtenerEmpleadoPorId, crearEmpleado, actualizarEmpleado, 
+  verificarDniExistente, verificarUsuarioExistente,
+  obtenerAreas, obtenerCargos, obtenerJefes 
+} from '../../services/empleadosService';
+
 function getStoredAuthUser() {
   const raw = localStorage.getItem("authUser") || sessionStorage.getItem("authUser");
   if (!raw) return null;
@@ -29,9 +36,6 @@ const UBIGEO = {
   }
 };
 
-// ==========================================
-// NUEVAS FUNCIONES DE FORMATO Y CONVERSIÓN
-// ==========================================
 const formatearNombre = (text) => {
   if (!text) return "";
   return text.toLowerCase().split(',').map(parte => 
@@ -41,7 +45,6 @@ const formatearNombre = (text) => {
   ).join(", ");
 };
 
-// --- NUEVO SISTEMA DE FOTOS PARA GOOGLE DRIVE ---
 const extraerIdDrive = (url) => {
   if (!url) return null;
   const match =
@@ -62,14 +65,10 @@ const convertirDriveUrl = (url) => {
   return url;
 };
 
-
-// ==========================================
-
 export default function RegistrarUsuario() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editingId = searchParams.get("id");
-  // --- OBTENEMOS EL USUARIO ACTUAL Y SU ROL ---
   const [currentUser] = useState(() => getStoredAuthUser());
   const isSuperAdmin = String(currentUser?.rol || "").toUpperCase() === "SUPERADMIN";
 
@@ -78,6 +77,7 @@ export default function RegistrarUsuario() {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [formErrors, setFormErrors] = useState([]);
   const normalize = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  
   const [listaAreas, setListaAreas] = useState([]);
   const [listaCargos, setListaCargos] = useState([]);
   const [listaJefes, setListaJefes] = useState([]);
@@ -110,13 +110,13 @@ export default function RegistrarUsuario() {
 
   const cargarCatalogosSupabase = async () => {
     try {
-      const { data: areasData } = await supabase.from('areas').select('id, nombre').order('nombre');
+      const areasData = await obtenerAreas();
       if (areasData) setListaAreas(areasData);
 
-      const { data: cargosData } = await supabase.from('cargos').select('id, nombre').order('nombre');
+      const cargosData = await obtenerCargos();
       if (cargosData) setListaCargos(cargosData);
 
-      const { data: jefesData } = await supabase.from('empleados').select('id, nombre').ilike('tipo', 'white').order('nombre');
+      const jefesData = await obtenerJefes();
       if (jefesData) setListaJefes(jefesData);
     } catch (error) {
       console.error("Error al cargar catálogos:", error);
@@ -131,8 +131,7 @@ export default function RegistrarUsuario() {
     setLoading(true);
     setLoadingText("Cargando usuario...");
     try {
-      const { data, error } = await supabase.from('empleados').select('*').eq('id', id).single();
-      if (error) throw error;
+      const data = await obtenerEmpleadoPorId(id);
 
       if (data) {
         let edadCalculada = "";
@@ -193,7 +192,7 @@ export default function RegistrarUsuario() {
         });
 
         if (data.foto_url) {
-          setPhotoPreview(convertirDriveUrl(data.foto_url)); // Convierte si es de Drive
+          setPhotoPreview(convertirDriveUrl(data.foto_url));
         }
       }
     } catch (err) {
@@ -286,8 +285,6 @@ export default function RegistrarUsuario() {
     }
   };
 
-
-  // NUEVA FUNCIÓN: Se activa cuando dejas de escribir en el Nombre
   const handleNombreBlur = () => {
     setFormData(prev => ({
       ...prev,
@@ -302,7 +299,6 @@ export default function RegistrarUsuario() {
       const dataUrl = await compressImage(file, 900, 0.72);
       setPhotoDataUrl(dataUrl);
       setPhotoPreview(dataUrl);
-      // Limpiamos el campo URL si subió archivo
       setFormData(prev => ({ ...prev, foto: "" }));
     } catch (error) {
       setMessage({ text: "No se pudo procesar la foto.", type: "error" });
@@ -375,34 +371,22 @@ export default function RegistrarUsuario() {
     setLoadingText("Guardando usuario...");
 
     try {
-      // ==========================================
-      // VALIDACIONES EN BASE DE DATOS (DNI Y USUARIO)
-      // ==========================================
-      let queryDni = supabase.from('empleados').select('id').eq('dni', formData.dni.trim());
-      if (editingId) queryDni = queryDni.neq('id', editingId);
-      const { data: dniExist } = await queryDni;
-      
-      if (dniExist && dniExist.length > 0) {
+      const dniExiste = await verificarDniExistente(formData.dni, editingId);
+      if (dniExiste) {
         setFormErrors(prev => [...prev, 'dni']);
         setMessage({ text: '⚠️ ERROR: El DNI ingresado ya existe en la base de datos.', type: 'error' });
         setLoading(false);
         return;
       }
 
-      let queryUser = supabase.from('empleados').select('id').eq('usuario', formData.usuario.trim());
-      if (editingId) queryUser = queryUser.neq('id', editingId);
-      const { data: userExist } = await queryUser;
-
-      if (userExist && userExist.length > 0) {
+      const usuarioExiste = await verificarUsuarioExistente(formData.usuario, editingId);
+      if (usuarioExiste) {
         setFormErrors(prev => [...prev, 'nombre']);
         setMessage({ text: `⚠️ ERROR: El Usuario / Email (${formData.usuario}) ya está ocupado. Modifique el nombre para generar uno distinto.`, type: 'error' });
         setLoading(false);
         return;
       }
 
-      // ==========================================
-      // GUARDADO DE USUARIO
-      // ==========================================
       let finalUserId = editingId;
 
       if (!editingId) {
@@ -454,20 +438,14 @@ export default function RegistrarUsuario() {
       if (photoDataUrl) {
         recordData.foto_url = photoDataUrl;
       } else if (formData.foto) {
-        // Guardamos la URL de Google Drive ya convertida para que no de problemas después
         recordData.foto_url = convertirDriveUrl(formData.foto);
       }
 
-      let errorInsertUpdate;
       if (editingId) {
-        const res = await supabase.from('empleados').update(recordData).eq('id', editingId);
-        errorInsertUpdate = res.error;
+        await actualizarEmpleado(editingId, recordData);
       } else {
-        const res = await supabase.from('empleados').insert([recordData]);
-        errorInsertUpdate = res.error;
+        await crearEmpleado(recordData);
       }
-
-      if (errorInsertUpdate) throw new Error(`Error al guardar perfil: ${errorInsertUpdate.message}`);
 
       setMessage({ text: "Usuario guardado correctamente.", type: "success" });
       setTimeout(() => navigate('/usuarios/tracking_usuarios'), 800);
@@ -484,9 +462,6 @@ export default function RegistrarUsuario() {
   const provincias = formData.departamento ? Object.keys(UBIGEO[formData.departamento] || {}).sort() : [];
   const distritos = formData.departamento && formData.provincia ? (UBIGEO[formData.departamento][formData.provincia] || []) : [];
 
-// ==========================================
-  // FUNCIÓN PARA RESTABLECER CONTRASEÑA REAL
-  // ==========================================
   const handleRestablecerClave = async () => {
     if (!formData.dni) {
       setMessage({ text: "Falta el DNI para poder restablecer la clave.", type: "error" });
@@ -500,7 +475,6 @@ export default function RegistrarUsuario() {
     setLoadingText("Restableciendo contraseña en el sistema...");
 
     try {
-      // 1. Forzamos el cambio en la bóveda secreta de Supabase Auth (Llama a la función SQL)
       const { error: authError } = await supabase.rpc('restablecer_clave_admin', {
         user_id: editingId,
         nueva_clave: formData.dni
@@ -508,9 +482,7 @@ export default function RegistrarUsuario() {
 
       if (authError) throw new Error("Error Auth: " + authError.message);
 
-      // 2. Actualizamos la tabla visual 'empleados' para que el SUPERADMIN pueda verla
-      const { error: dbError } = await supabase.from('empleados').update({ clave: formData.dni }).eq('id', editingId);
-      if (dbError) throw new Error("Error BD: " + dbError.message);
+      await actualizarEmpleado(editingId, { clave: formData.dni });
 
       setFormData(prev => ({ ...prev, clave: formData.dni }));
       setMessage({ text: "¡Éxito! Contraseña restablecida al DNI. El usuario ya puede iniciar sesión.", type: "success" });
@@ -522,8 +494,6 @@ export default function RegistrarUsuario() {
       setLoading(false);
     }
   };
-
-
 
   return (
     <div className="registro-page" style={{ position: 'relative' }}>
@@ -572,11 +542,11 @@ export default function RegistrarUsuario() {
               <input type="text" value={formData.estado} readOnly />
             </div>
             <div className="field field-manual">
-              <label>DNI <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <label>DNI <span className="field-badge manual">OBLIGATORIO</span></label>
               <input type="text" id="dni" className={formErrors.includes('dni') ? 'input-error' : ''} value={formData.dni} onChange={handleChange} maxLength="20" required />
             </div>
             <div className="field field-manual">
-              <label>Área <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <label>Área <span className="field-badge manual">OBLIGATORIO</span></label>
               <select id="area" className={formErrors.includes('area') ? 'input-error' : ''} value={formData.area} onChange={handleChange} required>
                 <option value="">Seleccione área</option>
                 {listaAreas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
@@ -586,8 +556,7 @@ export default function RegistrarUsuario() {
 
           <div className="form-grid cols-4">
             <div className="field field-manual">
-              <label>Nombre <span className="field-badge manual">* OBLIGATORIO</span></label>
-              {/* OJO: Agregué el onBlur para que al soltar el campo, se arreglen las mayúsculas */}
+              <label>Nombre <span className="field-badge manual">OBLIGATORIO</span></label>
               <input 
                 type="text" 
                 id="nombre" 
@@ -600,21 +569,21 @@ export default function RegistrarUsuario() {
               />
             </div>
             <div className="field field-manual">
-              <label>Sexo <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <label>Sexo <span className="field-badge manual">OBLIGATORIO</span></label>
               <select id="sexo" className={formErrors.includes('sexo') ? 'input-error' : ''} value={formData.sexo} onChange={handleChange} required>
                 <option value="">Seleccione sexo</option>
                 {SEXOS.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div className="field field-manual">
-              <label>Tipo <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <label>Tipo <span className="field-badge manual">OBLIGATORIO</span></label>
               <select id="tipo" className={formErrors.includes('tipo') ? 'input-error' : ''} value={formData.tipo} onChange={handleChange} required>
                 <option value="">Seleccione tipo</option>
                 {TIPOS_USUARIO.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="field field-manual">
-              <label>Cargo <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <label>Cargo <span className="field-badge manual">OBLIGATORIO</span></label>
                 <select id="cargo" className={formErrors.includes('cargo') ? 'input-error' : ''} value={formData.cargo} onChange={handleChange} required>
                     <option value="">Seleccione cargo</option>
                     {listaCargos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -624,14 +593,14 @@ export default function RegistrarUsuario() {
 
           <div className="form-grid cols-4">
             <div className="field field-manual">
-              <label>Jefe directo <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <label>Jefe directo <span className="field-badge manual">OBLIGATORIO</span></label>
                 <select id="jefeDirecto" className={formErrors.includes('jefeDirecto') ? 'input-error' : ''} value={formData.jefeDirecto} onChange={handleChange} required>
                     <option value="">Seleccione jefe directo</option>
                     {listaJefes.map(j => <option key={j.id} value={j.id}>{j.nombre}</option>)}
                 </select>
             </div>
             <div className="field field-manual">
-              <label>Rol <span className="field-badge manual">* OBLIGATORIO</span></label>
+              <label>Rol <span className="field-badge manual">OBLIGATORIO</span></label>
               <select id="rol" className={formErrors.includes('rol') ? 'input-error' : ''} value={formData.rol} onChange={handleChange} required>
                 <option value="">Seleccione rol</option>
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
@@ -657,8 +626,6 @@ export default function RegistrarUsuario() {
                 style={!isSuperAdmin ? { letterSpacing: '3px', color: '#94a3b8', fontWeight: 'bold' } : {}}
               />
             </div>
-
-            
           </div>
 
           <div className="dual-titles">
@@ -693,7 +660,6 @@ export default function RegistrarUsuario() {
                         src={photoPreview} 
                         alt="Vista previa" 
                         onError={(e) => {
-                          // Si el formato principal es bloqueado por el navegador, usamos el visor de respaldo
                           if (!e.target.dataset.retried) {
                             e.target.dataset.retried = "true";
                             const driveId = extraerIdDrive(formData.foto);

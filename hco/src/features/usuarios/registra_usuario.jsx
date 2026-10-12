@@ -3,14 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Loading from '../../layouts/Loading';
 import './registra_usuario.css';
 
-// Importamos supabase desde config para Auth y RPC
+// Integración de Red y Modo Offline
+import { useNetwork } from '../../hooks/useNetwork';
+import { localDb } from '../../services/localDb';
+import { useLiveQuery } from 'dexie-react-hooks';
+
+// Importamos supabase para Auth y RPC (Solo cuando haya internet)
 import { supabase } from '../../config/supabaseClient';
-// Importamos los servicios de base de datos
-import { 
-  obtenerEmpleadoPorId, crearEmpleado, actualizarEmpleado, 
-  verificarDniExistente, verificarUsuarioExistente,
-  obtenerAreas, obtenerCargos, obtenerJefes 
-} from '../../services/empleadosService';
+import { crearEmpleado, actualizarEmpleado } from '../../services/empleadosService';
 
 function getStoredAuthUser() {
   const raw = localStorage.getItem("authUser") || sessionStorage.getItem("authUser");
@@ -39,18 +39,13 @@ const UBIGEO = {
 const formatearNombre = (text) => {
   if (!text) return "";
   return text.toLowerCase().split(',').map(parte => 
-    parte.trim().split(/\s+/).map(palabra => 
-      palabra.charAt(0).toUpperCase() + palabra.slice(1)
-    ).join(" ")
+    parte.trim().split(/\s+/).map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)).join(" ")
   ).join(", ");
 };
 
 const extraerIdDrive = (url) => {
   if (!url) return null;
-  const match =
-    url.match(/\/file\/d\/([^/]+)/) ||
-    url.match(/[?&]id=([^&]+)/) ||
-    url.match(/thumbnail\?id=([^&]+)/);
+  const match = url.match(/\/file\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/) || url.match(/thumbnail\?id=([^&]+)/);
   return match ? match[1] : null;
 };
 
@@ -58,10 +53,7 @@ const convertirDriveUrl = (url) => {
   if (!url) return "";
   if (url.startsWith("data:image/")) return url;
   const driveId = extraerIdDrive(url);
-
-  if (driveId) {
-    return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
-  }
+  if (driveId) return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
   return url;
 };
 
@@ -71,16 +63,17 @@ export default function RegistrarUsuario() {
   const editingId = searchParams.get("id");
   const [currentUser] = useState(() => getStoredAuthUser());
   const isSuperAdmin = String(currentUser?.rol || "").toUpperCase() === "SUPERADMIN";
+  const isOnline = useNetwork();
 
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState("Cargando datos...");
   const [message, setMessage] = useState({ text: '', type: '' });
   const [formErrors, setFormErrors] = useState([]);
   const normalize = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  
-  const [listaAreas, setListaAreas] = useState([]);
-  const [listaCargos, setListaCargos] = useState([]);
-  const [listaJefes, setListaJefes] = useState([]);
+
+  const listaAreas = useLiveQuery(() => localDb.areas.toArray()) || [];
+  const listaCargos = useLiveQuery(() => localDb.cargos.toArray()) || [];
+  const listaJefes = useLiveQuery(() => localDb.jefes.toArray()) || [];
 
   const TIPOS_USUARIO = ["white", "blue"];
   const SEXOS = ['Masculino', 'Femenino', 'Otro'];
@@ -89,9 +82,14 @@ export default function RegistrarUsuario() {
 
   const [formData, setFormData] = useState({
     id: "", estado: "Activo", dni: "", nombre: "", sexo: "", tipo: "", cargo: "",
-    area: "", jefeDirecto: "", rol: "", usuario: "", clave: "", fechaNacimiento: "", edad: "",
+    area: "", jefeDirecto: "", rol: "", usuario: "", 
+    // CAMBIO 1: El estado interno sigue siendo 'clave' por comodidad, pero se mapeará a 'cl' en la BD
+    clave: "", 
+    fechaNacimiento: "", edad: "",
     hijos: "", celular: "", departamento: "", provincia: "", distrito: "", direccion: "",
     urlCasa: "", coordenadas: "", grupoSanguineo: "", contactoEmergencia: "", 
+    // CAMBIO 2: Agregamos rubrica al estado inicial
+    rubrica: "",
     correo: "", correoCeva: "", correo3m: "", codMainchart: "", 
     fechaIngreso: "", rutaMovilidad: "", fechaSalida: "", permanencia: "", motivoSalida: "", foto: ""
   });
@@ -100,41 +98,16 @@ export default function RegistrarUsuario() {
   const [photoDataUrl, setPhotoDataUrl] = useState("");
 
   useEffect(() => {
-    cargarCatalogosSupabase();
-    if (editingId) {
-      cargarUsuarioEditar(editingId);
-    } else {
-      generarSiguienteId();
-    }
+    if (editingId) cargarUsuarioEditar(editingId);
+    else setFormData(prev => ({ ...prev, id: "Auto-generado al guardar" }));
   }, [editingId]);
-
-  const cargarCatalogosSupabase = async () => {
-    try {
-      const areasData = await obtenerAreas();
-      if (areasData) setListaAreas(areasData);
-
-      const cargosData = await obtenerCargos();
-      if (cargosData) setListaCargos(cargosData);
-
-      const jefesData = await obtenerJefes();
-      if (jefesData) setListaJefes(jefesData);
-    } catch (error) {
-      console.error("Error al cargar catálogos:", error);
-    }
-  };
-
-  const generarSiguienteId = async () => {
-    setFormData(prev => ({ ...prev, id: "Auto-generado al guardar" }));
-  };
 
   const cargarUsuarioEditar = async (id) => {
     setLoading(true);
-    setLoadingText("Cargando usuario...");
     try {
-      const data = await obtenerEmpleadoPorId(id);
-
+      const data = await localDb.usuarios.get(id);
       if (data) {
-        let edadCalculada = "";
+        let edadCalculada = "", permanenciaCalculada = "";
         if (data.fch_nacimiento) {
           const nacimiento = new Date(data.fch_nacimiento + "T00:00:00");
           const hoy = new Date();
@@ -143,57 +116,35 @@ export default function RegistrarUsuario() {
           if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) edad--;
           edadCalculada = String(Math.max(0, edad));
         }
-
-        let permanenciaCalculada = "";
         if (data.fecha_ingreso) {
           const inicio = new Date(data.fecha_ingreso + "T00:00:00");
           const fin = data.fch_salida ? new Date(data.fch_salida + "T00:00:00") : new Date();
           inicio.setHours(0, 0, 0, 0);
           fin.setHours(0, 0, 0, 0);
-          const diff = Math.floor((fin.getTime() - inicio.getTime()) / 86400000);
-          permanenciaCalculada = String(Math.max(0, diff));
+          permanenciaCalculada = String(Math.max(0, Math.floor((fin.getTime() - inicio.getTime()) / 86400000)));
         }
 
         setFormData({
-          id: data.id || "",
-          estado: data.estado || "Activo",
-          dni: data.dni || "",
-          nombre: data.nombre || "",
-          sexo: data.sexo || "",
-          tipo: data.tipo || "",
-          cargo: data.cargo_id || "",
-          area: data.area_id || "",
-          jefeDirecto: data.jefe_directo_id || "",
-          rol: data.rol || "",
-          usuario: data.usuario || "",
-          clave: data.clave || "", 
-          fechaNacimiento: data.fch_nacimiento || "", 
-          fechaSalida: data.fch_salida || "",
-          fechaIngreso: data.fecha_ingreso || "",
-          hijos: data.hijos !== null && data.hijos !== undefined ? data.hijos : "", 
-          celular: data.celular || "",
-          departamento: data.departamento || "",
-          provincia: data.provincia || "",
-          distrito: data.distrito || "",
-          direccion: data.direccion || "",
-          urlCasa: data.url_casa || "",
-          coordenadas: data.coordenadas || "",
-          grupoSanguineo: data.grupo_sanguineo || "",
-          contactoEmergencia: data.contacto_emergencia || "",
+          id: data.id || "", estado: data.estado || "Activo", dni: data.dni || "",
+          nombre: data.nombre || "", sexo: data.sexo || "", tipo: data.tipo || "",
+          cargo: data.cargo_id || "", area: data.area_id || "", jefeDirecto: data.jefe_directo_id || "",
+          rol: data.rol || "", usuario: data.usuario || "", 
+          // CAMBIO 3: Leer de la columna 'cl' en lugar de 'clave'
+          clave: data.cl || "", 
+          fechaNacimiento: data.fch_nacimiento || "", fechaSalida: data.fch_salida || "",
+          fechaIngreso: data.fecha_ingreso || "", hijos: data.hijos !== null && data.hijos !== undefined ? data.hijos : "", 
+          celular: data.celular || "", departamento: data.departamento || "", provincia: data.provincia || "",
+          distrito: data.distrito || "", direccion: data.direccion || "", urlCasa: data.url_casa || "",
+          coordenadas: data.coordenadas || "", grupoSanguineo: data.grupo_sanguineo || "",
+          contactoEmergencia: data.contacto_emergencia || "", 
+          // CAMBIO 4: Leer la rúbrica
+          rubrica: data.rubrica || "",
           correo: data.correo_personal || "", 
-          correoCeva: data.correo_ceva || "",
-          correo3m: data.correo_3m || "",
-          codMainchart: data.cod_mainchart || "",
-          rutaMovilidad: data.ruta_movilidad || "",
-          motivoSalida: data.motivo_salida || "",
-          foto: data.foto_url || "",
-          edad: edadCalculada, 
-          permanencia: permanenciaCalculada
+          correoCeva: data.correo_ceva || "", correo3m: data.correo_3m || "", codMainchart: data.cod_mainchart || "",
+          rutaMovilidad: data.ruta_movilidad || "", motivoSalida: data.motivo_salida || "", foto: data.foto_url || "",
+          edad: edadCalculada, permanencia: permanenciaCalculada
         });
-
-        if (data.foto_url) {
-          setPhotoPreview(convertirDriveUrl(data.foto_url));
-        }
+        if (data.foto_url) setPhotoPreview(convertirDriveUrl(data.foto_url));
       }
     } catch (err) {
       console.error(err);
@@ -209,7 +160,7 @@ export default function RegistrarUsuario() {
       setFormData(prev => ({ ...prev, usuario: generatedUser, clave: prev.dni }));
     }
   }, [formData.nombre, formData.dni, editingId]);
-
+  
   useEffect(() => {
     if (formData.fechaNacimiento) {
       const nacimiento = new Date(formData.fechaNacimiento + "T00:00:00");
@@ -252,65 +203,35 @@ export default function RegistrarUsuario() {
     const primerNombre = nombres[0] || "";
     const primerApellido = apellidos[0] || "";
     const segundoApellido = apellidos[1] || "";
-    
     const base = normalize(primerNombre.substring(0, 1) + primerApellido + segundoApellido.substring(0, 1)).replace(/[^a-z0-9]/g, "");
     return `${base}@hco.com`.toLowerCase();
   };
 
   const handleChange = (e) => {
     const { id, value } = e.target;
-
     setFormData(prev => {
       const next = { ...prev, [id]: value };
-
-      if (id === 'departamento') {
-        next.provincia = "";
-        next.distrito = "";
-      }
-
-      if (id === 'provincia') {
-        next.distrito = "";
-      }
-
+      if (id === 'departamento') { next.provincia = ""; next.distrito = ""; }
+      if (id === 'provincia') { next.distrito = ""; }
       return next;
     });
-
-    if (id === "foto") {
-      setPhotoDataUrl("");
-      setPhotoPreview(convertirDriveUrl(value));
-    }
-
-    if (formErrors.includes(id)) {
-      setFormErrors(prev => prev.filter(field => field !== id));
-    }
+    if (id === "foto") { setPhotoDataUrl(""); setPhotoPreview(convertirDriveUrl(value)); }
+    if (formErrors.includes(id)) setFormErrors(prev => prev.filter(field => field !== id));
   };
-
-  const handleNombreBlur = () => {
-    setFormData(prev => ({
-      ...prev,
-      nombre: formatearNombre(prev.nombre)
-    }));
-  };
-
+  
+  const handleNombreBlur = () => setFormData(prev => ({ ...prev, nombre: formatearNombre(prev.nombre) }));
+  
   const handlePhotoSelected = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     try {
       const dataUrl = await compressImage(file, 900, 0.72);
-      setPhotoDataUrl(dataUrl);
-      setPhotoPreview(dataUrl);
-      setFormData(prev => ({ ...prev, foto: "" }));
-    } catch (error) {
-      setMessage({ text: "No se pudo procesar la foto.", type: "error" });
-    }
+      setPhotoDataUrl(dataUrl); setPhotoPreview(dataUrl); setFormData(prev => ({ ...prev, foto: "" }));
+    } catch (error) { setMessage({ text: "No se pudo procesar la foto.", type: "error" }); }
     e.target.value = "";
   };
 
-  const clearPhoto = () => {
-    setPhotoDataUrl("");
-    setPhotoPreview("");
-    setFormData(prev => ({ ...prev, foto: "" }));
-  };
+  const clearPhoto = () => { setPhotoDataUrl(""); setPhotoPreview(""); setFormData(prev => ({ ...prev, foto: "" })); };
 
   const compressImage = (file, maxWidth, quality) => {
     return new Promise((resolve, reject) => {
@@ -319,22 +240,15 @@ export default function RegistrarUsuario() {
         const img = new Image();
         img.onload = () => {
           let { width, height } = img;
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
+          if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
           const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          ctx.drawImage(img, 0, 0, width, height);
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, width, height);
           resolve(canvas.toDataURL("image/jpeg", quality));
         };
-        img.onerror = reject;
-        img.src = reader.result;
+        img.onerror = reject; img.src = reader.result;
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      reader.onerror = reject; reader.readAsDataURL(file);
     });
   };
 
@@ -344,23 +258,12 @@ export default function RegistrarUsuario() {
     setFormErrors([]); 
 
     const requiredFields = [
-      { key: 'dni', label: 'DNI' }, 
-      { key: 'nombre', label: 'Nombre' },
-      { key: 'sexo', label: 'Sexo' }, 
-      { key: 'tipo', label: 'Tipo' },
-      { key: 'cargo', label: 'Cargo' }, 
-      { key: 'area', label: 'Área' },
-      { key: 'jefeDirecto', label: 'Jefe directo' }, 
-      { key: 'rol', label: 'Rol' }
+      { key: 'dni', label: 'DNI' }, { key: 'nombre', label: 'Nombre' }, { key: 'sexo', label: 'Sexo' }, 
+      { key: 'tipo', label: 'Tipo' }, { key: 'cargo', label: 'Cargo' }, { key: 'area', label: 'Área' },
+      { key: 'jefeDirecto', label: 'Jefe directo' }, { key: 'rol', label: 'Rol' }
     ];
 
-    const erroresEncontrados = [];
-    for (let field of requiredFields) {
-      if (!formData[field.key]) {
-        erroresEncontrados.push(field.key);
-      }
-    }
-
+    const erroresEncontrados = requiredFields.filter(f => !formData[f.key]).map(f => f.key);
     if (erroresEncontrados.length > 0) {
       setFormErrors(erroresEncontrados);
       setMessage({ text: 'Por favor, complete todos los campos resaltados en rojo.', type: 'error' });
@@ -368,87 +271,76 @@ export default function RegistrarUsuario() {
     }
 
     setLoading(true);
-    setLoadingText("Guardando usuario...");
 
     try {
-      const dniExiste = await verificarDniExistente(formData.dni, editingId);
-      if (dniExiste) {
+      const duplicadoDni = await localDb.usuarios.where('dni').equals(formData.dni.trim()).first();
+      if (duplicadoDni && duplicadoDni.id !== editingId) {
         setFormErrors(prev => [...prev, 'dni']);
-        setMessage({ text: '⚠️ ERROR: El DNI ingresado ya existe en la base de datos.', type: 'error' });
-        setLoading(false);
-        return;
+        throw new Error('⚠️ ERROR: El DNI ingresado ya existe localmente.');
       }
-
-      const usuarioExiste = await verificarUsuarioExistente(formData.usuario, editingId);
-      if (usuarioExiste) {
+      
+      const duplicadoUsuario = await localDb.usuarios.where('usuario').equals(formData.usuario.trim()).first();
+      if (duplicadoUsuario && duplicadoUsuario.id !== editingId) {
         setFormErrors(prev => [...prev, 'nombre']);
-        setMessage({ text: `⚠️ ERROR: El Usuario / Email (${formData.usuario}) ya está ocupado. Modifique el nombre para generar uno distinto.`, type: 'error' });
-        setLoading(false);
-        return;
+        throw new Error(`⚠️ ERROR: El Usuario/Email (${formData.usuario}) ya está ocupado.`);
       }
 
       let finalUserId = editingId;
+      let needsAuthCreation = false;
 
       if (!editingId) {
-        const emailLogin = formData.usuario.trim();
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: emailLogin,
-          password: formData.clave.trim(),
-        });
-
-        if (authError) throw new Error(`Error en Autenticación: ${authError.message}`);
-        if (!authData.user) throw new Error("No se pudo obtener el ID del usuario creado.");
-
-        finalUserId = authData.user.id;
+        if (isOnline) {
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: formData.usuario.trim(), password: formData.clave.trim(),
+          });
+          if (authError) throw new Error(`Error Auth: ${authError.message}`);
+          finalUserId = authData.user.id;
+        } else {
+          finalUserId = crypto.randomUUID();
+          needsAuthCreation = true;
+        }
       }
 
       const recordData = {
-        id: finalUserId,
-        estado: formData.estado,
-        dni: formData.dni.trim(),
-        nombre: formData.nombre.trim(),
-        sexo: formData.sexo,
-        tipo: formData.tipo,
-        cargo_id: formData.cargo ? parseInt(formData.cargo) : null,
-        area_id: formData.area ? parseInt(formData.area) : null,
-        jefe_directo_id: formData.jefeDirecto || null, 
-        rol: formData.rol,
-        usuario: formData.usuario.trim(),
-        fch_nacimiento: formData.fechaNacimiento || null,
-        fch_salida: formData.fechaSalida || null,
-        fecha_ingreso: formData.fechaIngreso || null,
-        correo_personal: formData.correo.trim(),
-        correo_ceva: formData.correoCeva.trim(),
-        correo_3m: formData.correo3m.trim(),
-        cod_mainchart: formData.codMainchart.trim(),        
-        hijos: formData.hijos !== "" ? parseInt(formData.hijos) : 0, 
-        celular: formData.celular.trim(),
-        departamento: formData.departamento,
-        provincia: formData.provincia,
-        distrito: formData.distrito,
-        direccion: formData.direccion.trim(),
-        url_casa: formData.urlCasa.trim(),
-        coordenadas: formData.coordenadas.trim(),
-        grupo_sanguineo: formData.grupoSanguineo.trim(),
-        contacto_emergencia: formData.contactoEmergencia.trim(),
+        id: finalUserId, estado: formData.estado, dni: formData.dni.trim(), nombre: formData.nombre.trim(),
+        sexo: formData.sexo, tipo: formData.tipo, cargo_id: formData.cargo ? parseInt(formData.cargo) : null,
+        area_id: formData.area ? parseInt(formData.area) : null, jefe_directo_id: formData.jefeDirecto || null, 
+        rol: formData.rol, usuario: formData.usuario.trim(), 
+        // CAMBIO 5: Mapear el estado 'clave' a la columna 'cl' al guardar
+        cl: formData.clave.trim(), 
+        fch_nacimiento: formData.fechaNacimiento || null, fch_salida: formData.fechaSalida || null,
+        fecha_ingreso: formData.fechaIngreso || null, correo_personal: formData.correo.trim(),
+        correo_ceva: formData.correoCeva.trim(), correo_3m: formData.correo3m.trim(),
+        cod_mainchart: formData.codMainchart.trim(), hijos: formData.hijos !== "" ? parseInt(formData.hijos) : 0, 
+        celular: formData.celular.trim(), departamento: formData.departamento, provincia: formData.provincia,
+        distrito: formData.distrito, direccion: formData.direccion.trim(), url_casa: formData.urlCasa.trim(),
+        coordenadas: formData.coordenadas.trim(), grupo_sanguineo: formData.grupoSanguineo.trim(),
+        contacto_emergencia: formData.contactoEmergencia.trim(), 
+        // CAMBIO 6: Incluir rubrica al guardar
+        rubrica: formData.rubrica.trim(),
         ruta_movilidad: formData.rutaMovilidad || null, 
-        motivo_salida: formData.motivoSalida.trim()
+        motivo_salida: formData.motivoSalida.trim(),
+        foto_url: photoDataUrl ? photoDataUrl : (formData.foto ? convertirDriveUrl(formData.foto) : null)
       };
 
-      if (photoDataUrl) {
-        recordData.foto_url = photoDataUrl;
-      } else if (formData.foto) {
-        recordData.foto_url = convertirDriveUrl(formData.foto);
-      }
+      if (editingId) await localDb.usuarios.update(finalUserId, recordData);
+      else await localDb.usuarios.add(recordData);
 
-      if (editingId) {
-        await actualizarEmpleado(editingId, recordData);
+      if (isOnline) {
+        if (editingId) await actualizarEmpleado(editingId, recordData);
+        else await crearEmpleado(recordData);
+        setMessage({ text: "Usuario guardado correctamente en el servidor.", type: "success" });
       } else {
-        await crearEmpleado(recordData);
+        await localDb.sync_queue.add({
+          tabla: 'usuarios',
+          operacion: editingId ? 'UPDATE' : 'INSERT',
+          needsAuth: needsAuthCreation,
+          payload: recordData
+        });
+        setMessage({ text: "Modo Offline: Guardado localmente, se sincronizará luego.", type: "warning" });
       }
 
-      setMessage({ text: "Usuario guardado correctamente.", type: "success" });
-      setTimeout(() => navigate('/usuarios/tracking_usuarios'), 800);
+      setTimeout(() => navigate('/usuarios/tracking_usuarios'), 1200);
 
     } catch (error) {
       console.error(error);
@@ -463,45 +355,36 @@ export default function RegistrarUsuario() {
   const distritos = formData.departamento && formData.provincia ? (UBIGEO[formData.departamento][formData.provincia] || []) : [];
 
   const handleRestablecerClave = async () => {
-    if (!formData.dni) {
-      setMessage({ text: "Falta el DNI para poder restablecer la clave.", type: "error" });
+    if (!isOnline) {
+      setMessage({ text: "Esta acción requiere conexión a internet.", type: "error" });
       return;
     }
+    if (!formData.dni) return setMessage({ text: "Falta DNI.", type: "error" });
     
-    const confirmar = window.confirm(`¿Estás seguro de restablecer la contraseña de este usuario a su DNI (${formData.dni})?`);
-    if (!confirmar) return;
+    if (!window.confirm(`¿Estás seguro de restablecer la contraseña a su DNI (${formData.dni})?`)) return;
 
     setLoading(true);
-    setLoadingText("Restableciendo contraseña en el sistema...");
-
     try {
-      const { error: authError } = await supabase.rpc('restablecer_clave_admin', {
-        user_id: editingId,
-        nueva_clave: formData.dni
-      });
+      const { error: authError } = await supabase.rpc('restablecer_clave_admin', { user_id: editingId, nueva_clave: formData.dni });
+      if (authError) throw authError;
 
-      if (authError) throw new Error("Error Auth: " + authError.message);
-
-      await actualizarEmpleado(editingId, { clave: formData.dni });
-
-      setFormData(prev => ({ ...prev, clave: formData.dni }));
-      setMessage({ text: "¡Éxito! Contraseña restablecida al DNI. El usuario ya puede iniciar sesión.", type: "success" });
+      // CAMBIO 7: Actualizar la columna 'cl' al restablecer la contraseña
+      await actualizarEmpleado(editingId, { cl: formData.dni });
+      await localDb.usuarios.update(editingId, { cl: formData.dni });
       
+      setFormData(prev => ({ ...prev, clave: formData.dni }));
+      setMessage({ text: "Contraseña restablecida exitosamente.", type: "success" });
     } catch (error) {
-      console.error("Error al restablecer:", error);
-      setMessage({ text: "Error al restablecer: " + error.message, type: "error" });
-    } finally {
-      setLoading(false);
-    }
+      setMessage({ text: "Error al restablecer.", type: "error" });
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="registro-page" style={{ position: 'relative' }}>
       {loading && <Loading />}
-
       <section className="page-hero">
         <span className="page-chip">Administración</span>
-        <h1>{editingId ? "Editar usuario" : "Nuevo usuario"}</h1>
+        <h1>{editingId ? "Editar usuario" : "Nuevo usuario"} {isOnline ? '🟢' : '🔴 (Offline)'}</h1>
         <p>Complete los datos principales del usuario. Los campos obligatorios están marcados como * OBLIGATORIO.</p>
       </section>
 
@@ -513,7 +396,7 @@ export default function RegistrarUsuario() {
           </div>
 
           <div className="card-head-right">
-            {editingId && isSuperAdmin && (
+            {editingId && isSuperAdmin && isOnline && (
               <button 
                 type="button" 
                 className="btn-restablecer-mini"
@@ -558,14 +441,9 @@ export default function RegistrarUsuario() {
             <div className="field field-manual">
               <label>Nombre <span className="field-badge manual">OBLIGATORIO</span></label>
               <input 
-                type="text" 
-                id="nombre" 
-                className={formErrors.includes('nombre') ? 'input-error' : ''} 
+                type="text" id="nombre" className={formErrors.includes('nombre') ? 'input-error' : ''} 
                 placeholder="Apellido Apellido, Nombre Nombre" 
-                value={formData.nombre} 
-                onChange={handleChange} 
-                onBlur={handleNombreBlur} 
-                required 
+                value={formData.nombre} onChange={handleChange} onBlur={handleNombreBlur} required 
               />
             </div>
             <div className="field field-manual">
@@ -619,8 +497,7 @@ export default function RegistrarUsuario() {
                 }
               </label>
               <input 
-                type="text" 
-                id="clave" 
+                type="text" id="clave" 
                 value={isSuperAdmin ? (formData.clave || "Sin clave registrada") : "••••••••••••"} 
                 readOnly 
                 style={!isSuperAdmin ? { letterSpacing: '3px', color: '#94a3b8', fontWeight: 'bold' } : {}}
@@ -657,8 +534,7 @@ export default function RegistrarUsuario() {
                   {photoPreview ? (
                     <div className="preview-card-split">
                       <img 
-                        src={photoPreview} 
-                        alt="Vista previa" 
+                        src={photoPreview} alt="Vista previa" 
                         onError={(e) => {
                           if (!e.target.dataset.retried) {
                             e.target.dataset.retried = "true";
@@ -673,7 +549,6 @@ export default function RegistrarUsuario() {
                         Quitar
                       </button>
                     </div>
-
                   ) : (
                     <div className="placeholder-split">Sin foto</div>
                   )}
@@ -753,9 +628,11 @@ export default function RegistrarUsuario() {
             <div className="field field-manual"><label>Coordenadas</label><input type="text" id="coordenadas" placeholder="-12.000000, -77.000000" value={formData.coordenadas} onChange={handleChange} /></div>
           </div>
 
+          {/* CAMBIO 8: Actualizada esta grid para incluir Rúbrica */}
           <div className="form-grid cols-3">
             <div className="field field-manual"><label>Grupo sanguíneo</label><input type="text" id="grupoSanguineo" value={formData.grupoSanguineo} onChange={handleChange} /></div>
             <div className="field field-manual"><label>Contacto emergencia</label><input type="tel" id="contactoEmergencia" value={formData.contactoEmergencia} onChange={handleChange} /></div>
+            <div className="field field-manual"><label>Rúbrica</label><input type="text" id="rubrica" value={formData.rubrica} onChange={handleChange} /></div>
           </div>
 
           <div className="section-title">Datos laborales</div>
@@ -791,7 +668,6 @@ export default function RegistrarUsuario() {
               {editingId ? "Actualizar usuario" : "Guardar usuario"}
             </button>
           </div>
-
         </form>
       </section>
     </div>

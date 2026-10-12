@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
 import Loading from '../../layouts/Loading';
 import './mhe_evaluar.css';
 import '../usuarios/registra_usuario.css';
+
+// Importamos los servicios de MHE
+import { 
+  obtenerDatosMaestrosMhe, 
+  obtenerUltimaInspeccionEquipo, 
+  guardarInspeccionCompleta 
+} from '../../services/mheService';
 
 // Leer sesión
 function getStoredAuthUser() {
@@ -17,6 +23,7 @@ const extraerIdDrive = (url) => {
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   return match ? match[1] : null;
 };
+
 const convertirDriveUrl = (url) => {
   if (!url) return "";
   if (url.startsWith("data:image/")) return url;
@@ -64,19 +71,11 @@ export default function MheEvaluar() {
   const cargarDatosMaestros = async () => {
     setLoading(true);
     try {
-      // Descargamos todo al mismo tiempo para máxima velocidad
-      const [resCat, resEq, resPreg] = await Promise.all([
-        supabase.from('categorias_equipos').select('*').order('nombre'),
-        supabase.from('equipos').select('*'),
-        supabase.from('items_checklist').select('*')
-      ]);
-
-      if (resCat.error) throw resCat.error;
-      
-      if (resCat.data) setCategorias(resCat.data);
-      if (resEq.data) setTodosEquipos(resEq.data);
-      if (resPreg.data) setTodasPreguntas(resPreg.data);
-      
+      // USANDO EL SERVICIO
+      const data = await obtenerDatosMaestrosMhe();
+      setCategorias(data.categorias);
+      setTodosEquipos(data.equipos);
+      setTodasPreguntas(data.preguntas);
     } catch (error) {
       alert("Error al conectar con la base de datos: " + error.message);
     } finally {
@@ -115,7 +114,6 @@ export default function MheEvaluar() {
     setRespuestas(initResp);
   };
 
-
   // 3. Al seleccionar un equipo, cargar su foto y su último checklist
   const handleEquipoChange = async (e) => {
     const eqId = e.target.value;
@@ -128,19 +126,12 @@ export default function MheEvaluar() {
     setChecklistAnterior(null);
     if (!eqId) return;
 
-    // Buscar historial anterior
+    // USANDO EL SERVICIO PARA BUSCAR HISTORIAL ANTERIOR
     try {
-      const { data } = await supabase
-        .from('inspecciones')
-        .select('estado_mhe, observaciones_generales, fecha_hora, registrado_por_nombre')
-        .eq('equipo_id', eqId)
-        .order('fecha_hora', { ascending: false })
-        .limit(1)
-        .single();
-      
+      const data = await obtenerUltimaInspeccionEquipo(eqId);
       if (data) setChecklistAnterior(data);
     } catch (error) {
-      // Si no hay historial, no hacemos nada (es normal en equipos nuevos)
+      console.error(error.message);
     }
   };
 
@@ -174,11 +165,9 @@ export default function MheEvaluar() {
     // Validación de respuestas
     const incompletas = preguntas.some(p => {
       const resp = respuestas[p.id];
-      // Si es Bateria o Contador[cite: 14], validamos que haya escrito un texto/número
       if (p.seccion === 'BATERIA' || p.seccion === 'CONTADOR') {
         return !resp.respuesta_texto.trim();
       }
-      // Si son botones, validamos que haya seleccionado uno
       return !resp.valor_estado;
     });
 
@@ -189,38 +178,28 @@ export default function MheEvaluar() {
 
     try {
       const estadoCalculado = calcularEstadoMaquina();
-      
-      // La foto final ya no se sube, se hereda la del equipo (opcional, pero la guardamos en cabecera por historial)
       const fotoEquipoHistorial = equipoSeleccionado?.foto_url || null;
 
-      const { data: inspGuardada, error: errorInsp } = await supabase
-        .from('inspecciones')
-        .insert([{
-          area_id: currentUser.area_id, 
-          usuario_id: currentUser.id,   
-          registrado_por_dni: currentUser.dni,
-          registrado_por_nombre: currentUser.nombre,
-          equipo_id: formData.equipo_id,
-          foto_equipo: fotoEquipoHistorial, 
-          observaciones_generales: formData.observaciones,
-          vb_operador: formData.vb_operador,
-          estado_mhe: estadoCalculado,
-          estado_personal: 'OPERATIVO',
-          
-          // Guardamos el snapshot del último checklist para auditoría
-          chk_ant_estado: checklistAnterior?.estado_mhe || null,
-          chk_ant_obs: checklistAnterior?.observaciones_generales || null,
-          chk_ant_fecha: checklistAnterior?.fecha_hora || null,
-          chk_ant_usuario: checklistAnterior?.registrado_por_nombre || null
-        }])
-        .select()
-        .single();
+      // Armamos el objeto de cabecera para el servicio
+      const datosInspeccion = {
+        area_id: currentUser.area_id, 
+        usuario_id: currentUser.id,   
+        registrado_por_dni: currentUser.dni,
+        registrado_por_nombre: currentUser.nombre,
+        equipo_id: formData.equipo_id,
+        foto_equipo: fotoEquipoHistorial, 
+        observaciones_generales: formData.observaciones,
+        vb_operador: formData.vb_operador,
+        estado_mhe: estadoCalculado,
+        estado_personal: 'OPERATIVO',
+        chk_ant_estado: checklistAnterior?.estado_mhe || null,
+        chk_ant_obs: checklistAnterior?.observaciones_generales || null,
+        chk_ant_fecha: checklistAnterior?.fecha_hora || null,
+        chk_ant_usuario: checklistAnterior?.registrado_por_nombre || null
+      };
 
-      if (errorInsp) throw errorInsp;
-
-      // Guardar respuestas individualmente
+      // Armamos el array de respuestas para el servicio
       const respuestasArray = Object.keys(respuestas).map(itemId => {
-        // Si es Bateria o Contador, forzamos valor_estado a NO_APLICA para que no rompa la BD
         const pregSeccion = preguntas.find(p => p.id === itemId)?.seccion;
         let finalValorEstado = respuestas[itemId].valor_estado;
         if (pregSeccion === 'BATERIA' || pregSeccion === 'CONTADOR') {
@@ -228,15 +207,14 @@ export default function MheEvaluar() {
         }
 
         return {
-          inspeccion_id: inspGuardada.id,
           item_id: itemId,
           valor_estado: finalValorEstado,
           respuesta_texto: respuestas[itemId].respuesta_texto
         };
       });
 
-      const { error: errorResp } = await supabase.from('respuestas_inspeccion').insert(respuestasArray);
-      if (errorResp) throw errorResp;
+      // USANDO EL SERVICIO PARA GUARDAR TODO
+      await guardarInspeccionCompleta(datosInspeccion, respuestasArray);
 
       alert(`Inspección guardada exitosamente. Estado Final: ${estadoCalculado}`);
       navigate('/mhe/tracking_mhe');
@@ -257,6 +235,7 @@ export default function MheEvaluar() {
   const pregResumen = preguntas.filter(p => p.seccion === 'RESUMEN');
   const pregSalud = preguntas.filter(p => p.seccion === 'SALUD');
 
+  // EL RETURN SE MANTIENE EXACTAMENTE IGUAL A PARTIR DE AQUÍ
   return (
     <div className="registro-page">
       {loading && <Loading />}
@@ -274,13 +253,9 @@ export default function MheEvaluar() {
 
         <form onSubmit={handleSubmit}>
           
-          {/* ======================================= */}
-          {/* 1. DATOS DEL EQUIPO (PANELES GEMELOS SÚPER COMPACTOS) */}
-          {/* ======================================= */}
-          <div className="section-title">1. Datos del Equipo</div>
+          {/* 1. DATOS DEL EQUIPO */}
+          <div className="section-title">Datos del Equipo</div>
           <div className="split-layout datos-equipo-compact">
-            
-            {/* Panel Izquierdo: Selects */}
             <div className="split-panel panel-inputs">
               <div className="field">
                 <label>Tipo de Equipo <span className="field-badge manual">OBLIGATORIO</span></label>
@@ -298,28 +273,21 @@ export default function MheEvaluar() {
               </div>
             </div>
 
-            {/* Panel Derecho: Foto adaptada */}
             <div className="split-panel panel-foto">
               {equipoSeleccionado?.foto_url ? (
-                <img 
-                  src={convertirDriveUrl(equipoSeleccionado.foto_url)} 
-                  alt="Equipo" 
-                />
+                <img src={convertirDriveUrl(equipoSeleccionado.foto_url)} alt="Equipo" />
               ) : (
                 <span style={{fontSize: '13px', color: '#64748b', fontWeight: '600', textAlign: 'center'}}>
                   {formData.equipo_id ? "Sin foto registrada" : "Seleccione un equipo"}
                 </span>
               )}
             </div>
-
           </div>
 
 
           {preguntas.length > 0 && (
             <>
-              {/* ======================================= */}
-              {/* 2 Y 3. BATERÍA Y CONTADOR (Inputs) */}
-              {/* ======================================= */}
+              {/* 2 Y 3. BATERÍA Y CONTADOR */}
               {(pregBateria.length > 0 || pregContador.length > 0) && (
                 <div className="form-grid cols-2" style={{marginTop: '24px'}}>
                   
@@ -327,17 +295,13 @@ export default function MheEvaluar() {
                     <div>
                       <div className="section-title" style={{marginTop: 0}}>2. Carga de Batería</div>
                       {pregBateria.map(p => {
-                        // LÓGICA DE BATERÍA: Detectamos el valor y asignamos color
                         const valorTxt = respuestas[p.id].respuesta_texto;
                         const numero = parseInt(valorTxt, 10);
                         let colorClase = 'bat-default';
                         let anchoBarra = 0;
 
                         if (valorTxt !== '' && !isNaN(numero)) {
-                          // Si es <= 30 se pone rojo, si es mayor se pone verde
                           colorClase = numero <= 30 ? 'bat-rojo' : 'bat-verde';
-                          
-                          // Calculamos el llenado del icono (El ancho máximo interno es 12px)
                           const porcentajeReal = Math.min(Math.max(numero, 0), 100); 
                           anchoBarra = (15 * porcentajeReal) / 100;
                         }
@@ -357,10 +321,8 @@ export default function MheEvaluar() {
                               />
                               <span className={`icon-suffix ${colorClase}`}>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  {/* Contorno de la batería */}
                                   <rect x="2" y="7" width="16" height="10" rx="2" ry="2"></rect>
                                   <line x1="22" y1="11" x2="22" y2="13"></line>
-                                  {/* Relleno dinámico: Crece según el % */}
                                   {valorTxt !== '' && !isNaN(numero) && (
                                     <rect x="4" y="9" width={anchoBarra} height="6" fill="currentColor" stroke="none"></rect>
                                   )}
@@ -373,7 +335,6 @@ export default function MheEvaluar() {
                     </div>
                   )}
 
-                  {/* CONTADOR SE MANTIENE IGUAL */}
                   {pregContador.length > 0 && (
                     <div>
                       <div className="section-title" style={{marginTop: 0}}>3. Contador</div>
@@ -389,9 +350,7 @@ export default function MheEvaluar() {
               )}
 
 
-              {/* ======================================= */}
               {/* 4. INSPECCIÓN VISUAL */}
-              {/* ======================================= */}
               {pregVisual.length > 0 && (
                 <>
                   <div className="section-title">4. Inspección Visual</div>
@@ -419,9 +378,7 @@ export default function MheEvaluar() {
                 </>
               )}
 
-              {/* ======================================= */}
               {/* 5. INSPECCIÓN DE FUNCIONES */}
-              {/* ======================================= */}
               {pregFunciones.length > 0 && (
                 <>
                   <div className="section-title">5. Inspección de Funciones</div>
@@ -449,24 +406,19 @@ export default function MheEvaluar() {
                 </>
               )}
 
-              {/* ======================================= */}
               {/* 6. RESUMEN DE LA EVALUACIÓN */}
-              {/* ======================================= */}
               {pregResumen.length > 0 && (
                 <>
                   <div className="section-title">6. Resumen de la evaluación del equipo</div>
                   <div className="form-grid cols-2" style={{marginBottom: '24px'}}>
                     {pregResumen.map(p => {
-                      // Detectamos qué tipo de pregunta es leyendo su texto
                       const textoMinuscula = p.descripcion.toLowerCase();
                       const esObservacion = textoMinuscula.includes('describa') || textoMinuscula.includes('observacion');
                       const esVB = textoMinuscula.includes('vb operador');
 
                       return (
                         <div className="checklist-card-2col" key={p.id} style={esObservacion ? {flexDirection: 'column', alignItems: 'stretch', gap: '10px'} : {}}>
-                          
                           {esObservacion ? (
-                            /* CAMPO DE TEXTO (Para Observaciones) */
                             <>
                               <div className="checklist-question-2col" style={{padding: 0}}>{p.descripcion}</div>
                               <input 
@@ -478,7 +430,6 @@ export default function MheEvaluar() {
                               />
                             </>
                           ) : (
-                            /* BOTONES (Para VB Operador y otros) */
                             <>
                               <div className="checklist-question-2col">{p.descripcion}</div>
                               <div className="checklist-options-2col">
@@ -488,8 +439,6 @@ export default function MheEvaluar() {
                                 <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Malo">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"></path></svg>
                                 </button>
-                                
-                                {/* El botón del Ojo (Observado) NO se muestra si es "VB Operador" */}
                                 {!esVB && (
                                   <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OBSERVADO' ? 'selected OBSERVADO' : ''}`} onClick={() => handleRespuesta(p.id, 'OBSERVADO')} title="Observado">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -498,7 +447,6 @@ export default function MheEvaluar() {
                               </div>
                             </>
                           )}
-
                         </div>
                       );
                     })}
@@ -507,9 +455,7 @@ export default function MheEvaluar() {
               )}
 
 
-              {/* ======================================= */}
               {/* 7. ESTADO DE SALUD */}
-              {/* ======================================= */}
               {pregSalud.length > 0 && (
                 <>
                   <div className="section-title">7. Estado de Salud</div>
@@ -536,9 +482,7 @@ export default function MheEvaluar() {
                 </>
               )}
 
-              {/* ======================================= */}
               {/* 8. DATOS DEL CHECKLIST ANTERIOR */}
-              {/* ======================================= */}
               <div className="section-title">8. Datos del Check List Anterior</div>
               
               {checklistAnterior ? (
@@ -576,9 +520,7 @@ export default function MheEvaluar() {
                 </div>
               )}
 
-
-
-                {/* DECLARAR */}
+              {/* DECLARAR */}
               <div style={{marginTop: '20px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px'}}>
                 <input type="checkbox" id="vb_operador" checked={formData.vb_operador} onChange={(e) => setFormData({...formData, vb_operador: e.target.checked})} style={{width: '20px', height: '20px', cursor: 'pointer'}} />
                 <label htmlFor="vb_operador" style={{fontWeight: '700', color: '#0f172a', cursor: 'pointer', margin: 0}}>Declaro que el equipo se encuentra en las condiciones indicadas en este checklist.</label>

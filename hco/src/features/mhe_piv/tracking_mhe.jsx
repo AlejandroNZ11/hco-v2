@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabaseClient';
 import Loading from '../../layouts/Loading';
 import './tracking_mhe.css';
+
+// Importamos el servicio
+import { obtenerUltimasInspecciones } from '../../services/mheService';
 
 export default function TrackingMHE() {
   const navigate = useNavigate();
@@ -15,18 +17,9 @@ export default function TrackingMHE() {
 
   const cargarInspecciones = async () => {
     try {
-      // Hacemos join con equipos y áreas para traer los nombres
-      const { data, error } = await supabase
-        .from('inspecciones')
-        .select(`
-          id, fecha_hora, estado_mhe, registrado_por_nombre, estado_proceso,
-          equipos ( serie )
-        `)
-        .order('fecha_hora', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      setInspecciones(data || []);
+      // USANDO EL SERVICIO
+      const data = await obtenerUltimasInspecciones();
+      setInspecciones(data);
     } catch (error) {
       console.error("Error al cargar PIV:", error);
     } finally {

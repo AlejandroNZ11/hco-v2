@@ -1,0 +1,2 @@
+aqui 
+Esto es útil para almacenar componentes genéricos y reutilizables en múltiples módulos (como botones personalizados, modales, tablas, o alertas)

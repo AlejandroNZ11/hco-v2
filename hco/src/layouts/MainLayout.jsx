@@ -1,114 +1,41 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  FaHome,
-  FaSyncAlt,
-  FaCog,
-  FaKey,
-  FaSignOutAlt,
-  FaExchangeAlt,
-  FaArrowLeft,
+  FaHome, FaSyncAlt, FaCog, FaKey, FaSignOutAlt, FaExchangeAlt, FaArrowLeft,
 } from "react-icons/fa";
 
-// IMPORTANTE: Importamos Supabase para el cambio de contraseña real
-import { supabase } from "../supabaseClient";
 import "./MainLayout.css";
 
-const LOGIN_URL = "/";
+// Importamos nuestros custom hooks y utilidades
+import { useAuth } from "../hooks/useAuth";
+import { useSync } from "../hooks/useSync";
+import { obtenerIniciales, obtenerFuentesFoto } from "../utils/helpers";
+
 const MENU_URL = "/menu";
 const ADMIN_URL = "/almuerzos/admin";
-
-function getStoredAuthUser() {
-  const local = localStorage.getItem("authUser");
-  const session = sessionStorage.getItem("authUser");
-  const raw = local || session;
-
-  if (!raw) return null;
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    localStorage.removeItem("authUser");
-    sessionStorage.removeItem("authUser");
-    return null;
-  }
-}
-
-function syncSessionFromLocal(user) {
-  const text = JSON.stringify(user);
-  localStorage.setItem("authUser", text);
-  sessionStorage.setItem("authUser", text);
-}
-
-function obtenerIniciales(nombre) {
-  const partes = String(nombre || "").trim().split(/\s+/).filter(Boolean);
-  if (!partes.length) return "US";
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
-  return `${partes[0][0]}${partes[1][0]}`.toUpperCase();
-}
-
-function convertirGoogleDriveUrl(url) {
-  if (!url || typeof url !== "string") return "";
-  const cleanUrl = url.trim();
-  const matchFile = cleanUrl.match(/\/file\/d\/([^/]+)/);
-  if (matchFile?.[1]) {
-    return `https://drive.google.com/thumbnail?id=${matchFile[1]}&sz=w200`;
-  }
-  const matchId = cleanUrl.match(/[?&]id=([^&]+)/);
-  if (matchId?.[1]) {
-    return `https://drive.google.com/thumbnail?id=${matchId[1]}&sz=w200`;
-  }
-  return cleanUrl;
-}
-
-function obtenerFuentesFoto(user) {
-  return [
-    user?.foto_url, // <-- AGREGADO: Nombre exacto de tu columna en Supabase
-    user?.fotoDataUrl,
-    user?.fotoWeb,
-    user?.foto,
-    user?.fotoUrl,
-    user?.urlFoto,
-    user?.imagen,
-    user?.avatar,
-    user?.photo,
-    user?.picture,
-  ]
-    .map((v) => (typeof v === "string" ? convertirGoogleDriveUrl(v) : ""))
-    .filter(Boolean);
-}
-
-function leerCountLocal() {
-  return Number(localStorage.getItem("offlineAnomaliasCount") || "0");
-}
 
 export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [authUser] = useState(() => getStoredAuthUser());
+  // 1. Usar nuestros custom hooks
+  const { authUser, ejecutarCierreSesion, cambiarPassword } = useAuth();
+  const { pendingCount, syncLoading, sincronizarPendientes } = useSync(authUser);
 
+  // 2. Estados locales de la UI
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-
   const [nuevaPassword, setNuevaPassword] = useState("");
   const [passwordAlert, setPasswordAlert] = useState(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
-
-  const [pendingCount, setPendingCount] = useState(leerCountLocal());
-  const [syncLoading, setSyncLoading] = useState(false);
-
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoLoaded, setPhotoLoaded] = useState(false);
 
   const userMenuRef = useRef(null);
 
   const currentPage = useMemo(() => {
-    return location.pathname
-      .toLowerCase()
-      .replace(/\/$/, "")
-      .replace(/\.html$/, "");
+    return location.pathname.toLowerCase().replace(/\/$/, "").replace(/\.html$/, "");
   }, [location.pathname]);
 
   const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opciones/menu");
@@ -124,9 +51,7 @@ export default function MainLayout() {
     return { tituloCabecera: "Sistema de Control", subtituloCabecera: "Panel principal de operaciones" };
   }, [isMenuPage, isPedidosPage, isAdminPage, isListaPage]);
 
-  // --- CORRECCIÓN EN LA EXTRACCIÓN DE DATOS DE SUPABASE ---
   const nombreUsuario = String(authUser?.nombre || "Usuario").trim();
-  // Extraemos el nombre del cargo si viene como objeto relacional, sino usamos el texto plano
   const cargoRaw = authUser?.cargo?.nombre || authUser?.cargo || "Sin cargo asignado";
   const cargoUsuario = String(cargoRaw).trim();
   const rolUsuario = String(authUser?.rol || "").trim().toUpperCase();
@@ -136,14 +61,6 @@ export default function MainLayout() {
   const photoSrc = fuentesFoto[photoIndex] || "";
 
   const puedeAdministrar = (rolUsuario === "SUPERADMIN" || rolUsuario === "SUPERVISOR") && isPedidosPage;
-
-  useEffect(() => {
-    if (!authUser) {
-      navigate(LOGIN_URL, { replace: true });
-      return;
-    }
-    syncSessionFromLocal(authUser);
-  }, [authUser, navigate]);
 
   useEffect(() => {
     setPhotoIndex(0);
@@ -170,77 +87,6 @@ export default function MainLayout() {
     };
   }, [dropdownOpen]);
 
-  // ========================================================
-  // FUNCIONES DE SINCRONIZACIÓN (Pendientes de migrar API)
-  // ========================================================
-  const actualizarBadgePendientes = useCallback((count) => {
-    setPendingCount(Number(count || 0));
-  }, []);
-
-  const refrescarPendientesCabecera = useCallback(async () => {
-    try {
-      if (window.offlineQueue && typeof window.offlineQueue.refreshPendingCount === "function") {
-        const count = await window.offlineQueue.refreshPendingCount();
-        actualizarBadgePendientes(count);
-        return;
-      }
-    } catch (error) {
-      console.error("No se pudo refrescar pendientes:", error);
-    }
-    actualizarBadgePendientes(leerCountLocal());
-  }, [actualizarBadgePendientes]);
-
-  const sincronizarPendientesDesdeCabecera = useCallback(async (esAutomatico = false) => {
-    // Mantenemos la lógica de anomalías hasta que migres ese módulo específico
-    if (!window.offlineQueue || typeof window.offlineQueue.syncPendingAnomalias !== "function") {
-      actualizarBadgePendientes(leerCountLocal());
-      return;
-    }
-    if (!navigator.onLine) {
-      if (!esAutomatico) alert("No hay conexión a internet.");
-      return;
-    }
-    setSyncLoading(true);
-    try {
-      // Reemplazar URL por la de Supabase cuando migres Anomalías
-      const result = await window.offlineQueue.syncPendingAnomalias("PENDIENTE_DE_MIGRAR_API");
-      actualizarBadgePendientes(result.pending);
-      if (!esAutomatico) {
-        if (result.synced > 0 && result.failed === 0) alert(`Se sincronizaron ${result.synced} registros pendientes.`);
-        else if (result.synced > 0 || result.failed > 0) alert(`Sincronizados: ${result.synced} | Pendientes: ${result.pending}`);
-        else alert("No hay registros pendientes por sincronizar.");
-      }
-    } catch (error) {
-      console.error("Error sincronizando pendientes:", error);
-      if (!esAutomatico) alert("No se pudo sincronizar en este momento.");
-    } finally {
-      setSyncLoading(false);
-    }
-  }, [actualizarBadgePendientes]);
-
-  useEffect(() => {
-    if (!authUser) return;
-    refrescarPendientesCabecera();
-    function handleQueueCount(event) { actualizarBadgePendientes(Number(event?.detail?.count || 0)); }
-    function handleOnline() { sincronizarPendientesDesdeCabecera(true); }
-    window.addEventListener("offline-queue-count", handleQueueCount);
-    window.addEventListener("online", handleOnline);
-    return () => {
-      window.removeEventListener("offline-queue-count", handleQueueCount);
-      window.removeEventListener("online", handleOnline);
-    };
-  }, [authUser, refrescarPendientesCabecera, actualizarBadgePendientes, sincronizarPendientesDesdeCabecera]);
-
-  // ========================================================
-  // ACCIONES DE USUARIO
-  // ========================================================
-  function ejecutarCierreSesion() {
-    localStorage.removeItem("authUser");
-    sessionStorage.removeItem("authUser");
-    supabase.auth.signOut(); // Cierra sesión oficial en Supabase
-    navigate(LOGIN_URL, { replace: true });
-  }
-
   function abrirModalPassword() {
     setDropdownOpen(false);
     setNuevaPassword("");
@@ -248,60 +94,18 @@ export default function MainLayout() {
     setShowPasswordModal(true);
   }
 
-    // NUEVA FUNCIÓN: Usa Supabase Auth y actualiza la tabla empleados
-  async function guardarPassword() {
-    const nuevaPass = String(nuevaPassword || "").trim();
-
-    if (!nuevaPass || nuevaPass.length < 6) { // Supabase pide mín 6 caracteres
-      setPasswordAlert({
-        message: "La contraseña debe tener al menos 6 caracteres.",
-        type: "alert-danger",
-      });
-      return;
-    }
-
+  async function handleGuardarPassword() {
     setPasswordLoading(true);
-
     try {
-      // 1. ACTUALIZA LA BÓVEDA DE SEGURIDAD (Supabase Auth)
-      const { error: authError } = await supabase.auth.updateUser({
-        password: nuevaPass
-      });
-
-      if (authError) throw authError;
-
-      // 2. ACTUALIZA LA TABLA VISUAL 'EMPLEADOS'
-      if (authUser?.id) {
-        const { error: dbError } = await supabase.from('empleados')
-          .update({ clave: nuevaPass })
-          .eq('id', authUser.id);
-        
-        // Si hay error en la tabla, lo capturamos
-        if (dbError) throw new Error("Auth actualizado, pero falló la tabla: " + dbError.message);
-        
-        // Actualizamos la memoria del navegador
-        const sessionActual = { ...authUser, clave: nuevaPass };
-        localStorage.setItem("authUser", JSON.stringify(sessionActual));
-        sessionStorage.setItem("authUser", JSON.stringify(sessionActual));
-      }
-      
-      setPasswordAlert({
-        message: "¡Contraseña actualizada exitosamente!",
-        type: "alert-success",
-      });
-
+      await cambiarPassword(nuevaPassword);
+      setPasswordAlert({ message: "¡Contraseña actualizada exitosamente!", type: "alert-success" });
       setTimeout(() => {
         setShowPasswordModal(false);
         setPasswordLoading(false);
         setNuevaPassword("");
       }, 1500);
-
     } catch (error) {
-      console.error("Error al cambiar contraseña:", error);
-      setPasswordAlert({
-        message: error.message || "Error al cambiar la contraseña.",
-        type: "alert-danger",
-      });
+      setPasswordAlert({ message: error.message || "Error al cambiar la contraseña.", type: "alert-danger" });
       setPasswordLoading(false);
     }
   }
@@ -389,7 +193,7 @@ export default function MainLayout() {
                         <FaSignOutAlt className="user-dropdown-icon" />
                         <span>Cerrar sesión</span>
                     </button>
-                    </div>
+                </div>
               </div>
 
                 <button type="button" id="logoutBtnDesktop" className="logout-btn-desktop header-logout-button" onClick={() => setShowLogoutModal(true)}>
@@ -411,7 +215,7 @@ export default function MainLayout() {
                 className={`btn-sync-pendientes ${pendingCount > 0 ? "has-pending" : ""} ${syncLoading ? "is-loading" : ""}`}
                 title="Sincronizar registros pendientes"
                 disabled={syncLoading}
-                onClick={() => sincronizarPendientesDesdeCabecera(false)}
+                onClick={() => sincronizarPendientes(false)}
               >
                 <FaSyncAlt className="layout-icon" />
                 <span className="btn-sync-text">Sincronizar</span>
@@ -470,7 +274,7 @@ export default function MainLayout() {
                       {passwordAlert.message}
                     </div>
                   )}
-                  <form onSubmit={(e) => { e.preventDefault(); guardarPassword(); }}>
+                  <form onSubmit={(e) => { e.preventDefault(); handleGuardarPassword(); }}>
                     <div className="mb-3">
                       <label className="form-label fw-bold">Ingrese nueva contraseña (Mín. 6)</label>
                       <input
@@ -486,7 +290,7 @@ export default function MainLayout() {
                 </div>
                 <div className="modal-footer border-0 justify-content-center bg-light">
                   <button type="button" className="btn btn-secondary px-4 fw-bold" onClick={() => setShowPasswordModal(false)}>Cancelar</button>
-                  <button type="button" className="btn btn-primary px-4 fw-bold" disabled={passwordLoading} onClick={guardarPassword}>
+                  <button type="button" className="btn btn-primary px-4 fw-bold" disabled={passwordLoading} onClick={handleGuardarPassword}>
                     {passwordLoading ? "Actualizando..." : "Actualizar"}
                   </button>
                 </div>

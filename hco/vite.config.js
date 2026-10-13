@@ -9,8 +9,10 @@ export default defineConfig({
       registerType: 'autoUpdate', // Se actualiza automáticamente cuando hay nueva versión
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       workbox: {
-        // Esto le dice a Vite que guarde TODO tu código (rutas perezosas, css, assets) para uso offline
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt}'] 
+        // Esto le dice a Vite que guarde TODO tu código para uso offline
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt}'],
+        // SOLUCIÓN AL ERROR: Ampliamos el límite a 10 MiB para permitir imágenes pesadas
+        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
       },
       manifest: {
         name: 'HCO - Herramientas de Control',

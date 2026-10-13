@@ -1,4 +1,7 @@
 /* src/features/dashboard/Menu.css */
+html, body {
+  overscroll-behavior-y: none;
+}
 
 .dashboard-page {
   width: 100%;
@@ -727,6 +730,12 @@
   gap: 16px;
   padding: 0 20px 24px;
 }
+
+button, a, .app-category-tab, .app-card, .recordatorio-btn {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
 
 /* =========================================
 Responsive  movil celular 

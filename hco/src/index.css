@@ -9,3 +9,8 @@ body {
   font-family: Arial, sans-serif;
   background: #f4f6f8;
 }
+
+
+html, body {
+  overscroll-behavior-y: none;
+}

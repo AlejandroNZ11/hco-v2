@@ -144,7 +144,8 @@ export default function Login() {
   };
 
   // Registra la biometría del dispositivo (se llama tras un login correcto con "Recordar cuenta")
-  const activarBiometria = async (codigo, nombre, userId) => {
+  // 1. Guardamos el usuario, ID de huella y la contraseña codificada
+  const activarBiometria = async (codigo, nombre, userId, passRaw) => {
     try {
       const cred = await navigator.credentials.create({
         publicKey: {
@@ -156,13 +157,19 @@ export default function Login() {
           timeout: 60000
         }
       });
-      localStorage.setItem(KEY_BIO, JSON.stringify({ usuario: codigo, credId: aB64(cred.rawId) }));
+      
+      localStorage.setItem(KEY_BIO, JSON.stringify({ 
+        usuario: codigo, 
+        credId: aB64(cred.rawId),
+        _p: aB64(new TextEncoder().encode(passRaw)) // Contraseña oculta para el auto-login
+      }));
       setBioActivo(true);
     } catch (err) {
       console.warn('Biometría no activada:', err);
     }
   };
 
+  // 2. Login manual normal
   const handleLogin = async (e) => {
     e.preventDefault();
     if (!usuario || !password) return;
@@ -185,7 +192,8 @@ export default function Login() {
 
       if (recordar) {
         localStorage.setItem(KEY_RECORDAR, codigo);
-        if (bioSoportado && !bioActivo) await activarBiometria(codigo, emp?.nombre, authData.user.id);
+        // Le pasamos la contraseña a la biometría
+        if (bioSoportado && !bioActivo) await activarBiometria(codigo, emp?.nombre, authData.user.id, password);
       } else {
         localStorage.removeItem(KEY_RECORDAR);
         localStorage.removeItem(KEY_BIO);
@@ -200,21 +208,25 @@ export default function Login() {
     }
   };
 
+  // 3. Auto-Login con Huella o FaceID
   const handleBiometria = async () => {
     const guardado = JSON.parse(localStorage.getItem(KEY_BIO) || 'null');
+    
     if (!guardado) {
       mostrarAlerta(
         `Activa ${dispositivo.nombre}`,
-        `Inicia sesión con tu contraseña y marca “Recordar cuenta” para usar ${dispositivo.nombre} en este dispositivo.`
+        `Inicia sesión con tu contraseña y marca “Recordar cuenta” para usar ${dispositivo.nombre}.`
       );
       return;
     }
 
+    // Ponemos la app en estado de carga mientras pones la huella
     setUsuario(guardado.usuario);
     validar(guardado.usuario);
     setIsSubmitting(true);
 
     try {
+      // Pedimos la validación biométrica al celular/laptop
       await navigator.credentials.get({
         publicKey: {
           challenge: aleatorio(),
@@ -224,28 +236,33 @@ export default function Login() {
         }
       });
 
-      const sesion = await obtenerSesionActiva();
-      if (!sesion) {
-        mostrarAlerta('Sesión vencida', 'Ingresa con tu contraseña para continuar.');
-        setIsSubmitting(false);
-        return;
-      }
+      // Si la huella es correcta, recuperamos la contraseña decodificándola
+      const decodedPass = new TextDecoder().decode(deB64(guardado._p));
+      const userTrim = guardado.usuario.trim();
+      const emailToLogin = userTrim.includes('@') ? userTrim : `${userTrim}@hco.com`;
 
-      const perfilData = await obtenerPerfilCompleto(sesion.user.id);
+      // HACEMOS EL LOGIN CONTRA SUPABASE INMEDIATAMENTE
+      const authData = await iniciarSesion(emailToLogin, decodedPass);
+      const perfilData = await obtenerPerfilCompleto(authData.user.id);
+
       if (esInactivo(perfilData)) {
         await rechazarInactivo();
         setIsSubmitting(false);
         return;
       }
+
+      // ¡Entramos directo al menú!
       entrar(perfilData);
+
     } catch (err) {
-      // NotAllowedError = el usuario canceló o no coincidió la huella/rostro
+      // Si cancelas o la huella falla, detenemos la carga
       if (err.name !== 'NotAllowedError') {
-        mostrarAlerta('No se pudo verificar', 'Intenta de nuevo o ingresa con tu contraseña.');
+        mostrarAlerta('Error de validación', 'No se pudo verificar la identidad. Ingresa con tu contraseña.');
       }
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <div className="login-container-global">

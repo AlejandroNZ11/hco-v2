@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  FaHome, FaSyncAlt, FaCog, FaKey, FaSignOutAlt, FaExchangeAlt, FaArrowLeft,
+  FaHome, FaSyncAlt, FaCog, FaKey, FaSignOutAlt, FaExchangeAlt, FaArrowLeft, FaBroom
 } from "react-icons/fa";
 
 import "./MainLayout.css";
@@ -86,6 +86,51 @@ export default function MainLayout() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [dropdownOpen]);
+
+  async function limpiarCacheYActualizar() {
+    // Protección: Evitar que borren la caché si hay datos sin enviar al servidor
+    if (pendingCount > 0) {
+      alert("⚠️ Tienes registros pendientes por sincronizar. Por favor, haz clic en el botón 'Sincronizar' primero para no perder tu trabajo.");
+      return;
+    }
+
+    const confirmar = window.confirm(
+      "¿Deseas limpiar la memoria de la aplicación? Esto descargará la versión más reciente del sistema y solucionará problemas visuales."
+    );
+
+    if (!confirmar) return;
+
+    try {
+      // 1. Borrar la caché de la PWA (Archivos HTML, CSS, JS e imágenes estancadas)
+      if ('caches' in window) {
+        const nombresCaches = await caches.keys();
+        await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+      }
+
+      // 2. Eliminar el "Service Worker" (El motor que hace funcionar el modo offline)
+      if ('serviceWorker' in navigator) {
+        const registros = await navigator.serviceWorker.getRegistrations();
+        for (let registro of registros) {
+          await registro.unregister();
+        }
+      }
+
+      // 3. Borrar la base de datos local (IndexedDB de Dexie)
+      if (window.indexedDB) {
+        // Asegúrate de que el nombre coincida con tu db en Dexie (ej. HCO_OfflineDB)
+        indexedDB.deleteDatabase('HCO_OfflineDB'); 
+      }
+
+      // 4. Limpiar basuras secundarias del localStorage (sin borrar la sesión)
+      localStorage.removeItem('popup_almuerzo_cache_v2');
+
+      // 5. Forzar recarga completa saltándose la caché
+      window.location.reload(true);
+    } catch (error) {
+      console.error("Error al limpiar la caché:", error);
+      alert("Hubo un problema al limpiar la caché. Intenta reiniciar tu navegador.");
+    }
+  }
 
   function abrirModalPassword() {
     setDropdownOpen(false);
@@ -175,7 +220,7 @@ export default function MainLayout() {
                 </div>
                 </button>
 
-                <div className={`user-dropdown-card ${dropdownOpen ? "active" : ""}`} id="dropdownMenu">
+                                <div className={`user-dropdown-card ${dropdownOpen ? "active" : ""}`} id="dropdownMenu">
                     <div className="user-dropdown-info">
                         <span className="user-dropdown-name">{nombreUsuario}</span>
                         <span className="user-dropdown-role">{cargoUsuario}</span>
@@ -189,11 +234,19 @@ export default function MainLayout() {
                         <FaKey className="user-dropdown-icon" />
                         <span>Cambiar Contraseña</span>
                     </button>
+
+                    {/* NUEVO BOTÓN PARA LIMPIAR CACHÉ */}
+                    <button type="button" className="user-dropdown-item" onClick={limpiarCacheYActualizar}>
+                        <FaBroom className="user-dropdown-icon" style={{ color: '#0284c7' }} />
+                        <span>Limpiar Caché y Actualizar</span>
+                    </button>
+
                     <button type="button" className="user-dropdown-item user-dropdown-danger" onClick={() => { setDropdownOpen(false); setShowLogoutModal(true); }}>
                         <FaSignOutAlt className="user-dropdown-icon" />
                         <span>Cerrar sesión</span>
                     </button>
                 </div>
+
               </div>
 
                 <button type="button" id="logoutBtnDesktop" className="logout-btn-desktop header-logout-button" onClick={() => setShowLogoutModal(true)}>

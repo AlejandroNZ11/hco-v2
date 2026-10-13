@@ -184,10 +184,11 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const userTrim = usuario.trim();
+      const userTrim = usuario.trim(); // Lo que escribes, ej: "dnunezr"
       const emp = buscar(userTrim, usuariosCache);
-      const codigo = emp?.usuario || userTrim;
-      const emailToLogin = codigo.includes('@') ? codigo : `${codigo}@hco.com`;
+      
+      // LÓGICA INTERNA: Solo agregamos @hco.com para autenticar, pero no tocamos el input visual
+      const emailToLogin = userTrim.includes('@') ? userTrim : `${userTrim}@hco.com`;
 
       const authData = await iniciarSesion(emailToLogin, password);
       const perfilData = await obtenerPerfilCompleto(authData.user.id);
@@ -199,9 +200,12 @@ export default function Login() {
       }
 
       if (recordar) {
-        localStorage.setItem(KEY_RECORDAR, codigo);
-        // Le pasamos la contraseña a la biometría
-        if (bioSoportado && !bioActivo) await activarBiometria(codigo, emp?.nombre, authData.user.id, password);
+        // Guardamos el usuario "corto" (dnunezr) para que al recordar visualmente se vea limpio
+        localStorage.setItem(KEY_RECORDAR, userTrim); 
+        if (bioSoportado && !bioActivo) {
+          // Pasamos el usuario "corto" a la biometría
+          await activarBiometria(userTrim, emp?.nombre, authData.user.id, password); 
+        }
       } else {
         localStorage.removeItem(KEY_RECORDAR);
         localStorage.removeItem(KEY_BIO);
@@ -215,6 +219,7 @@ export default function Login() {
       setIsSubmitting(false);
     }
   };
+
 
   // 3. Auto-Login con Huella o FaceID
   const handleBiometria = async () => {
@@ -298,25 +303,22 @@ export default function Login() {
           <form onSubmit={handleLogin} autoComplete="on">
             <div className="campo">
               <Icono nombre="usuario" className="icono" />
-              <input
+                            <input
                 type="text"
                 name="username"
                 autoComplete="username"
                 placeholder="Usuario"
                 aria-label="Usuario o DNI"
                 value={usuario}
-                onBlur={() => {
-                  let valorLimpio = usuario.trim();
-                  // Si escribió algo, no tiene "@" y NO son puros números (DNI)
-                  if (valorLimpio && !valorLimpio.includes('@') && isNaN(valorLimpio)) {
-                    valorLimpio = `${valorLimpio}@hco.com`;
-                    setUsuario(valorLimpio); // Autocompleta visualmente
-                  }
-                  validar(valorLimpio);
+                onChange={(e) => {
+                  setUsuario(e.target.value);
+                  buscar(e.target.value, usuariosCache) ? validar(e.target.value) : setPerfil(PERFIL_VACIO);
                 }}
+                onBlur={() => validar(usuario)} /* <--- AQUÍ: Solo valida, no cambia el texto */
                 required
                 disabled={isSubmitting}
               />
+
             </div>
 
             <div className="campo">

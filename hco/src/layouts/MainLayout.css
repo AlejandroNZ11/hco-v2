@@ -15,17 +15,26 @@
 .layout-wrapper {
   padding-top: var(--header-total-height);
   min-height: 100vh;
+  min-height: 100dvh; /* FIX: 'dvh' respeta la barra de navegación de Safari */
   display: flex;
   flex-direction: column;
+  overflow-x: hidden; /* FIX: Evita que el celular haga zoom automático si algo sobresale */
 }
 
 .header-container {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
+  right: 0; /* FIX: Usar right:0 en lugar de width:100% es más estable en iPhone */
   z-index: 9999;
   font-family: Arial, sans-serif;
+
+  /* FIX: Truco de Aceleración por Hardware para Safari (iOS) */
+  /* Obliga al procesador gráfico del iPhone a renderizar esto fijamente */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 .main-content {

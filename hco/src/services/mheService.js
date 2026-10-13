@@ -1,20 +1,54 @@
 import { supabase } from '../config/supabaseClient';
 
 /**
- * Obtiene las últimas 50 inspecciones con los datos de equipo y área
+ * Obtiene las últimas 50 inspecciones con los datos completos de equipo, categoría y área
  */
 export const obtenerUltimasInspecciones = async () => {
   const { data, error } = await supabase
     .from('inspecciones')
     .select(`
-      id, fecha_hora, estado_mhe, registrado_por_nombre, estado_proceso,
-      equipos ( serie )
+      id,
+      fecha_hora,
+      area_id,
+      equipo_id,
+      usuario_id,
+      estado_proceso,
+      estado_mhe,
+      estado_personal,
+      registrado_por_nombre,
+      aprobado_por_id,
+      revisado_el,
+      area ( nombre ),
+      equipos (
+        serie,
+        categoria_id,
+        categorias_equipos ( nombre )
+      )
     `)
     .order('fecha_hora', { ascending: false })
     .limit(50);
 
   if (error) throw new Error(`Error al cargar inspecciones: ${error.message}`);
   return data || [];
+};
+
+/**
+ * Aprueba una inspección registrando quién la aprobó y la fecha/hora de revisión
+ */
+export const aprobarInspeccionMhe = async (inspeccionId, usuarioId) => {
+  const { data, error } = await supabase
+    .from('inspecciones')
+    .update({
+      estado_proceso: 'APROBADO',
+      aprobado_por_id: usuarioId,
+      revisado_el: new Date().toISOString()
+    })
+    .eq('id', inspeccionId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Error al aprobar inspección: ${error.message}`);
+  return data;
 };
 
 /**

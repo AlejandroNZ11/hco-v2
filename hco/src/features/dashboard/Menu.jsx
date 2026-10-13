@@ -282,8 +282,8 @@ export default function Menu() {
           url: "/Cuadro-Q/trackingCuadroQ.html",
         },
         {
-          title: "Inspección PIV",
-          description: "Realizar y registrar inspecciones PIV.",
+          title: "Inspección MHE",
+          description: "Realizar y registrar inspecciones MHE.",
           Icon: FaSearch,
           accent: "accent-violet",
           buttonText: "Entrar",

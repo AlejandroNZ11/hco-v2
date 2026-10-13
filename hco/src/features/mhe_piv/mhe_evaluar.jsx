@@ -158,21 +158,47 @@ export default function MheEvaluar() {
     return "OPERATIVO";
   };
 
+  // Función auxiliar para detectar si la pregunta es el cuadro de texto de observaciones
+  const esPreguntaObservacion = (p) => {
+    const texto = (p?.descripcion || "").toLowerCase();
+    return p?.seccion === 'RESUMEN' && (texto.includes('describa') || texto.includes('observacion'));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.equipo_id) return alert("Seleccione un equipo.");
     
-    // Validación de respuestas
-    const incompletas = preguntas.some(p => {
+    // Validación inteligente solo de las secciones visibles
+    const seccionesVisibles = ['BATERIA', 'CONTADOR', 'VISUAL', 'FUNCIONES', 'RESUMEN', 'SALUD'];
+    
+    const preguntaFaltante = preguntas.find(p => {
+      // Si la pregunta no pertenece a ninguna sección en pantalla, no bloquea
+      if (!seccionesVisibles.includes(p.seccion)) return false;
+
       const resp = respuestas[p.id];
-      if (p.seccion === 'BATERIA' || p.seccion === 'CONTADOR') {
-        return !resp.respuesta_texto.trim();
+      if (!resp) return true;
+
+      // 1. Si es la caja de texto de Observaciones en Resumen, no exige botón (es opcional)
+      if (esPreguntaObservacion(p)) {
+        return false;
       }
+
+      // 2. Si es Batería o Contador, exigir que haya escrito un valor
+      if (p.seccion === 'BATERIA' || p.seccion === 'CONTADOR') {
+        return !String(resp.respuesta_texto || "").trim();
+      }
+
+      // 3. Para el resto de preguntas con botones, exigir que haya marcado un botón
       return !resp.valor_estado;
     });
 
-    if (incompletas) return alert("Por favor responda todas las preguntas del checklist (incluyendo batería y contador si aplican).");
-    if (!formData.vb_operador) return alert("Debe marcar la conformidad al final del formulario.");
+    if (preguntaFaltante) {
+      return alert(`Por favor responda todas las preguntas del checklist.\n\nFalta responder: "${preguntaFaltante.descripcion}"`);
+    }
+
+    if (!formData.vb_operador) {
+      return alert("Debe marcar la conformidad (declaración jurada) al final del formulario.");
+    }
 
     setLoading(true);
 
@@ -180,7 +206,19 @@ export default function MheEvaluar() {
       const estadoCalculado = calcularEstadoMaquina();
       const fotoEquipoHistorial = equipoSeleccionado?.foto_url || null;
 
-      // Armamos el objeto de cabecera para el servicio
+      // Extraemos el texto de la pregunta de observación para guardarlo en la cabecera de Supabase
+      const pregObs = preguntas.find(p => esPreguntaObservacion(p));
+      const textoObservacionGeneral = pregObs 
+        ? (respuestas[pregObs.id]?.respuesta_texto?.trim() || formData.observaciones || null)
+        : (formData.observaciones || null);
+
+      // Extraemos detalles de salud si escribió algo en la sección 7 (para entrevista_somnolencia)
+      const textosSalud = pregSalud
+        .map(p => respuestas[p.id]?.respuesta_texto?.trim())
+        .filter(Boolean)
+        .join(" | ");
+
+      // Armamos el objeto de cabecera para Supabase
       const datosInspeccion = {
         area_id: currentUser.area_id, 
         usuario_id: currentUser.id,   
@@ -188,7 +226,8 @@ export default function MheEvaluar() {
         registrado_por_nombre: currentUser.nombre,
         equipo_id: formData.equipo_id,
         foto_equipo: fotoEquipoHistorial, 
-        observaciones_generales: formData.observaciones,
+        observaciones_generales: textoObservacionGeneral,
+        entrevista_somnolencia: textosSalud || null,
         vb_operador: formData.vb_operador,
         estado_mhe: estadoCalculado,
         estado_personal: 'OPERATIVO',
@@ -198,11 +237,14 @@ export default function MheEvaluar() {
         chk_ant_usuario: checklistAnterior?.registrado_por_nombre || null
       };
 
-      // Armamos el array de respuestas para el servicio
+      // Armamos el array de respuestas individuales para el detalle
       const respuestasArray = Object.keys(respuestas).map(itemId => {
-        const pregSeccion = preguntas.find(p => p.id === itemId)?.seccion;
+        const preg = preguntas.find(p => p.id === itemId);
+        const pregSeccion = preg?.seccion;
         let finalValorEstado = respuestas[itemId].valor_estado;
-        if (pregSeccion === 'BATERIA' || pregSeccion === 'CONTADOR') {
+
+        // Si es un campo de texto (Batería, Contador u Observación), su estado pasa como NO_APLICA
+        if (pregSeccion === 'BATERIA' || pregSeccion === 'CONTADOR' || esPreguntaObservacion(preg)) {
           finalValorEstado = 'NO_APLICA'; 
         }
 
@@ -243,7 +285,7 @@ export default function MheEvaluar() {
       <section className="card mb-4">
         <div className="card-head-modern">
           <div className="card-head-left">
-            <h2>Inspección PIV (MHE)</h2>
+            <h2>Inspección MHE</h2>
             <p>Operador: <strong>{currentUser?.nombre}</strong></p>
           </div>
           <div className="card-head-right">

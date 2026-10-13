@@ -73,9 +73,17 @@ const deB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const aleatorio = () => crypto.getRandomValues(new Uint8Array(32));
 const esInactivo = (p) => p?.estado && p.estado.toLowerCase() === 'inactivo';
 
+
 const buscar = (valor, lista) => {
   const v = valor.trim().toLowerCase();
-  return lista.find((e) => (e.usuario && e.usuario.toLowerCase() === v) || e.dni === v);
+  // Preparamos la versión con dominio por si el usuario solo escribió la primera parte
+  const vConDominio = v.includes('@') ? v : `${v}@hco.com`;
+  
+  return lista.find((e) => {
+    const emailBD = (e.usuario || '').toLowerCase();
+    // Validamos contra el exacto, la versión con dominio, o el DNI
+    return emailBD === v || emailBD === vConDominio || e.dni === v;
+  });
 };
 
 /* ---------- Componente ---------- */
@@ -297,11 +305,15 @@ export default function Login() {
                 placeholder="Usuario"
                 aria-label="Usuario o DNI"
                 value={usuario}
-                onChange={(e) => {
-                  setUsuario(e.target.value);
-                  buscar(e.target.value, usuariosCache) ? validar(e.target.value) : setPerfil(PERFIL_VACIO);
+                onBlur={() => {
+                  let valorLimpio = usuario.trim();
+                  // Si escribió algo, no tiene "@" y NO son puros números (DNI)
+                  if (valorLimpio && !valorLimpio.includes('@') && isNaN(valorLimpio)) {
+                    valorLimpio = `${valorLimpio}@hco.com`;
+                    setUsuario(valorLimpio); // Autocompleta visualmente
+                  }
+                  validar(valorLimpio);
                 }}
-                onBlur={() => validar(usuario)}
                 required
                 disabled={isSubmitting}
               />

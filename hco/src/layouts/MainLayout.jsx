@@ -87,6 +87,67 @@ export default function MainLayout() {
     };
   }, [dropdownOpen]);
 
+  // ==========================================
+  // VIGILANTE DE VERSIONES (FORCE UPDATE)
+  // ==========================================
+  useEffect(() => {
+    async function comprobarVersion() {
+      try {
+        // Le agregamos un timestamp (?t=...) para engañar a la caché y obligar
+        // al celular a leer el archivo version.json real del servidor
+        const response = await fetch(`/version.json?t=${new Date().getTime()}`);
+        const data = await response.json();
+        
+        const versionLocal = localStorage.getItem('hco_app_version');
+
+        // Si es la primera vez que entra, solo guarda la versión
+        if (!versionLocal) {
+          localStorage.setItem('hco_app_version', data.version);
+          return;
+        }
+
+        // ¡SI LA VERSIÓN ES DIFERENTE, OCURRE LA MAGIA!
+        if (versionLocal !== data.version) {
+          console.warn("¡Nueva versión detectada! Limpiando caché y cerrando sesión...");
+          
+          alert("🚀 Hemos implementado una nueva actualización importante. Tu sesión se cerrará para aplicar los cambios.");
+
+          // 1. Borramos la caché de HTML, CSS y JS (La basura antigua)
+          if ('caches' in window) {
+            const nombresCaches = await caches.keys();
+            await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+          }
+
+          // 2. Apagamos el Service Worker actual
+          if ('serviceWorker' in navigator) {
+            const registros = await navigator.serviceWorker.getRegistrations();
+            for (let registro of registros) {
+              await registro.unregister();
+            }
+          }
+
+          // 3. Actualizamos el número de versión en el celular
+          localStorage.setItem('hco_app_version', data.version);
+
+          // 4. Los expulsamos del sistema (cierra sesión en Supabase y borra authUser)
+          ejecutarCierreSesion(); 
+
+          // 5. Recargamos la página forzosamente para que descargue lo nuevo
+          window.location.reload(true);
+        }
+      } catch (error) {
+        console.log("Modo offline, no se pudo comprobar la versión.");
+      }
+    }
+
+    // Comprueba la versión al entrar a la pantalla principal
+    comprobarVersion();
+
+    // Opcional: Que el celular compruebe si hay nueva versión cada 15 minutos en segundo plano
+    const intervalo = setInterval(comprobarVersion, 15 * 60 * 1000); 
+    return () => clearInterval(intervalo);
+  }, []);
+  
   async function limpiarCacheYActualizar() {
     // Protección: Evitar que borren la caché si hay datos sin enviar al servidor
     if (pendingCount > 0) {

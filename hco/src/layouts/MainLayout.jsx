@@ -31,6 +31,9 @@ export default function MainLayout() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoLoaded, setPhotoLoaded] = useState(false);
+  const [showClearCacheModal, setShowClearCacheModal] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
 
   const userMenuRef = useRef(null);
 
@@ -93,61 +96,32 @@ export default function MainLayout() {
   useEffect(() => {
     async function comprobarVersion() {
       try {
-        // Le agregamos un timestamp (?t=...) para engañar a la caché y obligar
-        // al celular a leer el archivo version.json real del servidor
         const response = await fetch(`/version.json?t=${new Date().getTime()}`);
         const data = await response.json();
         
         const versionLocal = localStorage.getItem('hco_app_version');
 
-        // Si es la primera vez que entra, solo guarda la versión
         if (!versionLocal) {
           localStorage.setItem('hco_app_version', data.version);
           return;
         }
 
-        // ¡SI LA VERSIÓN ES DIFERENTE, OCURRE LA MAGIA!
         if (versionLocal !== data.version) {
-          console.warn("¡Nueva versión detectada! Limpiando caché y cerrando sesión...");
-          
-          alert("🚀 Hemos implementado una nueva actualización importante. Tu sesión se cerrará para aplicar los cambios.");
-
-          // 1. Borramos la caché de HTML, CSS y JS (La basura antigua)
-          if ('caches' in window) {
-            const nombresCaches = await caches.keys();
-            await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
-          }
-
-          // 2. Apagamos el Service Worker actual
-          if ('serviceWorker' in navigator) {
-            const registros = await navigator.serviceWorker.getRegistrations();
-            for (let registro of registros) {
-              await registro.unregister();
-            }
-          }
-
-          // 3. Actualizamos el número de versión en el celular
-          localStorage.setItem('hco_app_version', data.version);
-
-          // 4. Los expulsamos del sistema (cierra sesión en Supabase y borra authUser)
-          ejecutarCierreSesion(); 
-
-          // 5. Recargamos la página forzosamente para que descargue lo nuevo
-          window.location.reload(true);
+          console.warn("¡Nueva versión detectada!");
+          // Guardamos temporalmente la nueva versión para aplicarla al cerrar el modal
+          localStorage.setItem('hco_nueva_version', data.version);
+          setShowUpdateModal(true); // Muestra nuestro modal bonito
         }
       } catch (error) {
         console.log("Modo offline, no se pudo comprobar la versión.");
       }
     }
 
-    // Comprueba la versión al entrar a la pantalla principal
     comprobarVersion();
-
-    // Opcional: Que el celular compruebe si hay nueva versión cada 15 minutos en segundo plano
     const intervalo = setInterval(comprobarVersion, 15 * 60 * 1000); 
     return () => clearInterval(intervalo);
   }, []);
-  
+
   async function limpiarCacheYActualizar() {
     // Protección: Evitar que borren la caché si hay datos sin enviar al servidor
     if (pendingCount > 0) {
@@ -155,9 +129,7 @@ export default function MainLayout() {
       return;
     }
 
-    const confirmar = window.confirm(
-      "¿Deseas limpiar la memoria de la aplicación? Esto descargará la versión más reciente del sistema y solucionará problemas visuales."
-    );
+    setShowClearCacheModal(true);
 
     if (!confirmar) return;
 
@@ -200,6 +172,8 @@ export default function MainLayout() {
     setShowPasswordModal(true);
   }
 
+
+
   async function handleGuardarPassword() {
     setPasswordLoading(true);
     try {
@@ -213,6 +187,54 @@ export default function MainLayout() {
     } catch (error) {
       setPasswordAlert({ message: error.message || "Error al cambiar la contraseña.", type: "alert-danger" });
       setPasswordLoading(false);
+    }
+  }
+
+    async function ejecutarLimpiezaCache() {
+    try {
+      if ('caches' in window) {
+        const nombresCaches = await caches.keys();
+        await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registros = await navigator.serviceWorker.getRegistrations();
+        for (let registro of registros) {
+          await registro.unregister();
+        }
+      }
+      if (window.indexedDB) {
+        indexedDB.deleteDatabase('HCO_OfflineDB');
+      }
+      localStorage.removeItem('popup_almuerzo_cache_v2');
+      window.location.reload(true);
+    } catch (error) {
+      console.error("Error al limpiar la caché:", error);
+      alert("Hubo un problema al limpiar la caché. Intenta reiniciar tu navegador.");
+    }
+  }
+
+  async function aplicarActualizacionYSalir() {
+    try {
+      if ('caches' in window) {
+        const nombresCaches = await caches.keys();
+        await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registros = await navigator.serviceWorker.getRegistrations();
+        for (let registro of registros) {
+          await registro.unregister();
+        }
+      }
+
+      const nuevaVersion = localStorage.getItem('hco_nueva_version') || '1.0.0';
+      localStorage.setItem('hco_app_version', nuevaVersion);
+      localStorage.removeItem('hco_nueva_version');
+
+      ejecutarCierreSesion();
+      window.location.reload(true);
+    } catch (error) {
+      console.error("Error al actualizar versión:", error);
+      window.location.reload(true);
     }
   }
 
@@ -353,48 +375,140 @@ export default function MainLayout() {
       </main>
 
       {showLogoutModal && (
-        <div className="custom-modal-overlay">
-            <div className="custom-logout-modal">
-                <div className="custom-modal-header custom-modal-danger">
-                <h5><FaSignOutAlt /> Cerrar Sesión</h5>
-                <button type="button" className="custom-modal-close" onClick={() => setShowLogoutModal(false)}>×</button>
+        <>
+          <style>{`
+            @keyframes floatLogout {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-6px); }
+            }
+            .animated-logout {
+              animation: floatLogout 2.5s ease-in-out infinite;
+            }
+          `}</style>
+
+          <div className="modal fade show d-block cabecera-modal" tabIndex="-1">
+            <div className="modal-dialog modal-dialog-centered px-3">
+              <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden p-4 bg-white position-relative">
+                
+                {/* Botón de cerrar discreto en la esquina superior */}
+                <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 10 }}>
+                  <button 
+                    type="button" 
+                    className="btn-close shadow-none" 
+                    onClick={() => setShowLogoutModal(false)}
+                    aria-label="Cerrar"
+                  ></button>
                 </div>
-                <div className="custom-modal-body">
-                ¿Estás seguro que deseas cerrar tu sesión?
+
+                {/* Icono de salida con animación flotante y fondo rojo suave */}
+                <div className="text-center pt-3 pb-2">
+                  <div className="d-inline-flex align-items-center justify-content-center text-danger rounded-circle shadow-sm animated-logout" style={{ width: '60px', height: '60px', fontSize: '24px', background: 'rgba(229, 47, 71, 0.1)' }}>
+                    <FaSignOutAlt />
+                  </div>
                 </div>
-                <div className="custom-modal-footer">
-                <button type="button" className="custom-btn custom-btn-cancel" onClick={() => setShowLogoutModal(false)}>Cancelar</button>
-                <button type="button" className="custom-btn custom-btn-danger" onClick={ejecutarCierreSesion}>Sí, salir</button>
+
+                {/* Título */}
+                <div className="text-center px-3 pb-2">
+                  <h4 className="fw-bold text-dark m-0" style={{ fontSize: '19px' }}>
+                    Cerrar Sesión
+                  </h4>
                 </div>
+
+                {/* Cuerpo del mensaje */}
+                <div className="modal-body text-center px-2 py-2">
+                  <p className="text-muted fs-6 mb-0" style={{ lineHeight: '1.5' }}>
+                    ¿Estás seguro que deseas cerrar tu sesión actual?
+                  </p>
+                </div>
+
+                {/* Botones inferiores armónicos y de tamaño ideal para móvil */}
+                <div className="modal-footer border-0 justify-content-center gap-2 pb-2 pt-3">
+                  <button 
+                    type="button" 
+                    className="btn px-4 py-2.5 fw-bold text-secondary bg-light border-0 shadow-sm" 
+                    style={{ fontSize: '14px', borderRadius: '12px' }}
+                    onClick={() => setShowLogoutModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn px-4 py-2.5 fw-bold text-white shadow-sm" 
+                    style={{ 
+                      background: '#e52f47', 
+                      fontSize: '14px', 
+                      borderRadius: '12px' 
+                    }}
+                    onClick={ejecutarCierreSesion}
+                  >
+                    Sí, salir
+                  </button>
+                </div>
+
+              </div>
             </div>
-        </div>
-        )}
+          </div>
+          <div className="modal-backdrop fade show cabecera-modal-backdrop" style={{ backdropFilter: 'blur(4px)', background: 'rgba(0,0,0,0.6)' }}></div>
+        </>
+      )}
 
       {showPasswordModal && (
         <>
+          <style>{`
+            @keyframes floatKey {
+              0%, 100% { transform: translateY(0) rotate(0deg); }
+              50% { transform: translateY(-6px) rotate(-5deg); }
+            }
+            .animated-key {
+              animation: floatKey 2.5s ease-in-out infinite;
+            }
+          `}</style>
+
           <div className="modal fade show d-block cabecera-modal" tabIndex="-1">
-            <div className="modal-dialog modal-dialog-centered">
-              <div className="modal-content border-0 shadow">
-                <div className="modal-header bg-primary text-white border-0">
-                  <h5 className="modal-title fw-bold">
-                    <FaKey className="modal-title-icon" />
-                    Cambiar Contraseña
-                  </h5>
-                  <button type="button" className="btn-close btn-close-white" onClick={() => setShowPasswordModal(false)}></button>
+            <div className="modal-dialog modal-dialog-centered px-3">
+              <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden p-4 bg-white position-relative">
+                
+                {/* Botón de cerrar discreto en la esquina superior */}
+                <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 10 }}>
+                  <button 
+                    type="button" 
+                    className="btn-close shadow-none" 
+                    onClick={() => setShowPasswordModal(false)}
+                    aria-label="Cerrar"
+                  ></button>
                 </div>
-                <div className="modal-body py-4">
+
+                {/* Icono de llave con animación flotante y colores corporativos */}
+                <div className="text-center pt-3 pb-2">
+                  <div className="d-inline-flex align-items-center justify-content-center text-white rounded-circle shadow-sm animated-key" style={{ width: '60px', height: '60px', fontSize: '24px', background: 'linear-gradient(135deg, #0b3055 0%, #0d3a66 100%)' }}>
+                    <FaKey />
+                  </div>
+                </div>
+
+                {/* Título */}
+                <div className="text-center px-3 pb-2">
+                  <h4 className="fw-bold text-dark m-0" style={{ fontSize: '19px' }}>
+                    Cambiar Contraseña
+                  </h4>
+                </div>
+
+                {/* Cuerpo del formulario */}
+                <div className="modal-body py-3">
                   {passwordAlert && (
-                    <div className={`alert ${passwordAlert.type} text-center fw-bold`}>
+                    <div className={`alert ${passwordAlert.type} text-center fw-bold rounded-3 py-2 fs-6`}>
                       {passwordAlert.message}
                     </div>
                   )}
                   <form onSubmit={(e) => { e.preventDefault(); handleGuardarPassword(); }}>
-                    <div className="mb-3">
-                      <label className="form-label fw-bold">Ingrese nueva contraseña (Mín. 6)</label>
+                    <div className="mb-2">
+                      <label className="form-label text-muted fw-semibold small d-block text-center mb-2">
+                        Ingrese nueva contraseña (Mín. 6 caracteres)
+                      </label>
                       <input
                         type="password"
-                        className="form-control text-center"
-                        placeholder=""
+                        className="form-control text-center py-2.5 shadow-none border-secondary-subtle"
+                        style={{ borderRadius: '12px', fontSize: '16px' }}
+                        placeholder="******"
                         required
                         value={nuevaPassword}
                         onChange={(e) => setNuevaPassword(e.target.value)}
@@ -402,18 +516,177 @@ export default function MainLayout() {
                     </div>
                   </form>
                 </div>
-                <div className="modal-footer border-0 justify-content-center bg-light">
-                  <button type="button" className="btn btn-secondary px-4 fw-bold" onClick={() => setShowPasswordModal(false)}>Cancelar</button>
-                  <button type="button" className="btn btn-primary px-4 fw-bold" disabled={passwordLoading} onClick={handleGuardarPassword}>
+
+                {/* Botones inferiores armónicos */}
+                <div className="modal-footer border-0 justify-content-center gap-2 pb-2 pt-2">
+                  <button 
+                    type="button" 
+                    className="btn px-4 py-2.5 fw-bold text-secondary bg-light border-0 shadow-sm" 
+                    style={{ fontSize: '14px', borderRadius: '12px' }}
+                    onClick={() => setShowPasswordModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn px-4 py-2.5 fw-bold text-white shadow-sm" 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #0b3055 0%, #0d3a66 100%)', 
+                      fontSize: '14px', 
+                      borderRadius: '12px' 
+                    }}
+                    disabled={passwordLoading} 
+                    onClick={handleGuardarPassword}
+                  >
                     {passwordLoading ? "Actualizando..." : "Actualizar"}
                   </button>
                 </div>
+
               </div>
             </div>
           </div>
-          <div className="modal-backdrop fade show cabecera-modal-backdrop"></div>
+          <div className="modal-backdrop fade show cabecera-modal-backdrop" style={{ backdropFilter: 'blur(4px)', background: 'rgba(0,0,0,0.6)' }}></div>
         </>
       )}
+
+      {showClearCacheModal && (
+        <>
+          <style>{`
+            @keyframes floatIcon {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-6px); }
+            }
+            .animated-broom {
+              animation: floatIcon 2.5s ease-in-out infinite;
+            }
+          `}</style>
+
+          <div className="modal fade show d-block cabecera-modal" tabIndex="-1">
+            <div className="modal-dialog modal-dialog-centered px-3">
+              <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden p-4 bg-white position-relative">
+                
+                {/* Botón de cerrar discreto en la esquina superior */}
+                <div className="position-absolute top-0 end-0 p-3" style={{ zIndex: 10 }}>
+                  <button 
+                    type="button" 
+                    className="btn-close shadow-none" 
+                    onClick={() => setShowClearCacheModal(false)}
+                    aria-label="Cerrar"
+                  ></button>
+                </div>
+
+                {/* Icono de escoba con animación flotante y celeste profesional */}
+                <div className="text-center pt-3 pb-2">
+                  <div className="d-inline-flex align-items-center justify-content-center text-white rounded-circle shadow-sm animated-broom" style={{ width: '60px', height: '60px', fontSize: '24px', background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' }}>
+                    <FaBroom />
+                  </div>
+                </div>
+
+                {/* Título */}
+                <div className="text-center px-3 pb-2">
+                  <h4 className="fw-bold text-dark m-0" style={{ fontSize: '19px' }}>
+                    Limpiar Caché y Actualizar
+                  </h4>
+                </div>
+
+                {/* Cuerpo del mensaje */}
+                <div className="modal-body text-center px-2 py-2">
+                  <p className="text-muted fs-6 mb-0" style={{ lineHeight: '1.5' }}>
+                    ¿Deseas limpiar la memoria de la aplicación? Esto descargará la versión más reciente del sistema y solucionará problemas visuales.
+                  </p>
+                </div>
+
+                {/* Botones inferiores con estilo sobrio y esquinas de 12px */}
+                <div className="modal-footer border-0 justify-content-center gap-2 pb-2 pt-3">
+                  <button 
+                    type="button" 
+                    className="btn px-4 py-2.5 fw-bold text-secondary bg-light border-0 shadow-sm" 
+                    style={{ fontSize: '14px', borderRadius: '12px' }}
+                    onClick={() => setShowClearCacheModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn px-4 py-2.5 fw-bold text-white shadow-sm" 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)', 
+                      fontSize: '14px', 
+                      borderRadius: '12px' 
+                    }}
+                    onClick={ejecutarLimpiezaCache}
+                  >
+                    Sí, limpiar y actualizar
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show cabecera-modal-backdrop" style={{ backdropFilter: 'blur(4px)', background: 'rgba(0,0,0,0.6)' }}></div>
+        </>
+      )}
+
+      {showUpdateModal && (
+        <>
+          <style>{`
+            @keyframes floatRocket {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-8px); }
+            }
+            .animated-rocket {
+              animation: floatRocket 2.5s ease-in-out infinite;
+            }
+          `}</style>
+          
+          <div className="modal fade show d-block cabecera-modal" tabIndex="-1">
+            <div className="modal-dialog modal-dialog-centered px-3">
+              <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden p-4 bg-white">
+                
+                {/* Icono con animación de movimiento */}
+                <div className="text-center pt-3 pb-2">
+                  <div className="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle animated-rocket" style={{ width: '64px', height: '64px', fontSize: '28px' }}>
+                    🚀
+                  </div>
+                </div>
+
+                {/* Título */}
+                <div className="text-center px-3 pb-2">
+                  <h4 className="fw-bold text-dark m-0" style={{ fontSize: '20px' }}>
+                    Actualización Disponible
+                  </h4>
+                </div>
+
+                {/* Cuerpo del mensaje */}
+                <div className="modal-body text-center px-2 py-2">
+                  <p className="text-muted fs-6 mb-0" style={{ lineHeight: '1.5' }}>
+                    Hemos implementado mejoras importantes en el sistema. Tu sesión se cerrará de forma segura para aplicar los cambios y sincronizar la nueva versión.
+                  </p>
+                </div>
+
+                {/* Botón inferior con menos curvatura (borderRadius: 12px) */}
+                <div className="modal-footer border-0 justify-content-center pb-2 pt-3">
+                  <button 
+                    type="button" 
+                    className="btn w-100 py-3 fw-bold shadow-sm text-white" 
+                    style={{ 
+                      background: 'linear-gradient(135deg, #0b3055 0%, #0d3a66 100%)', 
+                      fontSize: '15px', 
+                      borderRadius: '12px' 
+                    }}
+                    onClick={aplicarActualizacionYSalir}
+                  >
+                    ACTUALIZAR
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show cabecera-modal-backdrop" style={{ backdropFilter: 'blur(4px)', background: 'rgba(0,0,0,0.6)' }}></div>
+        </>
+      )}
+
     </div>
   );
 }

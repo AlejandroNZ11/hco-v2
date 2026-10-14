@@ -84,7 +84,7 @@ export default function TrackingMHE() {
           <p>Listado general de inspecciones diarias de equipos de manipulación.</p>
         </div>
         <button className="btn-nuevo" onClick={() => navigate('/mhe/mhe_evaluar')}>
-          + Nueva Inspección
+          +  Evaluar
         </button>
       </section>
 
@@ -184,7 +184,7 @@ export default function TrackingMHE() {
                               border: '1px solid #cbd5e1',
                               background: '#ffffff',
                               color: '#334155',
-                              fontSize: '12px',
+                              fontSize: '11px',
                               fontWeight: '700',
                               cursor: 'pointer'
                             }}
@@ -207,7 +207,7 @@ export default function TrackingMHE() {
                               border: 'none',
                               background: yaAprobado ? '#e2e8f0' : '#16a34a',
                               color: yaAprobado ? '#64748b' : '#ffffff',
-                              fontSize: '12px',
+                              fontSize: '11px',
                               fontWeight: '700',
                               cursor: yaAprobado ? 'not-allowed' : 'pointer'
                             }}

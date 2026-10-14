@@ -1,36 +1,63 @@
 import { supabase } from '../config/supabaseClient';
 
 /**
- * Obtiene las últimas 50 inspecciones con los datos completos de equipo, categoría y área
+ * Obtiene las últimas 50 inspecciones cruzando con las tablas 'areas', 'equipos' y 'categorias_equipos'
  */
 export const obtenerUltimasInspecciones = async () => {
-  const { data, error } = await supabase
-    .from('inspecciones')
-    .select(`
-      id,
-      fecha_hora,
-      area_id,
-      equipo_id,
-      usuario_id,
-      estado_proceso,
-      estado_mhe,
-      estado_personal,
-      registrado_por_nombre,
-      aprobado_por_id,
-      revisado_el,
-      area ( nombre ),
-      equipos (
-        serie,
-        categoria_id,
-        categorias_equipos ( nombre )
-      )
-    `)
-    .order('fecha_hora', { ascending: false })
-    .limit(50);
+  const [resInsp, resAreas, resEq, resCat] = await Promise.all([
+    supabase
+      .from('inspecciones')
+      .select('*')
+      .order('fecha_hora', { ascending: false })
+      .limit(50),
+    supabase.from('areas').select('id, nombre'),
+    supabase.from('equipos').select('id, serie, categoria_id'),
+    supabase.from('categorias_equipos').select('id, nombre')
+  ]);
 
-  if (error) throw new Error(`Error al cargar inspecciones: ${error.message}`);
-  return data || [];
+  if (resInsp.error) {
+    throw new Error(`Error al cargar inspecciones: ${resInsp.error.message}`);
+  }
+  if (resAreas.error) {
+    console.error("Error al leer tabla areas:", resAreas.error.message);
+  }
+  if (resCat.error) {
+    console.error("Error al leer tabla categorias_equipos:", resCat.error.message);
+  }
+
+  // Diccionario de áreas (tabla: areas -> columna: nombre)
+  const areasMap = Object.fromEntries(
+    (resAreas.data || []).map(a => [String(a.id), a])
+  );
+
+  // Diccionario de categorías (tabla: categorias_equipos -> columna: nombre)
+  const categoriasMap = Object.fromEntries(
+    (resCat.data || []).map(c => [String(c.id), c])
+  );
+
+  // Diccionario de equipos unidos con su categoría
+  const equiposMap = Object.fromEntries(
+    (resEq.data || []).map(eq => [
+      String(eq.id),
+      {
+        ...eq,
+        categorias_equipos: categoriasMap[String(eq.categoria_id)] || null
+      }
+    ])
+  );
+
+  // Retornamos cada inspección con sus objetos listos para la tabla
+  return (resInsp.data || []).map(insp => {
+    const areaObj = areasMap[String(insp.area_id)] || null;
+    return {
+      ...insp,
+      areas: areaObj,
+      area: areaObj, // Guardamos ambos por compatibilidad
+      equipos: equiposMap[String(insp.equipo_id)] || null
+    };
+  });
 };
+
 
 /**
  * Aprueba una inspección registrando quién la aprobó y la fecha/hora de revisión

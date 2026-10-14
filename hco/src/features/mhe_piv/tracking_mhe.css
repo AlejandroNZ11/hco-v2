@@ -5,109 +5,470 @@
 .tracking-page {
   width: 100%;
   padding: 20px 24px;
-  color: var(--text, #102033);
+  color: #102033;
+  background-color: #f4f7fb;
+  min-height: calc(100vh - 110px);
 }
 
-.page-hero,
-.card {
-  background: var(--card, #ffffff);
-  border-radius: 16px;
-  border: 1px solid var(--border, #e2e8f0);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+/* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS AZULES */
+.top-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  margin-bottom: 18px;
+  align-items: stretch;
 }
 
-.page-hero {
-  padding: 16px 24px;
-  margin-bottom: 20px;
+.hero-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  padding: 22px 26px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.module-pill {
+  background: #eef2f8;
+  color: #1e3a6d;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  margin-bottom: 10px;
+  display: inline-block;
+}
+
+.hero-card h1 {
+  margin: 0 0 6px;
+  font-size: 25px;
+  font-weight: 800;
+  color: #0b2239;
+}
+
+.hero-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+.kpi-container-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  padding: 14px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.kpi-blue-box {
+  background: linear-gradient(180deg, #0d5cab 0%, #094787 100%);
+  color: #ffffff;
+  border-radius: 14px;
+  min-width: 155px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-shadow: 0 6px 14px rgba(9, 71, 135, 0.22);
+}
+
+.kpi-box-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.95;
+  margin-bottom: 6px;
+}
+
+.kpi-box-value {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* 2. SECCIÓN DE FILTROS Y BOTONES */
+.filters-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  padding: 18px 22px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+/* Buscador grande (2.4fr) y los 5 filtros restantes más compactos */
+.filters-grid {
+  display: grid;
+  grid-template-columns: 2.4fr 0.95fr 0.95fr 0.85fr 0.85fr 0.85fr;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.filter-group label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+
+.filter-group select,
+.filter-group input {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid #dbe2ea;
+  background-color: #f8fafc;
+  color: #1e293b;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+  width: 100%;
+}
+
+.filter-group.filter-buscar input {
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  border-color: #0f4c81;
+  background-color: #ffffff;
+}
+
+.filters-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
 }
 
-.hero-titles h1 {
-  margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--title, #0f172a);
-}
-
-.hero-titles p {
-  margin: 0;
-  color: var(--muted, #64748b);
-  font-size: 14px;
-}
-
-.btn-nuevo {
-  background: var(--primary, #0f4c81);
-  color: white;
-  padding: 10px 20px;
+.btn-action-primary {
+  background: #0f4c81;
+  color: #ffffff;
+  height: 38px;
+  padding: 0 18px;
   border-radius: 10px;
-  font-weight: 700;
-  font-size: 14px;
   border: none;
-  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
 }
 
-.btn-nuevo:hover {
-  background: var(--primary-2, #1565a7);
-  transform: translateY(-2px);
+.btn-action-primary:hover {
+  background: #145d9b;
+  transform: translateY(-1px);
 }
 
+.btn-action-secondary {
+  background: #eef2f7;
+  color: #1e3a6d;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid #d8e2ee;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-action-secondary:hover {
+  background: #e2e8f0;
+}
+
+/* 3. SECCIÓN DE TABLA, PAGINACIÓN Y EXPORTAR */
+.table-section-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  padding: 16px 20px 20px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.table-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.records-counter {
+  font-size: 12.5px;
+  color: #334155;
+}
+
+.pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-nav-btn {
+  background: transparent;
+  border: none;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 6px;
+  transition: opacity 0.2s;
+}
+
+.page-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.nav-chevron {
+  font-size: 13px;
+}
+
+.btn-exportar-excel {
+  background: #1f7a3f;
+  color: #ffffff;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-exportar-excel:hover {
+  background: #186332;
+}
+
+.excel-icon-box {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* TABLA SIN SCROLLBAR VISIBLE Y CON MANITO PARA ARRASTRAR */
 .table-container {
   width: 100%;
   overflow-x: auto;
-  border-radius: 12px;
+  border-radius: 10px;
+  cursor: grab;
+  user-select: none;
+  scrollbar-width: none; /* Oculta barra en Firefox */
+  -ms-overflow-style: none; /* Oculta barra en Edge antiguo */
 }
 
-/* 👇 AQUÍ CAMBIAS EL TAMAÑO GENERAL DE LA TABLA (11px o 10px) */
+.table-container::-webkit-scrollbar {
+  display: none; /* Oculta barra en Chrome, Safari y Edge */
+}
+
+.table-container.dragging {
+  cursor: grabbing;
+}
+
 .table-container table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px !important; /* Cámbialo a 10px si lo quieres aún más pequeño */
+  white-space: nowrap;
+  font-size: 11px !important;
 }
 
-/* 👇 CABECERA AZUL COMO EL BOTÓN Y LETRA BLANCA */
 .table-container th {
-  background: var(--primary, #0f4c81);
+  background: #234375;
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
-  font-size: 11px !important; /* Cámbialo a 10px si prefieres */
-  padding: 10px 12px !important;
-  text-align: left;
-  border-bottom: 2px solid #0b375e;
+  font-size: 11px !important;
+  padding: 12px 12px !important;
+  text-align: center;
+  border-bottom: none;
   letter-spacing: 0.3px;
 }
 
-/* 👇 CELDAS DE DATOS */
-.table-container td {
-  font-size: 11px !important; /* Cámbialo a 10px si prefieres */
-  padding: 9px 12px !important;
-  border-bottom: 1px solid #e2e8f0;
-  vertical-align: middle;
+.table-container th:first-child {
+  border-top-left-radius: 10px;
 }
 
-/* Efecto suave al pasar el mouse por las filas */
+.table-container th:last-child {
+  border-top-right-radius: 10px;
+}
+
+.table-container td {
+  font-size: 11px !important;
+  padding: 10px 12px !important;
+  border-bottom: 1px solid #eef2f6;
+  vertical-align: middle;
+  text-align: center;
+  color: #1e293b;
+}
+
 .table-container tbody tr:hover {
   background-color: #f8fafc;
 }
 
-/* Badges de Estado ajustados al nuevo tamaño */
+/* BADGES ESTILO PÍLDORA SÓLIDA */
 .badge-estado {
-  padding: 3px 8px;
+  display: inline-block;
+  padding: 4px 12px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
-.badge-estado.operativo { background: #dcfce7; color: #166534; }
-.badge-estado.observado { background: #fef08a; color: #854d0e; }
-.badge-estado.inoperativo { background: #fee2e2; color: #991b1b; }
 
-@media (max-width: 768px) {
-  .page-hero { flex-direction: column; align-items: flex-start; gap: 16px; }
-  .btn-nuevo { width: 100%; justify-content: center; }
+.badge-estado.operativo {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.badge-estado.observado {
+  background: #eab308;
+  color: #1e293b;
+}
+
+.badge-estado.inoperativo {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* BOTONES DE ACCIÓN EN FILA (SOLO ICONOS) */
+.acciones-cell {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-tabla-editar,
+.btn-tabla-aprobar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-tabla-editar {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #2857af;
+}
+
+.btn-tabla-editar:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+/* Estado por aprobar: AZUL */
+.btn-tabla-aprobar {
+  border: none;
+  background: #0f4c81;
+  color: #ffffff;
+}
+
+.btn-tabla-aprobar:hover:not(:disabled) {
+  background: #145d9b;
+  transform: translateY(-1px);
+}
+
+/* Estado cuando YA está aprobado: VERDE */
+.btn-tabla-aprobar.is-approved {
+  background: #16a34a;
+  color: #ffffff;
+  cursor: default;
+  opacity: 1;
+}
+
+/* RESPONSIVE CELULAR Y TABLET */
+@media (max-width: 1150px) {
+  .top-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kpi-container-card {
+    justify-content: stretch;
+  }
+
+  .kpi-blue-box {
+    flex: 1;
+  }
+
+  .filters-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .filter-group.filter-buscar {
+    grid-column: span 3;
+  }
+}
+
+@media (max-width: 600px) {
+  .tracking-page {
+    padding: 12px;
+  }
+
+  .filters-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-group.filter-buscar {
+    grid-column: span 1;
+  }
+
+  .filters-actions-row button {
+    flex: 1;
+    justify-content: center;
+  }
 }

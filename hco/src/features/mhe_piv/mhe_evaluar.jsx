@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import Loading from '../../layouts/Loading';
 import './mhe_evaluar.css';
 import '../usuarios/registra_usuario.css';
@@ -8,7 +8,9 @@ import '../usuarios/registra_usuario.css';
 import { 
   obtenerDatosMaestrosMhe, 
   obtenerUltimaInspeccionEquipo, 
-  guardarInspeccionCompleta 
+  guardarInspeccionCompleta,
+  obtenerInspeccionPorId,
+  actualizarInspeccionCompleta
 } from '../../services/mheService';
 
 // Leer sesión
@@ -34,8 +36,14 @@ const convertirDriveUrl = (url) => {
 
 export default function MheEvaluar() {
   const navigate = useNavigate();
-  const [currentUser] = useState(() => getStoredAuthUser());
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
+  // Detectamos si venimos del botón Editar (por URL ?id=... o por state)
+  const inspeccionEditId = searchParams.get('id') || location.state?.inspeccion?.id || null;
+  const esModoEdicion = Boolean(inspeccionEditId);
+
+  const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(false);
   
   // Variables maestras que guardan toda la BD al inicio
@@ -58,36 +66,94 @@ export default function MheEvaluar() {
   const [equipoSeleccionado, setEquipoSeleccionado] = useState(null);
   const [checklistAnterior, setChecklistAnterior] = useState(null);
 
-  // 1. Cargar TODOS los datos maestros de golpe al abrir la pantalla
+  // Función auxiliar para detectar si la pregunta es el cuadro de texto de observaciones
+  const esPreguntaObservacion = (p) => {
+    const texto = (p?.descripcion || "").toLowerCase();
+    return p?.seccion === 'RESUMEN' && (texto.includes('describa') || texto.includes('observacion'));
+  };
+
+  // 1. Cargar datos maestros y, si estamos editando, cargar los datos de la fila
   useEffect(() => {
     if (!currentUser) {
       alert("Inicie sesión para continuar.");
       navigate('/');
       return;
     }
-    cargarDatosMaestros();
-  }, [currentUser, navigate]);
+    inicializarFormulario();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, navigate, inspeccionEditId]);
 
-  const cargarDatosMaestros = async () => {
+  const inicializarFormulario = async () => {
     setLoading(true);
     try {
-      // USANDO EL SERVICIO
       const data = await obtenerDatosMaestrosMhe();
       setCategorias(data.categorias);
       setTodosEquipos(data.equipos);
       setTodasPreguntas(data.preguntas);
+
+      // Si se pulsó en Editar una fila, cargamos sus datos y respuestas
+      if (inspeccionEditId) {
+        const { inspeccion, respuestas: respGuardadas } = await obtenerInspeccionPorId(inspeccionEditId);
+
+        // Buscamos el equipo para saber a qué categoría pertenece
+        const eqEncontrado = data.equipos.find(eq => String(eq.id) === String(inspeccion.equipo_id));
+        const catId = eqEncontrado ? String(eqEncontrado.categoria_id) : "";
+
+        // Filtramos equipos y preguntas de esa categoría
+        const eqFiltrados = data.equipos.filter(eq => String(eq.categoria_id) === catId);
+        const pregFiltradas = data.preguntas.filter(p => String(p.categoria_id) === catId);
+
+        setEquipos(eqFiltrados);
+        setPreguntas(pregFiltradas);
+        setEquipoSeleccionado(eqEncontrado || null);
+
+        // Rellenamos la cabecera del formulario
+        setFormData({
+          categoria_id: catId,
+          equipo_id: String(inspeccion.equipo_id || ""),
+          observaciones: inspeccion.observaciones_generales || "",
+          vb_operador: Boolean(inspeccion.vb_operador)
+        });
+
+        // Reconstruimos el historial anterior si estaba guardado en la inspección
+        if (inspeccion.chk_ant_estado || inspeccion.chk_ant_fecha) {
+          setChecklistAnterior({
+            estado_mhe: inspeccion.chk_ant_estado,
+            observaciones_generales: inspeccion.chk_ant_obs,
+            fecha_hora: inspeccion.chk_ant_fecha,
+            registrado_por_nombre: inspeccion.chk_ant_usuario
+          });
+        }
+
+        // Inicializamos todas las preguntas de la categoría y les volcamos las respuestas guardadas
+        const mapaRespuestas = {};
+        pregFiltradas.forEach(p => {
+          mapaRespuestas[p.id] = {
+            valor_estado: "",
+            respuesta_texto: esPreguntaObservacion(p) ? (inspeccion.observaciones_generales || "") : ""
+          };
+        });
+
+        respGuardadas.forEach(r => {
+          mapaRespuestas[r.item_id] = {
+            valor_estado: r.valor_estado || "",
+            respuesta_texto: r.respuesta_texto || ""
+          };
+        });
+
+        setRespuestas(mapaRespuestas);
+      }
     } catch (error) {
-      alert("Error al conectar con la base de datos: " + error.message);
+      alert("Error al cargar datos: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Al cambiar categoría, se filtra localmente (¡INSTANTÁNEO!)
+  // 2. Al cambiar categoría manualmente
   const handleCategoriaChange = (e) => {
     const catId = e.target.value;
     
-    // Limpiamos los datos de la pantalla
     setFormData({ ...formData, categoria_id: catId, equipo_id: "" });
     setEquipoSeleccionado(null);
     setChecklistAnterior(null);
@@ -99,14 +165,12 @@ export default function MheEvaluar() {
       return;
     }
 
-    // Filtramos directamente de la memoria (sin usar internet)
-    const eqFiltrados = todosEquipos.filter(eq => eq.categoria_id === catId);
+    const eqFiltrados = todosEquipos.filter(eq => String(eq.categoria_id) === String(catId));
     setEquipos(eqFiltrados);
 
-    const pregFiltradas = todasPreguntas.filter(p => p.categoria_id === catId);
+    const pregFiltradas = todasPreguntas.filter(p => String(p.categoria_id) === String(catId));
     setPreguntas(pregFiltradas);
 
-    // Inicializamos las respuestas vacías
     const initResp = {};
     pregFiltradas.forEach(p => {
       initResp[p.id] = { valor_estado: "", respuesta_texto: "" };
@@ -119,14 +183,12 @@ export default function MheEvaluar() {
     const eqId = e.target.value;
     setFormData({ ...formData, equipo_id: eqId });
     
-    // Buscar la foto del equipo seleccionado
-    const eq = equipos.find(x => x.id === eqId);
+    const eq = equipos.find(x => String(x.id) === String(eqId));
     setEquipoSeleccionado(eq || null);
 
     setChecklistAnterior(null);
     if (!eqId) return;
 
-    // USANDO EL SERVICIO PARA BUSCAR HISTORIAL ANTERIOR
     try {
       const data = await obtenerUltimaInspeccionEquipo(eqId);
       if (data) setChecklistAnterior(data);
@@ -139,7 +201,7 @@ export default function MheEvaluar() {
   const handleRespuesta = (itemId, valor) => {
     setRespuestas(prev => ({
       ...prev,
-      [itemId]: { ...prev[itemId], valor_estado: valor }
+      [itemId]: { ...(prev[itemId] || { respuesta_texto: "" }), valor_estado: valor }
     }));
   };
 
@@ -147,7 +209,7 @@ export default function MheEvaluar() {
   const handleTextoExtra = (itemId, texto) => {
     setRespuestas(prev => ({
       ...prev,
-      [itemId]: { ...prev[itemId], respuesta_texto: texto }
+      [itemId]: { ...(prev[itemId] || { valor_estado: "" }), respuesta_texto: texto }
     }));
   };
 
@@ -158,37 +220,34 @@ export default function MheEvaluar() {
     return "OPERATIVO";
   };
 
-  // Función auxiliar para detectar si la pregunta es el cuadro de texto de observaciones
-  const esPreguntaObservacion = (p) => {
-    const texto = (p?.descripcion || "").toLowerCase();
-    return p?.seccion === 'RESUMEN' && (texto.includes('describa') || texto.includes('observacion'));
-  };
+  // Agrupación de preguntas
+  const pregBateria = preguntas.filter(p => p.seccion === 'BATERIA');
+  const pregContador = preguntas.filter(p => p.seccion === 'CONTADOR');
+  const pregVisual = preguntas.filter(p => p.seccion === 'VISUAL');
+  const pregFunciones = preguntas.filter(p => p.seccion === 'FUNCIONES');
+  const pregResumen = preguntas.filter(p => p.seccion === 'RESUMEN');
+  const pregSalud = preguntas.filter(p => p.seccion === 'SALUD');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.equipo_id) return alert("Seleccione un equipo.");
     
-    // Validación inteligente solo de las secciones visibles
     const seccionesVisibles = ['BATERIA', 'CONTADOR', 'VISUAL', 'FUNCIONES', 'RESUMEN', 'SALUD'];
     
     const preguntaFaltante = preguntas.find(p => {
-      // Si la pregunta no pertenece a ninguna sección en pantalla, no bloquea
       if (!seccionesVisibles.includes(p.seccion)) return false;
 
       const resp = respuestas[p.id];
       if (!resp) return true;
 
-      // 1. Si es la caja de texto de Observaciones en Resumen, no exige botón (es opcional)
       if (esPreguntaObservacion(p)) {
         return false;
       }
 
-      // 2. Si es Batería o Contador, exigir que haya escrito un valor
       if (p.seccion === 'BATERIA' || p.seccion === 'CONTADOR') {
         return !String(resp.respuesta_texto || "").trim();
       }
 
-      // 3. Para el resto de preguntas con botones, exigir que haya marcado un botón
       return !resp.valor_estado;
     });
 
@@ -206,19 +265,16 @@ export default function MheEvaluar() {
       const estadoCalculado = calcularEstadoMaquina();
       const fotoEquipoHistorial = equipoSeleccionado?.foto_url || null;
 
-      // Extraemos el texto de la pregunta de observación para guardarlo en la cabecera de Supabase
       const pregObs = preguntas.find(p => esPreguntaObservacion(p));
       const textoObservacionGeneral = pregObs 
         ? (respuestas[pregObs.id]?.respuesta_texto?.trim() || formData.observaciones || null)
         : (formData.observaciones || null);
 
-      // Extraemos detalles de salud si escribió algo en la sección 7 (para entrevista_somnolencia)
       const textosSalud = pregSalud
         .map(p => respuestas[p.id]?.respuesta_texto?.trim())
         .filter(Boolean)
         .join(" | ");
 
-      // Armamos el objeto de cabecera para Supabase
       const datosInspeccion = {
         area_id: currentUser.area_id, 
         usuario_id: currentUser.id,   
@@ -237,13 +293,11 @@ export default function MheEvaluar() {
         chk_ant_usuario: checklistAnterior?.registrado_por_nombre || null
       };
 
-      // Armamos el array de respuestas individuales para el detalle
       const respuestasArray = Object.keys(respuestas).map(itemId => {
-        const preg = preguntas.find(p => p.id === itemId);
+        const preg = preguntas.find(p => String(p.id) === String(itemId));
         const pregSeccion = preg?.seccion;
-        let finalValorEstado = respuestas[itemId].valor_estado;
+        let finalValorEstado = respuestas[itemId]?.valor_estado || "";
 
-        // Si es un campo de texto (Batería, Contador u Observación), su estado pasa como NO_APLICA
         if (pregSeccion === 'BATERIA' || pregSeccion === 'CONTADOR' || esPreguntaObservacion(preg)) {
           finalValorEstado = 'NO_APLICA'; 
         }
@@ -251,14 +305,18 @@ export default function MheEvaluar() {
         return {
           item_id: itemId,
           valor_estado: finalValorEstado,
-          respuesta_texto: respuestas[itemId].respuesta_texto
+          respuesta_texto: respuestas[itemId]?.respuesta_texto || ""
         };
       });
 
-      // USANDO EL SERVICIO PARA GUARDAR TODO
-      await guardarInspeccionCompleta(datosInspeccion, respuestasArray);
+      if (esModoEdicion) {
+        await actualizarInspeccionCompleta(inspeccionEditId, datosInspeccion, respuestasArray);
+        alert(`Inspección actualizada exitosamente. Estado Final: ${estadoCalculado}`);
+      } else {
+        await guardarInspeccionCompleta(datosInspeccion, respuestasArray);
+        alert(`Inspección guardada exitosamente. Estado Final: ${estadoCalculado}`);
+      }
 
-      alert(`Inspección guardada exitosamente. Estado Final: ${estadoCalculado}`);
       navigate('/mhe/tracking_mhe');
 
     } catch (error) {
@@ -269,15 +327,6 @@ export default function MheEvaluar() {
     }
   };
 
-  // Agrupación de preguntas
-  const pregBateria = preguntas.filter(p => p.seccion === 'BATERIA');
-  const pregContador = preguntas.filter(p => p.seccion === 'CONTADOR');
-  const pregVisual = preguntas.filter(p => p.seccion === 'VISUAL');
-  const pregFunciones = preguntas.filter(p => p.seccion === 'FUNCIONES');
-  const pregResumen = preguntas.filter(p => p.seccion === 'RESUMEN');
-  const pregSalud = preguntas.filter(p => p.seccion === 'SALUD');
-
-  // EL RETURN SE MANTIENE EXACTAMENTE IGUAL A PARTIR DE AQUÍ
   return (
     <div className="registro-page">
       {loading && <Loading />}
@@ -285,11 +334,11 @@ export default function MheEvaluar() {
       <section className="card mb-4">
         <div className="card-head-modern">
           <div className="card-head-left">
-            <h2>Inspección MHE</h2>
+            <h2>{esModoEdicion ? 'Editar Inspección PIV (MHE)' : 'Inspección PIV (MHE)'}</h2>
             <p>Operador: <strong>{currentUser?.nombre}</strong></p>
           </div>
           <div className="card-head-right">
-             <div className="legend-item"><span className="legend-dot auto"></span><span>Área Automática</span></div>
+            <div className="legend-item"><span className="legend-dot auto"></span><span>Área Automática</span></div>
           </div>
         </div>
 
@@ -326,7 +375,6 @@ export default function MheEvaluar() {
             </div>
           </div>
 
-
           {preguntas.length > 0 && (
             <>
               {/* 2 Y 3. BATERÍA Y CONTADOR */}
@@ -337,7 +385,7 @@ export default function MheEvaluar() {
                     <div>
                       <div className="section-title" style={{marginTop: 0}}>2. Carga de Batería</div>
                       {pregBateria.map(p => {
-                        const valorTxt = respuestas[p.id].respuesta_texto;
+                        const valorTxt = respuestas[p.id]?.respuesta_texto || "";
                         const numero = parseInt(valorTxt, 10);
                         let colorClase = 'bat-default';
                         let anchoBarra = 0;
@@ -383,14 +431,19 @@ export default function MheEvaluar() {
                       {pregContador.map(p => (
                         <div className="field" key={p.id}>
                           <label>{p.descripcion}</label>
-                          <input type="number" placeholder="Ej: 12500" value={respuestas[p.id].respuesta_texto} onChange={(e) => handleTextoExtra(p.id, e.target.value)} required />
+                          <input
+                            type="number"
+                            placeholder="Ej: 12500"
+                            value={respuestas[p.id]?.respuesta_texto || ""}
+                            onChange={(e) => handleTextoExtra(p.id, e.target.value)}
+                            required
+                          />
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
               )}
-
 
               {/* 4. INSPECCIÓN VISUAL */}
               {pregVisual.length > 0 && (
@@ -401,16 +454,16 @@ export default function MheEvaluar() {
                       <div className="checklist-card-2col" key={p.id}>
                         <div className="checklist-question-2col">{p.descripcion}</div>
                         <div className="checklist-options-2col">
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Operativo">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Operativo">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                           </button>
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Inoperativo">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Inoperativo">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"></path></svg>
                           </button>
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OBSERVADO' ? 'selected OBSERVADO' : ''}`} onClick={() => handleRespuesta(p.id, 'OBSERVADO')} title="Observado">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OBSERVADO' ? 'selected OBSERVADO' : ''}`} onClick={() => handleRespuesta(p.id, 'OBSERVADO')} title="Observado">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                           </button>
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'NO_APLICA' ? 'selected NO_APLICA' : ''}`} onClick={() => handleRespuesta(p.id, 'NO_APLICA')} title="No Aplica">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'NO_APLICA' ? 'selected NO_APLICA' : ''}`} onClick={() => handleRespuesta(p.id, 'NO_APLICA')} title="No Aplica">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
                           </button>
                         </div>
@@ -429,16 +482,16 @@ export default function MheEvaluar() {
                       <div className="checklist-card-2col" key={p.id}>
                         <div className="checklist-question-2col">{p.descripcion}</div>
                         <div className="checklist-options-2col">
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Operativo">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Operativo">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                           </button>
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Inoperativo">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Inoperativo">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"></path></svg>
                           </button>
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OBSERVADO' ? 'selected OBSERVADO' : ''}`} onClick={() => handleRespuesta(p.id, 'OBSERVADO')} title="Observado">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OBSERVADO' ? 'selected OBSERVADO' : ''}`} onClick={() => handleRespuesta(p.id, 'OBSERVADO')} title="Observado">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                           </button>
-                          <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'NO_APLICA' ? 'selected NO_APLICA' : ''}`} onClick={() => handleRespuesta(p.id, 'NO_APLICA')} title="No Aplica">
+                          <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'NO_APLICA' ? 'selected NO_APLICA' : ''}`} onClick={() => handleRespuesta(p.id, 'NO_APLICA')} title="No Aplica">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
                           </button>
                         </div>
@@ -466,7 +519,7 @@ export default function MheEvaluar() {
                               <input 
                                 type="text" 
                                 placeholder="Escriba aquí sus observaciones..." 
-                                value={respuestas[p.id].respuesta_texto} 
+                                value={respuestas[p.id]?.respuesta_texto || ""} 
                                 onChange={(e) => handleTextoExtra(p.id, e.target.value)} 
                                 style={{padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '100%', fontSize: '13px', background: '#f8fafc'}}
                               />
@@ -475,14 +528,14 @@ export default function MheEvaluar() {
                             <>
                               <div className="checklist-question-2col">{p.descripcion}</div>
                               <div className="checklist-options-2col">
-                                <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Bueno">
+                                <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Bueno">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                                 </button>
-                                <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Malo">
+                                <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Malo">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"></path></svg>
                                 </button>
                                 {!esVB && (
-                                  <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OBSERVADO' ? 'selected OBSERVADO' : ''}`} onClick={() => handleRespuesta(p.id, 'OBSERVADO')} title="Observado">
+                                  <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OBSERVADO' ? 'selected OBSERVADO' : ''}`} onClick={() => handleRespuesta(p.id, 'OBSERVADO')} title="Observado">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                   </button>
                                 )}
@@ -496,7 +549,6 @@ export default function MheEvaluar() {
                 </>
               )}
 
-
               {/* 7. ESTADO DE SALUD */}
               {pregSalud.length > 0 && (
                 <>
@@ -507,16 +559,22 @@ export default function MheEvaluar() {
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%'}}>
                           <div className="checklist-question-2col">{p.descripcion}</div>
                           <div className="checklist-options-2col">
-                            <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}>
+                            <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}>
                               SÍ
                             </button>
-                            <button type="button" className={`icon-btn ${respuestas[p.id].valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}>
+                            <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}>
                               NO
                             </button>
                           </div>
                         </div>
-                        {respuestas[p.id].valor_estado !== '' && (
-                          <input type="text" placeholder="Detalles adicionales (Opcional)" value={respuestas[p.id].respuesta_texto} onChange={(e) => handleTextoExtra(p.id, e.target.value)} style={{marginTop: '12px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '100%', fontSize: '13px'}}/>
+                        {(respuestas[p.id]?.valor_estado || '') !== '' && (
+                          <input
+                            type="text"
+                            placeholder="Detalles adicionales (Opcional)"
+                            value={respuestas[p.id]?.respuesta_texto || ""}
+                            onChange={(e) => handleTextoExtra(p.id, e.target.value)}
+                            style={{marginTop: '12px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '100%', fontSize: '13px'}}
+                          />
                         )}
                       </div>
                     ))}
@@ -540,12 +598,12 @@ export default function MheEvaluar() {
                     <div className="hist-item">
                       <span className="hist-label">Registrado el:</span>
                       <span className="hist-value">
-                        {new Date(checklistAnterior.fecha_hora).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}
+                        {checklistAnterior.fecha_hora ? new Date(checklistAnterior.fecha_hora).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-'}
                       </span>
                     </div>
                     <div className="hist-item">
                       <span className="hist-label">Operador:</span>
-                      <span className="hist-value">{checklistAnterior.registrado_por_nombre}</span>
+                      <span className="hist-value">{checklistAnterior.registrado_por_nombre || '-'}</span>
                     </div>
                   </div>
                   
@@ -570,7 +628,9 @@ export default function MheEvaluar() {
 
               <div className="submit-row">
                 <button type="button" className="secondary-btn" onClick={() => navigate('/mhe/tracking_mhe')}>Cancelar</button>
-                <button type="submit" className="primary-btn" disabled={loading}>Guardar Inspección</button>
+                <button type="submit" className="primary-btn" disabled={loading}>
+                  {esModoEdicion ? 'Actualizar Inspección' : 'Guardar Inspección'}
+                </button>
               </div>
             </>
           )}

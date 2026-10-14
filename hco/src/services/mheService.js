@@ -147,3 +147,75 @@ export const guardarInspeccionCompleta = async (datosInspeccion, respuestasArray
 
   return inspGuardada;
 };
+
+/**
+ * Obtiene una inspección por su ID junto con todas sus respuestas marcadas
+ */
+export const obtenerInspeccionPorId = async (inspeccionId) => {
+  const [resInsp, resResp] = await Promise.all([
+    supabase
+      .from('inspecciones')
+      .select('*')
+      .eq('id', inspeccionId)
+      .single(),
+    supabase
+      .from('respuestas_inspeccion')
+      .select('*')
+      .eq('inspeccion_id', inspeccionId)
+  ]);
+
+  if (resInsp.error) {
+    throw new Error(`Error al cargar la inspección: ${resInsp.error.message}`);
+  }
+  if (resResp.error) {
+    throw new Error(`Error al cargar las respuestas: ${resResp.error.message}`);
+  }
+
+  return {
+    inspeccion: resInsp.data,
+    respuestas: resResp.data || []
+  };
+};
+
+/**
+ * Actualiza una inspección existente y reemplaza el detalle de sus respuestas
+ */
+export const actualizarInspeccionCompleta = async (inspeccionId, datosInspeccion, respuestasArray) => {
+  // 1. Actualizar cabecera en 'inspecciones'
+  const { data: inspActualizada, error: errorInsp } = await supabase
+    .from('inspecciones')
+    .update(datosInspeccion)
+    .eq('id', inspeccionId)
+    .select()
+    .single();
+
+  if (errorInsp) {
+    throw new Error(`Error al actualizar inspección: ${errorInsp.message}`);
+  }
+
+  // 2. Borrar respuestas anteriores de esta inspección para insertar las actualizadas
+  const { error: errorDel } = await supabase
+    .from('respuestas_inspeccion')
+    .delete()
+    .eq('inspeccion_id', inspeccionId);
+
+  if (errorDel) {
+    throw new Error(`Error al limpiar respuestas previas: ${errorDel.message}`);
+  }
+
+  // 3. Insertar las respuestas nuevas
+  const respuestasConId = respuestasArray.map(resp => ({
+    ...resp,
+    inspeccion_id: inspeccionId
+  }));
+
+  const { error: errorResp } = await supabase
+    .from('respuestas_inspeccion')
+    .insert(respuestasConId);
+
+  if (errorResp) {
+    throw new Error(`Error al guardar respuestas actualizadas: ${errorResp.message}`);
+  }
+
+  return inspActualizada;
+};

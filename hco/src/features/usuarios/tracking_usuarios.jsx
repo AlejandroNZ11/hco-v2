@@ -9,6 +9,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '../../services/localDb';
 import { useNetwork } from '../../hooks/useNetwork';
 
+import { 
+  FaHome, FaSyncAlt, FaCog, FaKey, FaSignOutAlt, FaExchangeAlt, FaArrowLeft, FaBroom,
+  FaEdit, FaPowerOff, FaCheckCircle, FaTimesCircle, FaUser
+} from "react-icons/fa";
+
+
 // Importamos los servicios para sincronizar cuando hay red
 import { obtenerTodosLosEmpleados, obtenerAreas, cambiarEstadoEmpleado } from '../../services/empleadosService';
 
@@ -25,11 +31,10 @@ export default function TrackingUsuarios() {
   const navigate = useNavigate();
   const isOnline = useNetwork();
 
-  // 1. LECTURA REACTIVA DESDE DEXIE (Reemplaza a loadUsuarios y estados de carga)
-  const usuariosDb = useLiveQuery(() => localDb.usuarios.toArray()) || [];
-  const listaAreas = useLiveQuery(() => localDb.areas.toArray()) || [];
+  // 1. LECTURA REACTIVA ESTABLE DESDE DEXIE (Pasamos [] como 3er argumento para evitar nuevas referencias)
+  const usuariosDb = useLiveQuery(() => localDb.usuarios.toArray(), [], []);
+  const listaAreas = useLiveQuery(() => localDb.areas.toArray(), [], []);
 
-  const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
@@ -40,22 +45,78 @@ export default function TrackingUsuarios() {
     area: ''
   });
 
+  // Estado para el modal de confirmación personalizado
+  const [confirmModal, setConfirmModal] = useState({
+    show: false,
+    item: null,
+    nuevoEstado: ""
+  });
+
   // =========================================================================
-  // NUEVO: SINCRONIZACIÓN INICIAL CON SUPABASE
+  // EFECTO DE ARRASTRE CON EL MOUSE (MANITO DESLIZANTE EN LA TABLA)
   // =========================================================================
   useEffect(() => {
+    const slider = document.querySelector('.table-wrap');
+    if (!slider) return;
+
+    let isDown = false;
+    let startX;
+    let scrollLeft;
+
+    const handleMouseDown = (e) => {
+      isDown = true;
+      slider.classList.add('active');
+      startX = e.pageX - slider.offsetLeft;
+      scrollLeft = slider.scrollLeft;
+    };
+
+    const handleMouseLeave = () => {
+      isDown = false;
+      slider.classList.remove('active');
+    };
+
+    const handleMouseUp = () => {
+      isDown = false;
+      slider.classList.remove('active');
+    };
+
+    const handleMouseMove = (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - slider.offsetLeft;
+      const walk = (x - startX) * 1.5;
+      slider.scrollLeft = scrollLeft - walk;
+    };
+
+    slider.addEventListener('mousedown', handleMouseDown);
+    slider.addEventListener('mouseleave', handleMouseLeave);
+    slider.addEventListener('mouseup', handleMouseUp);
+    slider.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      slider.removeEventListener('mousedown', handleMouseDown);
+      slider.removeEventListener('mouseleave', handleMouseLeave);
+      slider.removeEventListener('mouseup', handleMouseUp);
+      slider.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
+  // =========================================================================
+  // SINCRONIZACIÓN INICIAL CON SUPABASE (Con candado para no repetir)
+  // =========================================================================
+  const syncIniciado = React.useRef(false);
+
+
+  useEffect(() => {
     const sincronizarDatosIniciales = async () => {
-      // Solo intentamos descargar si hay internet y la base local está vacía
-      if (isOnline && usuariosDb.length === 0) {
+      if (isOnline && usuariosDb.length === 0 && !syncIniciado.current) {
+        syncIniciado.current = true;
         setLoading(true);
         try {
-          // Descargamos de Supabase
           const datosEmpleados = await obtenerTodosLosEmpleados();
           const datosAreas = await obtenerAreas();
 
-          // Guardamos en Dexie
           if (datosEmpleados && datosEmpleados.length > 0) {
-            // Formateamos antes de guardar para facilitar la lectura offline
             const empleadosFormateados = datosEmpleados.map(emp => ({
               ...emp,
               cargo: emp.cargo ? emp.cargo.nombre : '-',
@@ -76,52 +137,33 @@ export default function TrackingUsuarios() {
     };
 
     sincronizarDatosIniciales();
-  }, [isOnline, usuariosDb.length]); // Se ejecuta al conectar o si la BD está vacía
+  }, [isOnline, usuariosDb.length]);
 
   // 2. PROCESAMIENTO LOCAL (Formateo de relaciones y ORDENAMIENTO A-Z)
   const allItems = React.useMemo(() => {
     const empleadosMapeados = usuariosDb.map(emp => ({
       ...emp,
-      cargo: emp.cargo?.nombre || emp.cargo || '-',
-      area: emp.area?.nombre || emp.area || '-',
-      jefe_directo: emp.jefe?.nombre || emp.jefe_directo || '-'
+      cargo: (typeof emp.cargo === 'object' ? emp.cargo?.nombre : emp.cargo) || '-',
+      area: (typeof emp.area === 'object' ? emp.area?.nombre : emp.area) || '-',
+      jefe_directo: (typeof emp.jefe === 'object' ? emp.jefe?.nombre : emp.jefe_directo) || '-'
     }));
 
-    // Ordenar alfabéticamente por la columna nombre (A - Z)
     return empleadosMapeados.sort((a, b) => {
-      const nombreA = a.nombre || "";
-      const nombreB = b.nombre || "";
-      // localeCompare es ideal para español porque entiende que Á y A son la misma letra al ordenar
+      const nombreA = String(a.nombre || "");
+      const nombreB = String(b.nombre || "");
       return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' });
     });
   }, [usuariosDb]);
 
-
-  useEffect(() => {
-    applyFilters();
-  }, [filters, allItems]);
-
-  useEffect(() => {
-    if (!message.text) return;
-    const timer = setTimeout(() => {
-      setMessage({ text: '', type: '' });
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [message]);
-
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
-  };
-
-  const applyFilters = () => {
+  // 2.1. FILTRADO DIRECTO CON USEMEMO (Cero bucles infinitos)
+  const filteredItems = React.useMemo(() => {
     const { search, estado, tipo, area } = filters;
     const searchNorm = normalize(search);
     const estadoNorm = normalize(estado);
     const tipoNorm = normalize(tipo);
     const areaNorm = normalize(area);
 
-    const filtered = allItems.filter(item => {
+    return allItems.filter(item => {
       if (estadoNorm && normalize(item.estado) !== estadoNorm) return false;
       if (tipoNorm && normalize(item.tipo) !== tipoNorm) return false;
       if (areaNorm && normalize(item.area) !== areaNorm) return false;
@@ -135,19 +177,38 @@ export default function TrackingUsuarios() {
       }
       return true;
     });
+  }, [filters, allItems]);
 
-    setFilteredItems(filtered);
+  useEffect(() => {
+    if (!message.text) return;
+    const timer = setTimeout(() => {
+      setMessage({ text: '', type: '' });
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [message.text]);
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
   };
 
   const limpiarFiltros = () => {
     setFilters({ search: '', estado: '', tipo: '', area: '' });
   };
 
-  // 3. MUTACIÓN OFFLINE-FIRST
-  const cambiarEstado = async (item) => {
+  // 3. FUNCIONES DE MODAL Y MUTACIÓN OFFLINE-FIRST
+  const abrirConfirmacionEstado = (item) => {
     const nuevoEstado = (item.estado || "").toLowerCase() === "activo" ? "Inactivo" : "Activo";
-    const ok = window.confirm(`¿Desea cambiar el estado de ${item.nombre} a ${nuevoEstado}?`);
-    if (!ok) return;
+    setConfirmModal({
+      show: true,
+      item,
+      nuevoEstado
+    });
+  };
+
+  const confirmarCambioEstado = async () => {
+    const { item, nuevoEstado } = confirmModal;
+    setConfirmModal({ show: false, item: null, nuevoEstado: "" });
 
     try {
       await localDb.usuarios.update(item.id, { estado: nuevoEstado });
@@ -271,11 +332,18 @@ export default function TrackingUsuarios() {
             <option value="White">White</option>
             <option value="Blue">Blue</option>
           </select>
+          
           <select name="area" value={filters.area} onChange={handleFilterChange}>
             <option value="">Todas las áreas</option>
-            {listaAreas.map((area, index) => (
-              <option key={index} value={area.nombre || area}>{area.nombre || area}</option>
-            ))}
+            {listaAreas.map((area, index) => {
+              const nombreArea = typeof area === 'object' ? (area?.nombre || '') : String(area || '');
+              if (!nombreArea) return null;
+              return (
+                <option key={area?.id || index} value={nombreArea}>
+                  {nombreArea}
+                </option>
+              );
+            })}
           </select>
           
           <button type="button" onClick={limpiarFiltros} className="clear-btn" title="Limpiar Filtros">
@@ -316,18 +384,33 @@ export default function TrackingUsuarios() {
                       <td>{item.cargo || '-'}</td>
                       <td>{item.area || '-'}</td>
                       <td>{item.jefe_directo || '-'}</td>
-                      <td>{item.usuario || '-'}</td>
+                      <td>{item.usuario ? item.usuario.split('@')[0].toUpperCase() : '-'}</td>
                       <td>
-                        <span className={`foto-status ${hasPhoto ? "has" : "no"}`} title={hasPhoto ? "Tiene foto" : "No tiene foto"}>
-                          {hasPhoto ? "✓" : "!"}
+                        <span 
+                          className={`foto-status-icon ${hasPhoto ? "has" : "no"}`} 
+                          title={hasPhoto ? "Tiene foto" : "No tiene foto"}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyModel: 'center',
+                            color: hasPhoto ? '#0f883b' : '#adabab', // Verde si tiene, rojo si no
+                            fontSize: '16px'
+                          }}
+                        >
+                          <FaUser />
                         </span>
                       </td>
+
                       <td>
-                        <div className="actions-inline">
-                          <button type="button" onClick={() => handleEditarUsuario(item.id)} className="icon-btn edit" title="Editar">✎</button>
-                          <button type="button" onClick={() => cambiarEstado(item)} className="icon-btn status" title={isActive ? 'Desactivar' : 'Activar'}>⏻</button>
-                        </div>
-                      </td>
+                          <div className="actions-inline">
+                            <button type="button" onClick={() => handleEditarUsuario(item.id)} className="icon-btn edit" title="Editar usuario">
+                              <FaEdit size={14} />
+                            </button>
+                            <button type="button" onClick={() => abrirConfirmacionEstado(item)} className="icon-btn status" title={isActive ? 'Desactivar' : 'Activar'}>
+                              <FaPowerOff size={13} />
+                            </button>
+                          </div>
+                        </td>
                     </tr>
                   );
                 })
@@ -336,7 +419,50 @@ export default function TrackingUsuarios() {
           </table>
         </div>
       </section>
+
       {loading && <Loading />}
+
+      {/* MODAL DE CONFIRMACIÓN MODERNO (Bootstrap 5 + Tailwind) */}
+      {confirmModal.show && (
+        <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)' }}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg rounded-4 p-4 text-center bg-white">
+              
+              {/* Icono superior llamativo */}
+              <div className="mx-auto d-flex align-items-center justify-content-center rounded-circle bg-warning bg-opacity-10 text-warning mb-3" style={{ width: '56px', height: '56px', fontSize: '24px' }}>
+                ⚠️
+              </div>
+
+              <h4 className="fw-bold text-dark mb-2" style={{ fontSize: '18px' }}>
+                ¿Cambiar estado de usuario?
+              </h4>
+
+              <p className="text-muted fs-6 mb-4 px-2">
+                ¿Deseas cambiar el estado de <strong className="text-dark">{confirmModal.item?.nombre}</strong> a <span className={`badge ${confirmModal.nuevoEstado === 'Activo' ? 'bg-success' : 'bg-danger'}`}>{confirmModal.nuevoEstado}</span>?
+              </p>
+
+              <div className="d-flex justify-content-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-light text-secondary fw-bold px-4 py-2 rounded-3 border-0 shadow-sm"
+                  onClick={() => setConfirmModal({ show: false, item: null, nuevoEstado: "" })}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary fw-bold px-4 py-2 rounded-3 shadow-sm"
+                  style={{ background: '#0f4c81', border: 'none' }}
+                  onClick={confirmarCambioEstado}
+                >
+                  Sí, cambiar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

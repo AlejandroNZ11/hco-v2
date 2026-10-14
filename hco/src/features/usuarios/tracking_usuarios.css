@@ -396,6 +396,46 @@ align-items: center;
   }
 }
 
+/* =========================================
+   1. EVITAR QUE EL TEXTO DE LA CABECERA SE PARTA
+   ========================================= */
+.usuarios-table thead th {
+  white-space: nowrap !important; /* Fuerza a que el texto quede en una sola línea */
+  padding: 10px 12px;
+}
+
+/* =========================================
+   2. OCULTAR SCROLL HORIZONTAL Y PERMITIR ARRASTRE (MANITO)
+   ========================================= */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-top: none;
+  
+  /* Habilita el desplazamiento táctil fluido en celulares y tablets */
+  -webkit-overflow-scrolling: touch;
+  
+  /* Cambia el cursor por una manito indicando que se puede arrastrar */
+  cursor: grab;
+}
+
+/* Cursor de "agarrando" al hacer clic y arrastrar */
+.table-wrap:active {
+  cursor: grabbing;
+}
+
+/* Ocultar la barra de desplazamiento horizontal en navegadores Webkit (Chrome, Safari, Edge) */
+.table-wrap::-webkit-scrollbar {
+  display: none; /* Oculta la barra visualmente */
+  height: 0px;
+}
+
+/* Ocultar la barra de desplazamiento en Firefox */
+.table-wrap {
+  scrollbar-width: none; 
+}
 
 
 /* =========================================
@@ -407,8 +447,41 @@ align-items: center;
 }
 
 @media (max-width: 768px) {
-  .registro-page { padding: 12px; }
-  .card, .page-hero { padding: 16px; }
+  /* 1. Pegar los contenedores a los bordes de la pantalla */
+  .registro-page {
+    padding: 10px 10px;
+  }
+
+  /* 2. Achicar y compactar la tarjeta superior (Tracking de usuarios) */
+  .page-hero {
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+
+  .page-chip {
+    font-size: 10px;
+    padding: 2px 8px;
+    margin-bottom: 4px;
+  }
+
+  /* Achicar y adelgazar el título principal */
+  .page-hero h1 {
+    font-size: 18px;
+    font-weight: 600; /* Más delgado (antes 800) */
+    margin: 0 0 2px;
+  }
+
+  .page-hero p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  /* 3. Ajustar la tarjeta de la tabla para que alinee con la superior */
+  .card {
+    padding: 16px 14px;
+    border-radius: 12px;
+  }
 
   .toolbar {
     flex-direction: column;

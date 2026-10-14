@@ -485,19 +485,6 @@
   border-color: #94a3b8 !important;
 }
 
-/* En celular, lo pasamos a 2 filas limpias para que no colapse la pantalla */
-@media (max-width: 768px) {
-  .card-head-modern {
-    flex-direction: column;
-    gap: 16px;
-  }
-  .card-head-right {
-    flex-wrap: wrap; 
-  }
-}
-
-
-
 /* Responsive para tablets y celulares */
 @media (max-width: 992px) {
   .dual-titles { display: none; } /* Oculta títulos dobles en móvil */
@@ -515,6 +502,50 @@
 }
 
 @media (max-width: 768px) {
+
+  .card-head-modern {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card-head-right {
+    flex-wrap: wrap; 
+  }
+  /* 1. Pegar los contenedores a los bordes de la pantalla */
+  .registro-page {
+    padding: 10px 10px;
+  }
+
+  /* 2. Achicar y compactar la tarjeta superior (Nuevo usuario) */
+  .page-hero {
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+  }
+
+  .page-chip {
+    font-size: 10px;
+    padding: 2px 8px;
+    margin-bottom: 4px;
+  }
+
+  /* Achicar y adelgazar el título "Nuevo usuario" */
+  .page-hero h1 {
+    font-size: 18px;
+    font-weight: 600; /* Más delgado (antes era 800) */
+    margin: 0 0 2px;
+  }
+
+  .page-hero p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  /* Reducir también un poco el borde interno del formulario en móvil */
+  .card {
+    padding: 16px 14px;
+    border-radius: 12px;
+  }
+
   .cols-4, .cols-2 { grid-template-columns: 1fr; }
   .form-legend { float: none; margin-bottom: 16px; }
   

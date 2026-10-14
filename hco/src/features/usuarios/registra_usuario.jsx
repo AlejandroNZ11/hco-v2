@@ -182,11 +182,15 @@ export default function RegistrarUsuario() {
   };
 
   useEffect(() => {
-    if (!editingId || !formData.usuario) {
+    if (!editingId) {
       const generatedUser = generarUsuarioDesdeNombre(formData.nombre);
-      setFormData(prev => ({ ...prev, usuario: generatedUser, clave: prev.dni }));
+      setFormData(prev => {
+        if (prev.usuario === generatedUser && prev.clave === prev.dni) return prev;
+        return { ...prev, usuario: generatedUser, clave: prev.dni };
+      });
     }
   }, [formData.nombre, formData.dni, editingId]);
+
   
   useEffect(() => {
     if (formData.fechaNacimiento) {

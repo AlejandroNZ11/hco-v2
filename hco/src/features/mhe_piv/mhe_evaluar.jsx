@@ -334,7 +334,7 @@ export default function MheEvaluar() {
       <section className="card mb-4">
         <div className="card-head-modern">
           <div className="card-head-left">
-            <h2>{esModoEdicion ? 'Editar Inspección PIV (MHE)' : 'Inspección PIV (MHE)'}</h2>
+            <h2>{esModoEdicion ? 'Editar Inspección MHE' : 'Inspección MHE'}</h2>
             <p>Operador: <strong>{currentUser?.nombre}</strong></p>
           </div>
           <div className="card-head-right">
@@ -549,14 +549,16 @@ export default function MheEvaluar() {
                 </>
               )}
 
-              {/* 7. ESTADO DE SALUD */}
+                            {/* 7. ESTADO DE SALUD */}
               {pregSalud.length > 0 && (
                 <>
                   <div className="section-title">7. Estado de Salud</div>
                   <div className="form-grid cols-2" style={{marginBottom: '24px'}}>
                     {pregSalud.map(p => (
                       <div className="checklist-card-2col" key={p.id} style={{flexDirection: 'column', alignItems: 'stretch'}}>
-                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%'}}>
+                        
+                        {/* CAMBIO AQUÍ: usamos la clase salud-row en lugar del style en línea */}
+                        <div className="salud-row">
                           <div className="checklist-question-2col">{p.descripcion}</div>
                           <div className="checklist-options-2col">
                             <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}>
@@ -567,6 +569,7 @@ export default function MheEvaluar() {
                             </button>
                           </div>
                         </div>
+
                         {(respuestas[p.id]?.valor_estado || '') !== '' && (
                           <input
                             type="text"
@@ -581,6 +584,7 @@ export default function MheEvaluar() {
                   </div>
                 </>
               )}
+
 
               {/* 8. DATOS DEL CHECKLIST ANTERIOR */}
               <div className="section-title">8. Datos del Check List Anterior</div>
@@ -620,11 +624,30 @@ export default function MheEvaluar() {
                 </div>
               )}
 
-              {/* DECLARAR */}
-              <div style={{marginTop: '20px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px'}}>
-                <input type="checkbox" id="vb_operador" checked={formData.vb_operador} onChange={(e) => setFormData({...formData, vb_operador: e.target.checked})} style={{width: '20px', height: '20px', cursor: 'pointer'}} />
-                <label htmlFor="vb_operador" style={{fontWeight: '700', color: '#0f172a', cursor: 'pointer', margin: 0}}>Declaro que el equipo se encuentra en las condiciones indicadas en este checklist.</label>
-              </div>
+                            {/* DECLARAR */}
+              <label 
+                htmlFor="vb_operador" 
+                className={`declaracion-card ${formData.vb_operador ? 'is-checked' : ''}`}
+              >
+                <input 
+                  type="checkbox" 
+                  id="vb_operador" 
+                  checked={formData.vb_operador} 
+                  onChange={(e) => setFormData({...formData, vb_operador: e.target.checked})} 
+                />
+                
+                <div className="custom-chk">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+
+                <div className="declaracion-texto">
+                  <span className="declaracion-tag">Conformidad del Operador</span>
+                  <p>Declaro que el equipo se encuentra en las condiciones indicadas en este checklist.</p>
+                </div>
+              </label>
+
 
               <div className="submit-row">
                 <button type="button" className="secondary-btn" onClick={() => navigate('/mhe/tracking_mhe')}>Cancelar</button>

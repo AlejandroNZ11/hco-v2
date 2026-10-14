@@ -4,7 +4,7 @@
 
 .tracking-page {
   width: 100%;
-  padding: 20px 24px;
+  padding: 12px 10px; /* Reducido para acercar al borde en celulares */
   color: #102033;
   background-color: #f4f7fb;
   min-height: calc(100vh - 110px);
@@ -14,17 +14,17 @@
 .top-summary-grid {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 18px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 12px;
   align-items: stretch;
 }
 
 .hero-card {
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
-  padding: 22px 26px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  padding: 16px 18px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -34,18 +34,18 @@
 .module-pill {
   background: #eef2f8;
   color: #1e3a6d;
-  padding: 5px 12px;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.4px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   display: inline-block;
 }
 
 .hero-card h1 {
-  margin: 0 0 6px;
-  font-size: 25px;
+  margin: 0 0 4px;
+  font-size: 20px;
   font-weight: 800;
   color: #0b2239;
 }
@@ -53,45 +53,45 @@
 .hero-card p {
   margin: 0;
   color: #64748b;
-  font-size: 13.5px;
+  font-size: 12.5px;
 }
 
 .kpi-container-card {
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
-  padding: 14px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  padding: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
   display: flex;
-  gap: 14px;
+  gap: 8px;
   align-items: stretch;
 }
 
 .kpi-blue-box {
   background: linear-gradient(180deg, #0d5cab 0%, #094787 100%);
   color: #ffffff;
-  border-radius: 14px;
-  min-width: 155px;
-  padding: 16px 18px;
+  border-radius: 10px;
+  min-width: 110px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  box-shadow: 0 6px 14px rgba(9, 71, 135, 0.22);
+  box-shadow: 0 4px 10px rgba(9, 71, 135, 0.18);
 }
 
 .kpi-box-title {
-  font-size: 11px;
+  font-size: 9.5px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   opacity: 0.95;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .kpi-box-value {
-  font-size: 36px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1;
 }
@@ -99,31 +99,30 @@
 /* 2. SECCIÓN DE FILTROS Y BOTONES */
 .filters-card {
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
-  padding: 18px 22px;
-  margin-bottom: 18px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
 }
 
-/* Buscador grande (2.4fr) y los 5 filtros restantes más compactos */
 .filters-grid {
   display: grid;
   grid-template-columns: 2.4fr 0.95fr 0.95fr 0.85fr 0.85fr 0.85fr;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
   align-items: end;
 }
 
 .filter-group {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
 }
 
 .filter-group label {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   color: #334155;
   white-space: nowrap;
@@ -131,21 +130,21 @@
 
 .filter-group select,
 .filter-group input {
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 10px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
   border: 1px solid #dbe2ea;
   background-color: #f8fafc;
   color: #1e293b;
-  font-size: 12px;
+  font-size: 11.5px;
   outline: none;
   transition: border-color 0.2s, background-color 0.2s;
   width: 100%;
 }
 
 .filter-group.filter-buscar input {
-  padding: 0 14px;
-  font-size: 13px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .filter-group select:focus,
@@ -157,43 +156,42 @@
 .filters-actions-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .btn-action-primary {
   background: #0f4c81;
   color: #ffffff;
-  height: 38px;
-  padding: 0 18px;
-  border-radius: 10px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
   border: none;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
+  transition: background 0.2s;
 }
 
 .btn-action-primary:hover {
   background: #145d9b;
-  transform: translateY(-1px);
 }
 
 .btn-action-secondary {
   background: #eef2f7;
   color: #1e3a6d;
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 10px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
   border: 1px solid #d8e2ee;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -205,51 +203,50 @@
 /* 3. SECCIÓN DE TABLA, PAGINACIÓN Y EXPORTAR */
 .table-section-card {
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 14px;
   border: 1px solid #e2e8f0;
-  padding: 16px 20px 20px;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  padding: 12px 14px 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
 }
 
 .table-topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
-  gap: 12px;
+  margin-bottom: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 .pagination-bar {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
 .records-counter {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: #334155;
 }
 
 .pagination-controls {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .page-nav-btn {
   background: transparent;
   border: none;
   color: #0f172a;
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  padding: 4px 6px;
-  transition: opacity 0.2s;
+  padding: 2px 4px;
 }
 
 .page-nav-btn:disabled {
@@ -258,54 +255,60 @@
 }
 
 .nav-chevron {
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .btn-exportar-excel {
   background: #1f7a3f;
   color: #ffffff;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 10px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
   border: none;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
-  transition: background 0.2s;
 }
 
-.btn-exportar-excel:hover {
+.btn-exportar-excel:hover:not(:disabled) {
   background: #186332;
+}
+
+.btn-exportar-excel:disabled {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+  opacity: 0.75;
 }
 
 .excel-icon-box {
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  width: 20px;
-  height: 20px;
+  border-radius: 3px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
 }
 
-/* TABLA SIN SCROLLBAR VISIBLE Y CON MANITO PARA ARRASTRAR */
+/* TABLA COMPACTA SIN SCROLLBAR Y CON ARRASTRE */
 .table-container {
   width: 100%;
   overflow-x: auto;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: grab;
   user-select: none;
-  scrollbar-width: none; /* Oculta barra en Firefox */
-  -ms-overflow-style: none; /* Oculta barra en Edge antiguo */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .table-container::-webkit-scrollbar {
-  display: none; /* Oculta barra en Chrome, Safari y Edge */
+  display: none;
 }
 
 .table-container.dragging {
@@ -316,7 +319,7 @@
   width: 100%;
   border-collapse: collapse;
   white-space: nowrap;
-  font-size: 11px !important;
+  font-size: 10.5px !important;
 }
 
 .table-container th {
@@ -324,24 +327,24 @@
   color: #ffffff;
   font-weight: 800;
   text-transform: uppercase;
-  font-size: 11px !important;
-  padding: 12px 12px !important;
+  font-size: 10.5px !important;
+  padding: 9px 10px !important;
   text-align: center;
   border-bottom: none;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
 }
 
 .table-container th:first-child {
-  border-top-left-radius: 10px;
+  border-top-left-radius: 8px;
 }
 
 .table-container th:last-child {
-  border-top-right-radius: 10px;
+  border-top-right-radius: 8px;
 }
 
 .table-container td {
-  font-size: 11px !important;
-  padding: 10px 12px !important;
+  font-size: 10.5px !important;
+  padding: 8px 10px !important;
   border-bottom: 1px solid #eef2f6;
   vertical-align: middle;
   text-align: center;
@@ -355,11 +358,11 @@
 /* BADGES ESTILO PÍLDORA SÓLIDA */
 .badge-estado {
   display: inline-block;
-  padding: 4px 12px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 800;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   text-transform: uppercase;
 }
 
@@ -381,7 +384,7 @@
 /* BOTONES DE ACCIÓN EN FILA (SOLO ICONOS) */
 .acciones-cell {
   display: inline-flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
   justify-content: center;
 }
@@ -391,11 +394,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   padding: 0;
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: 5px;
+  font-size: 11px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -403,15 +406,13 @@
 .btn-tabla-editar {
   border: 1px solid #cbd5e1;
   background: #ffffff;
-  color: #2857af;
+  color: #1e3a6d;
 }
 
 .btn-tabla-editar:hover {
   background: #f1f5f9;
-  border-color: #94a3b8;
 }
 
-/* Estado por aprobar: AZUL */
 .btn-tabla-aprobar {
   border: none;
   background: #0f4c81;
@@ -420,18 +421,15 @@
 
 .btn-tabla-aprobar:hover:not(:disabled) {
   background: #145d9b;
-  transform: translateY(-1px);
 }
 
-/* Estado cuando YA está aprobado: VERDE */
 .btn-tabla-aprobar.is-approved {
   background: #16a34a;
   color: #ffffff;
   cursor: default;
-  opacity: 1;
 }
 
-/* RESPONSIVE CELULAR Y TABLET */
+/* RESPONSIVE MÓVIL Y PANTALLAS PEQUEÑAS (360px o más) */
 @media (max-width: 1150px) {
   .top-summary-grid {
     grid-template-columns: 1fr;
@@ -446,17 +444,25 @@
   }
 
   .filters-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .filter-group.filter-buscar {
-    grid-column: span 3;
+    grid-column: span 2;
   }
 }
 
 @media (max-width: 600px) {
   .tracking-page {
-    padding: 12px;
+    padding: 9px 9px; /* Muy cerca de los bordes laterales del celular */
+  }
+
+  .hero-card,
+  .kpi-container-card,
+  .filters-card,
+  .table-section-card {
+    border-radius: 10px;
+    padding: 10px 12px;
   }
 
   .filters-grid {
@@ -467,8 +473,20 @@
     grid-column: span 1;
   }
 
+  .filters-actions-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
   .filters-actions-row button {
-    flex: 1;
+    width: 100%;
     justify-content: center;
+    padding: 0 4px;
+    font-size: 11.5px;
+  }
+
+  .mobile-hidden-filter {
+    display: none !important;
   }
 }

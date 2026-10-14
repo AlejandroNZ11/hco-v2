@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './tracking_mhe.css';
+import * as XLSX from 'xlsx';
 
 // Importamos los servicios
 import { obtenerUltimasInspecciones, aprobarInspeccionMhe } from '../../services/mheService';
@@ -26,6 +27,13 @@ function getStoredAuthUser() {
 export default function TrackingMHE() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
+
+  // Validamos si el rol del usuario es superadmin o supervisor
+  const rolUsuario = String(
+    currentUser?.rol || currentUser?.role || currentUser?.roles?.nombre || ''
+  ).toLowerCase().trim();
+
+  const puedeExportar = rolUsuario === 'superadmin' || rolUsuario === 'supervisor';
 
   const [inspecciones, setInspecciones] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -223,10 +231,12 @@ export default function TrackingMHE() {
 
   function formatearFecha(fecha) {
     if (!fecha) return '-';
-    return new Date(fecha).toLocaleString('es-PE', {
-      dateStyle: 'short',
-      timeStyle: 'short'
-    });
+    return new Date(fecha)
+      .toLocaleString('es-PE', {
+        dateStyle: 'short',
+        timeStyle: 'short'
+      })
+      .replace(',', '');
   }
 
   const handleEditar = (insp) => {
@@ -251,54 +261,54 @@ export default function TrackingMHE() {
     }
   };
 
-  // Exportar a CSV compatible con Excel
+// Exportar a archivo Excel (.xlsx) real
   const handleExportarExcel = () => {
+    if (!puedeExportar) {
+      return alert("No tienes permisos para exportar. Solo Superadmin y Supervisor pueden realizar esta acción.");
+    }
+
     if (inspeccionesFiltradas.length === 0) {
       return alert("No hay registros para exportar.");
     }
 
-    const cabeceras = [
-      "N°",
-      "Fecha y Hora",
-      "Area",
-      "Estado Proceso",
-      "Categoria Equipo",
-      "Equipo (Serie)",
-      "Estado MHE",
-      "Estado Personal",
-      "Registrado Por",
-      "Aprobado Por",
-      "Revisado El"
+    const datosExcel = inspeccionesFiltradas.map((insp, idx) => ({
+      "N°": idx + 1,
+      "Fecha y Hora": formatearFecha(insp.fecha_hora),
+      "Área": insp.areas?.nombre || insp.area?.nombre || '-',
+      "Estado Proceso": insp.estado_proceso || 'PENDIENTE',
+      "Categoría Equipo": insp.equipos?.categorias_equipos?.nombre || 'N/A',
+      "Equipo (Serie)": insp.equipos?.serie || 'N/A',
+      "Estado MHE": insp.estado_mhe || '-',
+      "Estado Personal": insp.estado_personal || 'OPERATIVO',
+      "Registrado Por": insp.registrado_por_nombre || '-',
+      "Aprobado Por": insp.aprobador?.nombre || insp.aprobado_por_nombre || insp.aprobado_por_id || '-',
+      "Revisado El": formatearFecha(insp.revisado_el)
+    }));
+
+    // Creamos la hoja de Excel a partir del JSON
+    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+
+    // Ajustamos el ancho de cada columna para que se lea limpio al abrir el Excel
+    worksheet['!cols'] = [
+      { wch: 6 },  // N°
+      { wch: 20 }, // Fecha y Hora
+      { wch: 18 }, // Área
+      { wch: 22 }, // Estado Proceso
+      { wch: 22 }, // Categoría Equipo
+      { wch: 18 }, // Equipo (Serie)
+      { wch: 15 }, // Estado MHE
+      { wch: 16 }, // Estado Personal
+      { wch: 28 }, // Registrado Por
+      { wch: 28 }, // Aprobado Por
+      { wch: 20 }  // Revisado El
     ];
 
-    const filas = inspeccionesFiltradas.map((insp, idx) => [
-      idx + 1,
-      formatearFecha(insp.fecha_hora),
-      insp.areas?.nombre || insp.area?.nombre || '-',
-      insp.estado_proceso || 'PENDIENTE',
-      insp.equipos?.categorias_equipos?.nombre || 'N/A',
-      insp.equipos?.serie || 'N/A',
-      insp.estado_mhe || '-',
-      insp.estado_personal || 'OPERATIVO',
-      insp.registrado_por_nombre || '-',
-      insp.aprobador?.nombre || insp.aprobado_por_nombre || insp.aprobado_por_id || '-',
-      formatearFecha(insp.revisado_el)
-    ]);
+    // Creamos el libro y descargamos el archivo .xlsx
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tracking MHE");
 
-    const contenidoCsv =
-      "\uFEFF" +
-      [cabeceras, ...filas]
-        .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(";"))
-        .join("\n");
-
-    const blob = new Blob([contenidoCsv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `Tracking_MHE_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `Tracking_MHE_${fechaHoy}.xlsx`);
   };
 
   return (
@@ -309,7 +319,7 @@ export default function TrackingMHE() {
       <div className="top-summary-grid">
         <section className="hero-card">
           <span className="module-pill">MÓDULO OPERATIVO</span>
-          <h1>Tracking PIV (MHE)</h1>
+          <h1>Tracking MHE</h1>
           <p>Consulte, filtre, exporte y gestione las inspecciones diarias de equipos de manipulación.</p>
         </section>
 
@@ -380,7 +390,7 @@ export default function TrackingMHE() {
             </select>
           </div>
 
-          <div className="filter-group">
+          <div className="filter-group mobile-hidden-filter">
             <label>Fecha ini</label>
             <input
               type="date"
@@ -389,7 +399,7 @@ export default function TrackingMHE() {
             />
           </div>
 
-          <div className="filter-group">
+          <div className="filter-group mobile-hidden-filter">
             <label>Fecha fin</label>
             <input
               type="date"
@@ -460,7 +470,17 @@ export default function TrackingMHE() {
             </div>
           </div>
 
-          <button type="button" className="btn-exportar-excel" onClick={handleExportarExcel}>
+          <button
+            type="button"
+            className="btn-exportar-excel"
+            onClick={handleExportarExcel}
+            disabled={!puedeExportar}
+            title={
+              puedeExportar
+                ? "Exportar a Excel (.xlsx)"
+                : "Solo habilitado para Superadmin y Supervisor"
+            }
+          >
             <span className="excel-icon-box">X</span>
             <span>Exportar</span>
           </button>

@@ -225,6 +225,102 @@
 .bat-verde { color: #22c55e; }   /* Verde > 30% */
 .bat-rojo { font-weight: bold; }  
 
+/* Fila interna de Estado de Salud (En PC: pregunta a la izq, botones a la der) */
+.salud-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* =========================================
+   TARJETA DE DECLARACIÓN JURADA (MODERNA)
+   ========================================= */
+.declaracion-card {
+  margin-top: 20px;
+  background: #f8fafc;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.declaracion-card:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+/* Ocultamos el checkbox nativo feo */
+.declaracion-card input[type="checkbox"] {
+  display: none;
+}
+
+/* Cuadro del check personalizado */
+.custom-chk {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  border-radius: 6px;
+  border: 2px solid #94a3b8;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent; /* Oculta el ícono cuando no está marcado */
+  transition: all 0.2s ease;
+}
+
+/* Textos de la declaración */
+.declaracion-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.declaracion-tag {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.declaracion-texto p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+/* --- ESTADO MARCADO (VERDE SUAVE) --- */
+.declaracion-card.is-checked {
+  background: #f0fdf4;
+  border-color: #4ade80;
+  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.1);
+}
+
+.declaracion-card.is-checked .custom-chk {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #ffffff; /* Muestra el check blanco */
+  transform: scale(1.05);
+}
+
+.declaracion-card.is-checked .declaracion-tag {
+  color: #16a34a;
+}
+
+.declaracion-card.is-checked .declaracion-texto p {
+  color: #14532d;
+}
+
 /* =========================================
    CELULARES: DISEÑO RESPONSIVO 
    ========================================= */
@@ -236,6 +332,17 @@
     align-items: flex-start;
     gap: 12px;
   }
+
+  /* AGREGA ESTO DENTRO DE TU @media (max-width: 768px) */
+  .salud-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .salud-row .checklist-question-2col {
+    padding-right: 0;
+  }
+
   .checklist-options-2col {
     width: 100%;
     justify-content: flex-end;
@@ -258,5 +365,13 @@
   /* 2. Reducir el espacio blanco adentro de la tarjeta principal */
   .card {
     padding: 16px 12px !important; 
+  }
+
+  .declaracion-card {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  .declaracion-texto p {
+    font-size: 12.5px;
   }
 }

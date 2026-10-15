@@ -462,6 +462,15 @@
   color: #991b1b;            /* Texto rojo oscuro */
 }
 
+/* Botones de acción deshabilitados por falta de rol */
+.btn-tabla-editar.disabled-by-role,
+.btn-tabla-aprobar.disabled-by-role {
+  background: #e2e8f0 !important;
+  color: #94a3b8 !important;
+  border-color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
 
 
 /* RESPONSIVE MÓVIL Y PANTALLAS PEQUEÑAS (360px o más) */

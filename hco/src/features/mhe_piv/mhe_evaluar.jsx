@@ -485,7 +485,7 @@ export default function MheEvaluar() {
       }
     }
 
-    for (const pCont of pregContador) {
+        for (const pCont of pregContador) {
       const valTxt = String(respuestas[pCont.id]?.respuesta_texto || "").trim();
       if (!valTxt) {
         return alert(`Por favor ingrese el valor de: "${pCont.descripcion}"`);
@@ -494,7 +494,10 @@ export default function MheEvaluar() {
       if (isNaN(numHoro)) {
         return alert("Ingrese un horómetro válido.");
       }
-      if (horometroAnterior !== null && !isNaN(parseFloat(horometroAnterior))) {
+
+      // SI ESTAMOS EDITANDO: No castigamos si el horómetro es el mismo o mayor al que ya tenía guardado esta inspección.
+      // Si estamos en creación nueva: Validamos estrictamente que sea mayor al anterior.
+      if (!esModoEdicion && horometroAnterior !== null && !isNaN(parseFloat(horometroAnterior))) {
         const numAnt = parseFloat(horometroAnterior);
         if (numHoro <= numAnt) {
           return alert(
@@ -503,6 +506,7 @@ export default function MheEvaluar() {
         }
       }
     }
+
 
     const pregBotonesMhe = [
       ...pregVisual,
@@ -789,7 +793,10 @@ export default function MheEvaluar() {
                       <div className="section-title" style={{marginTop: 0}}>3. Contador / Horómetro</div>
                       {pregContador.map(p => {
                         const valorHoro = respuestas[p.id]?.respuesta_texto || "";
+                        
+                        // Si estamos editando, no marcamos error visual estricto por el historial anterior
                         const horoInvalido =
+                          !esModoEdicion &&
                           valorHoro !== "" &&
                           horometroAnterior !== null &&
                           !isNaN(parseFloat(valorHoro)) &&

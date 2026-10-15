@@ -39,6 +39,10 @@ export default function TrackingMHE() {
 
   const puedeExportar = rolUsuario === 'superadmin' || rolUsuario === 'supervisor';
 
+  // Roles permitidos para cada acción
+  const esSuperAdminOSupervisor = rolUsuario === 'superadmin' || rolUsuario === 'supervisor';
+  const esAdminSupervisorSuperAdmin = esSuperAdminOSupervisor || rolUsuario === 'admin';
+
   const [inspecciones, setInspecciones] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -635,29 +639,50 @@ export default function TrackingMHE() {
                       {/* 10. Revisado El */}
                       <td>{formatearFecha(insp.revisado_el)}</td>
 
-                      {/* 11. Acciones (Solo Iconos) */}
+                                            {/* 11. Acciones (Visibles pero bloqueadas según rol) */}
                       <td style={{ textAlign: 'center' }}>
                         <div className="acciones-cell">
                           <button
                             type="button"
-                            className="btn-tabla-editar"
-                            onClick={() => handleEditar(insp)}
-                            title="Editar inspección"
+                            className={`btn-tabla-editar ${!esSuperAdminOSupervisor ? 'disabled-by-role' : ''}`}
+                            onClick={() => {
+                              if (!esSuperAdminOSupervisor) {
+                                return alert("No tienes permisos para editar. Solo Supervisor y Superadmin.");
+                              }
+                              handleEditar(insp);
+                            }}
+                            title={
+                              esSuperAdminOSupervisor
+                                ? "Editar inspección"
+                                : "No autorizado: Solo Supervisor y Superadmin pueden editar"
+                            }
                           >
                             <FaEdit />
                           </button>
 
                           <button
                             type="button"
-                            className={`btn-tabla-aprobar ${yaAprobado ? 'is-approved' : ''}`}
-                            onClick={() => handleAprobar(insp)}
+                            className={`btn-tabla-aprobar ${yaAprobado ? 'is-approved' : ''} ${!esAdminSupervisorSuperAdmin ? 'disabled-by-role' : ''}`}
+                            onClick={() => {
+                              if (!esAdminSupervisorSuperAdmin) {
+                                return alert("No tienes permisos para aprobar. Solo Admin, Supervisor y Superadmin.");
+                              }
+                              handleAprobar(insp);
+                            }}
                             disabled={yaAprobado}
-                            title={yaAprobado ? "Inspección aprobada" : "Aprobar inspección"}
+                            title={
+                              yaAprobado
+                                ? "Inspección aprobada"
+                                : esAdminSupervisorSuperAdmin
+                                ? "Aprobar inspección"
+                                : "No autorizado: Solo Admin, Supervisor y Superadmin pueden aprobar"
+                            }
                           >
                             <FaCheck />
                           </button>
                         </div>
                       </td>
+
                       
                     </tr>
                   );

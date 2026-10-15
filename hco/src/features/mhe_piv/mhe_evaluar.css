@@ -7,6 +7,129 @@
 .card { background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
 
 /* =========================================
+   LEYENDA DE ICONOS AL INICIO
+   ========================================= */
+.leyenda-mhe-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.leyenda-mhe-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 10px;
+}
+
+.leyenda-mhe-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  max-width: 480px;
+  margin: 0 auto;
+  gap: 8px;
+}
+
+.leyenda-mhe-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #0f172a;
+}
+
+.leyenda-mhe-item span {
+  font-size: 12.5px;
+  font-style: italic;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+/* =========================================
+   CABECERAS DE SECCIÓN CON INDICADOR DE ESTADO
+   ========================================= */
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.status-pill-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-pill-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* Badges de Estado de Salud (APTO / OBSERVADO / NO APTO) */
+.salud-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 11px;
+  border: 1px solid transparent;
+}
+.salud-badge.APTO { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.salud-badge.OBSERVADO { background: #fef08a; color: #854d0e; border-color: #fde047; }
+.salud-badge.NO_APTO { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.salud-badge.PENDIENTE { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; }
+
+/* Mensajes y bordes de validación en tiempo real */
+.input-error-border {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+}
+
+.field-error-msg {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #dc2626;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.field-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  margin-left: 4px;
+}
+
+.horometro-prev-badge {
+  margin-left: 8px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field-badge.optional-ok {
+  background: #dcfce7;
+  color: #166534;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* =========================================
    NUEVO DISEÑO: 2 COLUMNAS + BOTONES DE ICONO (COLORES SUAVES)
    ========================================= */
 
@@ -92,7 +215,7 @@
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 12px 16px; /* Padding reducido al mínimo */
+  padding: 12px 16px;
   margin-bottom: 24px;
   display: flex;
   flex-direction: column;
@@ -101,9 +224,11 @@
 
 .historial-grid {
   display: flex;
-  justify-content: space-between; /* Expande los elementos de extremo a extremo */
+  justify-content: space-between;
   align-items: center;
   width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .hist-item {
@@ -111,12 +236,12 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  flex: 1; /* Permite que cada bloque (Estado, Fecha, Operador) ocupe un tercio del espacio */
+  flex: 1;
 }
 
 .hist-item.hist-obs {
   align-items: flex-start;
-  border-top: 1px dashed #cbd5e1; /* Línea separadora sutil */
+  border-top: 1px dashed #cbd5e1;
   padding-top: 10px;
 }
 
@@ -154,16 +279,14 @@
   padding: 16px;
 }
 
-
 /* =========================================
    COMPRESIÓN MÁXIMA: DATOS DEL EQUIPO
    ========================================= */
 .datos-equipo-compact {
   margin-bottom: 24px;
-  align-items: stretch; /* Hace que ambas cajas midan lo mismo */
+  align-items: stretch;
 }
 
-/* 1. Quitamos los espacios gigantes de arriba y abajo */
 .datos-equipo-compact .split-panel {
   padding: 10px 16px !important; 
   display: flex;
@@ -171,16 +294,14 @@
   justify-content: center;
 }
 
-/* 2. Aplastamos los márgenes de los campos (inputs) */
 .datos-equipo-compact .panel-inputs .field {
-  margin-bottom: 8px !important; /* Acerca los dos selects */
+  margin-bottom: 8px !important;
 }
 
 .datos-equipo-compact .panel-inputs .field:last-child {
-  margin-bottom: 1 !important; /* Mata el espacio vacío debajo del último select */
+  margin-bottom: 0 !important;
 }
 
-/* 3. Adaptamos la foto al cuadro completo sin fondo blanco extra */
 .datos-equipo-compact .panel-foto {
   padding: 4px !important; 
   align-items: center;
@@ -189,8 +310,8 @@
 .datos-equipo-compact .panel-foto img {
   width: 100%;
   height: 100%;
-  max-height: 180px; /* Límite para que la tarjeta siga delgada */
-  object-fit: contain; /* Hace que la foto crezca hasta tocar los bordes */
+  max-height: 180px;
+  object-fit: contain;
   border-radius: 6px;
 }
 
@@ -203,13 +324,11 @@
   align-items: center;
 }
 
-/* Le damos espacio a la derecha para que el texto no pise el icono */
 .input-icon-wrapper input {
   width: 100%;
   padding-right: 44px !important; 
 }
 
-/* Posicionamos el icono flotando a la derecha */
 .input-icon-wrapper .icon-suffix {
   position: absolute;
   right: 12px;
@@ -220,12 +339,11 @@
 }
 
 /* Colores condicionales */
-.bat-default { color: #94a3b8; } /* Gris cuando está vacío */
-.bat-rojo { color: #ef4444; }    /* Rojo <= 30% */
-.bat-verde { color: #22c55e; }   /* Verde > 30% */
-.bat-rojo { font-weight: bold; }  
+.bat-default { color: #94a3b8; }
+.bat-rojo { color: #ef4444; font-weight: bold; }
+.bat-verde { color: #22c55e; }
 
-/* Fila interna de Estado de Salud (En PC: pregunta a la izq, botones a la der) */
+/* Fila interna de Estado de Salud */
 .salud-row {
   display: flex;
   justify-content: space-between;
@@ -255,12 +373,10 @@
   background: #f1f5f9;
 }
 
-/* Ocultamos el checkbox nativo feo */
 .declaracion-card input[type="checkbox"] {
   display: none;
 }
 
-/* Cuadro del check personalizado */
 .custom-chk {
   width: 24px;
   height: 24px;
@@ -271,11 +387,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: transparent; /* Oculta el ícono cuando no está marcado */
+  color: transparent;
   transition: all 0.2s ease;
 }
 
-/* Textos de la declaración */
 .declaracion-texto {
   display: flex;
   flex-direction: column;
@@ -309,7 +424,7 @@
 .declaracion-card.is-checked .custom-chk {
   background: #22c55e;
   border-color: #22c55e;
-  color: #ffffff; /* Muestra el check blanco */
+  color: #ffffff;
   transform: scale(1.05);
 }
 
@@ -325,15 +440,21 @@
    CELULARES: DISEÑO RESPONSIVO 
    ========================================= */
 
-/* Celulares (pasa a 1 columna automáticamente) */
 @media (max-width: 768px) {
+  .leyenda-mhe-box {
+    padding: 10px 8px;
+    margin-bottom: 16px;
+  }
+  .leyenda-mhe-item span {
+    font-size: 11.5px;
+  }
+
   .checklist-card-2col {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
 
-  /* AGREGA ESTO DENTRO DE TU @media (max-width: 768px) */
   .salud-row {
     flex-direction: column;
     align-items: flex-start;
@@ -348,7 +469,7 @@
     justify-content: flex-end;
   }
   .icon-btn {
-    flex: 1; /* Estira los botones en el celular */
+    flex: 1;
   }
 
   .historial-grid {
@@ -357,12 +478,10 @@
     gap: 8px;
   }
 
-  /* 1. Reducir el espacio gris a los lados de la pantalla */
   .registro-page {
     padding: 12px 12px !important; 
   }
 
-  /* 2. Reducir el espacio blanco adentro de la tarjeta principal */
   .card {
     padding: 16px 12px !important; 
   }

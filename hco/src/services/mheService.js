@@ -100,24 +100,35 @@ export const obtenerDatosMaestrosMhe = async () => {
 };
 
 /**
- * Obtiene la última inspección realizada a un equipo específico
+ * Obtiene la última inspección realizada a un equipo específico junto con su ID y respuestas
  */
 export const obtenerUltimaInspeccionEquipo = async (equipoId) => {
   const { data, error } = await supabase
     .from('inspecciones')
-    .select('estado_mhe, observaciones_generales, fecha_hora, registrado_por_nombre')
+    .select('id, estado_mhe, observaciones_generales, fecha_hora, registrado_por_nombre')
     .eq('equipo_id', equipoId)
     .order('fecha_hora', { ascending: false })
     .limit(1)
     .single();
 
-  // Si da error es porque no hay datos, devolvemos null en vez de lanzar excepción
   if (error && error.code !== 'PGRST116') {
     throw new Error(`Error al buscar historial del equipo: ${error.message}`);
   }
   
-  return data || null;
+  if (!data) return null;
+
+  // Consultamos también las respuestas de esta última inspección para extraer el horómetro
+  const { data: respData } = await supabase
+    .from('respuestas_inspeccion')
+    .select('*')
+    .eq('inspeccion_id', data.id);
+
+  return {
+    ...data,
+    respuestas: respData || []
+  };
 };
+
 
 /**
  * Guarda una nueva inspección y sus respuestas detalladas

@@ -34,24 +34,27 @@ const convertirDriveUrl = (url) => {
   return url;
 };
 
+const normalizarTexto = (txt) =>
+  (txt || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 export default function MheEvaluar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  // Detectamos si venimos del botón Editar (por URL ?id=... o por state)
   const inspeccionEditId = searchParams.get('id') || location.state?.inspeccion?.id || null;
   const esModoEdicion = Boolean(inspeccionEditId);
 
   const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(false);
   
-  // Variables maestras que guardan toda la BD al inicio
   const [categorias, setCategorias] = useState([]);
   const [todosEquipos, setTodosEquipos] = useState([]);
   const [todasPreguntas, setTodasPreguntas] = useState([]);
   
-  // Variables que se muestran en pantalla (filtradas)
   const [equipos, setEquipos] = useState([]);
   const [preguntas, setPreguntas] = useState([]);
   
@@ -65,14 +68,81 @@ export default function MheEvaluar() {
   const [respuestas, setRespuestas] = useState({});
   const [equipoSeleccionado, setEquipoSeleccionado] = useState(null);
   const [checklistAnterior, setChecklistAnterior] = useState(null);
+  const [horometroAnterior, setHorometroAnterior] = useState(null);
 
-  // Función auxiliar para detectar si la pregunta es el cuadro de texto de observaciones
   const esPreguntaObservacion = (p) => {
-    const texto = (p?.descripcion || "").toLowerCase();
+    const texto = normalizarTexto(p?.descripcion);
     return p?.seccion === 'RESUMEN' && (texto.includes('describa') || texto.includes('observacion'));
   };
 
-  // 1. Cargar datos maestros y, si estamos editando, cargar los datos de la fila
+  const esPreguntaVB = (p) => {
+    const texto = normalizarTexto(p?.descripcion);
+    return p?.seccion === 'RESUMEN' && texto.includes('vb operador');
+  };
+
+  const esPreguntaMedicamentosDetalle = (p) => {
+    if (p?.seccion !== 'SALUD') return false;
+    const texto = normalizarTexto(p?.descripcion);
+    return (
+      texto.includes('en caso tu respuesta') ||
+      texto.includes('que medicamentos') ||
+      texto.includes('por cuanto tiempo')
+    );
+  };
+
+  const esPreguntaTratamiento = (p) => {
+    if (p?.seccion !== 'SALUD' || esPreguntaMedicamentosDetalle(p)) return false;
+    const texto = normalizarTexto(p?.descripcion);
+    return (
+      texto.includes('tratamiento') ||
+      texto.includes('medicacion') ||
+      texto.includes('somnolencia')
+    );
+  };
+
+  // Extracción optimizada del horómetro anterior desde la última inspección
+  const extraerHorometroDeInspeccion = async (ultimaInsp, listaPreguntas, eqObj = null) => {
+    if (!ultimaInsp) {
+      const valEq = eqObj?.horometro ?? eqObj?.ultimo_horometro ?? eqObj?.contador;
+      return valEq !== undefined && valEq !== null && !isNaN(parseFloat(valEq)) ? parseFloat(valEq) : null;
+    }
+
+    // 1. Identificamos los IDs de las preguntas de tipo CONTADOR para esta categoría
+    const idsContador = (listaPreguntas || [])
+      .filter(p => p.seccion === 'CONTADOR')
+      .map(p => String(p.id));
+
+    // 2. Buscamos en las respuestas que ya vienen adjuntas en la última inspección
+    const arrResp = ultimaInsp.respuestas || [];
+    if (Array.isArray(arrResp) && arrResp.length > 0) {
+      const itemCont = arrResp.find(r => idsContador.includes(String(r.item_id || r.pregunta_id || r.id)));
+      const textoResp = itemCont?.respuesta_texto ?? itemCont?.valor ?? itemCont?.respuesta;
+      if (textoResp !== undefined && textoResp !== null && String(textoResp).trim() !== "") {
+        const val = parseFloat(textoResp);
+        if (!isNaN(val)) return val;
+      }
+    }
+
+    // 3. Respaldo por si estuviera guardado directo en columnas de la cabecera
+    const camposPosibles = ['horometro', 'horometro_inicio', 'contador', 'valor_contador'];
+    for (const campo of camposPosibles) {
+      if (ultimaInsp[campo] !== undefined && ultimaInsp[campo] !== null && String(ultimaInsp[campo]).trim() !== "") {
+        const val = parseFloat(ultimaInsp[campo]);
+        if (!isNaN(val)) return val;
+      }
+    }
+
+    const valEqFallback = eqObj?.horometro ?? eqObj?.ultimo_horometro ?? eqObj?.contador;
+    return valEqFallback !== undefined && valEqFallback !== null && !isNaN(parseFloat(valEqFallback)) ? parseFloat(valEqFallback) : null;
+  };
+
+
+  const asyncResponseToDetails = (res) => {
+    if (!res) return { respuestas: [] };
+    if (res.respuestas) return res;
+    return { respuestas: res.detalles || res.mhe_respuestas || [] };
+  };
+
   useEffect(() => {
     if (!currentUser) {
       alert("Inicie sesión para continuar.");
@@ -91,15 +161,14 @@ export default function MheEvaluar() {
       setTodosEquipos(data.equipos);
       setTodasPreguntas(data.preguntas);
 
-      // Si se pulsó en Editar una fila, cargamos sus datos y respuestas
       if (inspeccionEditId) {
-        const { inspeccion, respuestas: respGuardadas } = await obtenerInspeccionPorId(inspeccionEditId);
+        const resultadoInsp = await obtenerInspeccionPorId(inspeccionEditId);
+        const inspeccion = resultadoInsp.inspeccion || resultadoInsp;
+        const respGuardadas = resultadoInsp.respuestas || resultadoInsp.detalles || [];
 
-        // Buscamos el equipo para saber a qué categoría pertenece
         const eqEncontrado = data.equipos.find(eq => String(eq.id) === String(inspeccion.equipo_id));
         const catId = eqEncontrado ? String(eqEncontrado.categoria_id) : "";
 
-        // Filtramos equipos y preguntas de esa categoría
         const eqFiltrados = data.equipos.filter(eq => String(eq.categoria_id) === catId);
         const pregFiltradas = data.preguntas.filter(p => String(p.categoria_id) === catId);
 
@@ -107,7 +176,6 @@ export default function MheEvaluar() {
         setPreguntas(pregFiltradas);
         setEquipoSeleccionado(eqEncontrado || null);
 
-        // Rellenamos la cabecera del formulario
         setFormData({
           categoria_id: catId,
           equipo_id: String(inspeccion.equipo_id || ""),
@@ -115,7 +183,6 @@ export default function MheEvaluar() {
           vb_operador: Boolean(inspeccion.vb_operador)
         });
 
-        // Reconstruimos el historial anterior si estaba guardado en la inspección
         if (inspeccion.chk_ant_estado || inspeccion.chk_ant_fecha) {
           setChecklistAnterior({
             estado_mhe: inspeccion.chk_ant_estado,
@@ -125,7 +192,18 @@ export default function MheEvaluar() {
           });
         }
 
-        // Inicializamos todas las preguntas de la categoría y les volcamos las respuestas guardadas
+        if (inspeccion.equipo_id) {
+          try {
+            const dataUltima = await obtenerUltimaInspeccionEquipo(inspeccion.equipo_id);
+            if (dataUltima) {
+              const horoPrevio = await extraerHorometroDeInspeccion(dataUltima, data.preguntas, eqEncontrado);
+              setHorometroAnterior(horoPrevio);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+
         const mapaRespuestas = {};
         pregFiltradas.forEach(p => {
           mapaRespuestas[p.id] = {
@@ -135,9 +213,9 @@ export default function MheEvaluar() {
         });
 
         respGuardadas.forEach(r => {
-          mapaRespuestas[r.item_id] = {
+          mapaRespuestas[r.item_id || r.pregunta_id] = {
             valor_estado: r.valor_estado || "",
-            respuesta_texto: r.respuesta_texto || ""
+            respuesta_texto: r.respuesta_texto || r.valor || ""
           };
         });
 
@@ -150,13 +228,13 @@ export default function MheEvaluar() {
     }
   };
 
-  // 2. Al cambiar categoría manualmente
   const handleCategoriaChange = (e) => {
     const catId = e.target.value;
     
     setFormData({ ...formData, categoria_id: catId, equipo_id: "" });
     setEquipoSeleccionado(null);
     setChecklistAnterior(null);
+    setHorometroAnterior(null);
 
     if (!catId) {
       setEquipos([]);
@@ -178,7 +256,6 @@ export default function MheEvaluar() {
     setRespuestas(initResp);
   };
 
-  // 3. Al seleccionar un equipo, cargar su foto y su último checklist
   const handleEquipoChange = async (e) => {
     const eqId = e.target.value;
     setFormData({ ...formData, equipo_id: eqId });
@@ -187,40 +264,24 @@ export default function MheEvaluar() {
     setEquipoSeleccionado(eq || null);
 
     setChecklistAnterior(null);
+    setHorometroAnterior(null);
     if (!eqId) return;
 
     try {
       const data = await obtenerUltimaInspeccionEquipo(eqId);
-      if (data) setChecklistAnterior(data);
+      if (data) {
+        setChecklistAnterior(data);
+        const horoPrevio = await extraerHorometroDeInspeccion(data, todasPreguntas, eq);
+        setHorometroAnterior(horoPrevio);
+      } else {
+        const horoPrevio = await extraerHorometroDeInspeccion(null, todasPreguntas, eq);
+        setHorometroAnterior(horoPrevio);
+      }
     } catch (error) {
       console.error(error.message);
     }
   };
 
-  // Manejo de respuestas de Botones
-  const handleRespuesta = (itemId, valor) => {
-    setRespuestas(prev => ({
-      ...prev,
-      [itemId]: { ...(prev[itemId] || { respuesta_texto: "" }), valor_estado: valor }
-    }));
-  };
-
-  // Manejo de respuestas de Texto/Número (Batería, Contador, Detalles)
-  const handleTextoExtra = (itemId, texto) => {
-    setRespuestas(prev => ({
-      ...prev,
-      [itemId]: { ...(prev[itemId] || { valor_estado: "" }), respuesta_texto: texto }
-    }));
-  };
-
-  const calcularEstadoMaquina = () => {
-    const valores = Object.values(respuestas).map(r => r.valor_estado);
-    if (valores.includes("INOPERATIVO")) return "INOPERATIVO";
-    if (valores.includes("OBSERVADO")) return "OBSERVADO";
-    return "OPERATIVO";
-  };
-
-  // Agrupación de preguntas
   const pregBateria = preguntas.filter(p => p.seccion === 'BATERIA');
   const pregContador = preguntas.filter(p => p.seccion === 'CONTADOR');
   const pregVisual = preguntas.filter(p => p.seccion === 'VISUAL');
@@ -228,31 +289,259 @@ export default function MheEvaluar() {
   const pregResumen = preguntas.filter(p => p.seccion === 'RESUMEN');
   const pregSalud = preguntas.filter(p => p.seccion === 'SALUD');
 
+  const preguntasVisualYFunciones = [...pregVisual, ...pregFunciones];
+  const hayInoperativoOObservado = preguntasVisualYFunciones.some(
+    p => respuestas[p.id]?.valor_estado === 'INOPERATIVO' || respuestas[p.id]?.valor_estado === 'OBSERVADO'
+  );
+  const todasVisualYFuncionesRespondidas =
+    preguntasVisualYFunciones.length > 0 &&
+    preguntasVisualYFunciones.every(p => Boolean(respuestas[p.id]?.valor_estado));
+  const todosVisualYFuncionesOperativo = todasVisualYFuncionesRespondidas && !hayInoperativoOObservado;
+
+  useEffect(() => {
+    if (preguntas.length === 0) return;
+    const pregObs = preguntas.find(p => esPreguntaObservacion(p));
+    if (!pregObs) return;
+
+    const textoActual = respuestas[pregObs.id]?.respuesta_texto || "";
+
+    if (todosVisualYFuncionesOperativo) {
+      if (textoActual === "") {
+        setRespuestas(prev => ({
+          ...prev,
+          [pregObs.id]: { ...(prev[pregObs.id] || { valor_estado: "" }), respuesta_texto: "OPERATIVO" }
+        }));
+      }
+    } else if (hayInoperativoOObservado) {
+      if (textoActual === "OPERATIVO") {
+        setRespuestas(prev => ({
+          ...prev,
+          [pregObs.id]: { ...(prev[pregObs.id] || { valor_estado: "" }), respuesta_texto: "" }
+        }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todosVisualYFuncionesOperativo, hayInoperativoOObservado]);
+
+  const handleRespuesta = (itemId, valor) => {
+    setRespuestas(prev => ({
+      ...prev,
+      [itemId]: { ...(prev[itemId] || { respuesta_texto: "" }), valor_estado: valor }
+    }));
+  };
+
+  const handleTextoExtra = (itemId, texto) => {
+    setRespuestas(prev => ({
+      ...prev,
+      [itemId]: { ...(prev[itemId] || { valor_estado: "" }), respuesta_texto: texto }
+    }));
+  };
+
+  const handleBateriaKeyDown = (e) => {
+    if (['-', '+', 'e', 'E', '.', ','].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleBateriaChange = (itemId, rawValue) => {
+    if (rawValue === "") {
+      handleTextoExtra(itemId, "");
+      return;
+    }
+    const soloDigitos = rawValue.replace(/\D/g, "");
+    if (soloDigitos === "") {
+      handleTextoExtra(itemId, "");
+      return;
+    }
+    const numero = parseInt(soloDigitos, 10);
+    if (isNaN(numero) || numero < 0 || numero > 100) {
+      return;
+    }
+    handleTextoExtra(itemId, String(numero));
+  };
+
+  const handleBateriaBlur = (valorTxt) => {
+    if (valorTxt !== "" && !isNaN(Number(valorTxt)) && Number(valorTxt) < 30) {
+      alert("Cambiar batería");
+    }
+  };
+
+  const obtenerRespuestaSiNoSalud = (p) => {
+    if (!p) return "";
+    const resp = respuestas[p.id];
+    if (!resp) return "";
+
+    const txt = (resp.respuesta_texto || "").toUpperCase().trim();
+    if (txt === "SI" || txt === "NO") return txt;
+
+    if (esPreguntaTratamiento(p)) {
+      if (resp.valor_estado === "INOPERATIVO") return "SI";
+      if (resp.valor_estado === "OPERATIVO") return "NO";
+    } else {
+      if (resp.valor_estado === "OPERATIVO") return "SI";
+      if (resp.valor_estado === "INOPERATIVO") return "NO";
+    }
+    return "";
+  };
+
+  const handleRespuestaSalud = (pregunta, opcionSiNo) => {
+    const esTratamiento = esPreguntaTratamiento(pregunta);
+    const valorEstadoColor = esTratamiento
+      ? (opcionSiNo === "SI" ? "INOPERATIVO" : "OPERATIVO")
+      : (opcionSiNo === "SI" ? "OPERATIVO" : "INOPERATIVO");
+
+    setRespuestas(prev => {
+      const nuevoMapa = {
+        ...prev,
+        [pregunta.id]: {
+          valor_estado: valorEstadoColor,
+          respuesta_texto: opcionSiNo
+        }
+      };
+
+      if (esTratamiento && opcionSiNo === "NO") {
+        const pregMed = pregSalud.find(item => esPreguntaMedicamentosDetalle(item));
+        if (pregMed) {
+          nuevoMapa[pregMed.id] = { valor_estado: "NO_APLICA", respuesta_texto: "" };
+        }
+      }
+
+      return nuevoMapa;
+    });
+  };
+
+  const calcularEstadoMaquina = () => {
+    const pregVbObj = pregResumen.find(p => esPreguntaVB(p));
+    if (pregVbObj && respuestas[pregVbObj.id]?.valor_estado === "INOPERATIVO") {
+      return "INOPERATIVO";
+    }
+
+    const preguntasMhe = [
+      ...pregVisual,
+      ...pregFunciones,
+      ...pregResumen.filter(p => !esPreguntaObservacion(p))
+    ];
+    const valoresMhe = preguntasMhe.map(p => respuestas[p.id]?.valor_estado).filter(Boolean);
+
+    if (valoresMhe.includes("INOPERATIVO")) return "INOPERATIVO";
+    if (valoresMhe.includes("OBSERVADO")) return "OBSERVADO";
+    return "OPERATIVO";
+  };
+
+  const preguntasSaludSiNo = pregSalud.filter(p => !esPreguntaMedicamentosDetalle(p));
+  const pregTratamientoObj = pregSalud.find(p => esPreguntaTratamiento(p));
+  const respuestaTratamiento = obtenerRespuestaSiNoSalud(pregTratamientoObj);
+
+  const calcularEstadoPersonal = () => {
+    if (preguntasSaludSiNo.length < 3) return "APTO";
+
+    const r1 = obtenerRespuestaSiNoSalud(preguntasSaludSiNo[0]);
+    const r2 = obtenerRespuestaSiNoSalud(preguntasSaludSiNo[1]);
+    const r3 = obtenerRespuestaSiNoSalud(preguntasSaludSiNo[2]);
+
+    if (!r1 || !r2 || !r3) return "PENDIENTE";
+
+    // - SÍ SÍ NO = APTO
+    if (r1 === "SI" && r2 === "SI" && r3 === "NO") return "APTO";
+
+    // - NO NO SÍ medicamentos = NO APTO
+    if (r1 === "NO" && r2 === "NO" && r3 === "SI") return "NO APTO";
+
+    // - NO SÍ NO = OBSERVADO
+    if (r1 === "NO" && r2 === "SI" && r3 === "NO") return "OBSERVADO";
+
+    // - SÍ NO NO = OBSERVADO
+    if (r1 === "SI" && r2 === "NO" && r3 === "NO") return "OBSERVADO";
+
+    // - SÍ SÍ SÍ medicamentos = OBSERVADO
+    if (r1 === "SI" && r2 === "SI" && r3 === "SI") return "OBSERVADO";
+
+    // - NO NO NO = OBSERVADO
+    if (r1 === "NO" && r2 === "NO" && r3 === "NO") return "OBSERVADO";
+
+    // Cualquier otra combinación no listada por defecto como OBSERVADO
+    return "OBSERVADO";
+  };
+
+
+  const estadoMheActual = calcularEstadoMaquina();
+  const estadoPersonalActual = calcularEstadoPersonal();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.equipo_id) return alert("Seleccione un equipo.");
-    
-    const seccionesVisibles = ['BATERIA', 'CONTADOR', 'VISUAL', 'FUNCIONES', 'RESUMEN', 'SALUD'];
-    
-    const preguntaFaltante = preguntas.find(p => {
-      if (!seccionesVisibles.includes(p.seccion)) return false;
 
-      const resp = respuestas[p.id];
-      if (!resp) return true;
-
-      if (esPreguntaObservacion(p)) {
-        return false;
+    for (const pBat of pregBateria) {
+      const valTxt = String(respuestas[pBat.id]?.respuesta_texto || "").trim();
+      if (!valTxt) {
+        return alert(`Por favor ingrese el valor de: "${pBat.descripcion}"`);
       }
-
-      if (p.seccion === 'BATERIA' || p.seccion === 'CONTADOR') {
-        return !String(resp.respuesta_texto || "").trim();
+      const numBat = Number(valTxt);
+      if (isNaN(numBat) || numBat < 0 || numBat > 100) {
+        return alert("El nivel de batería debe estar entre 0 y 100.");
       }
+      if (numBat < 30) {
+        return alert("Cambiar batería. No se puede guardar la inspección porque tiene menos de 30% de carga.");
+      }
+    }
 
-      return !resp.valor_estado;
-    });
+    for (const pCont of pregContador) {
+      const valTxt = String(respuestas[pCont.id]?.respuesta_texto || "").trim();
+      if (!valTxt) {
+        return alert(`Por favor ingrese el valor de: "${pCont.descripcion}"`);
+      }
+      const numHoro = parseFloat(valTxt);
+      if (isNaN(numHoro)) {
+        return alert("Ingrese un horómetro válido.");
+      }
+      if (horometroAnterior !== null && !isNaN(parseFloat(horometroAnterior))) {
+        const numAnt = parseFloat(horometroAnterior);
+        if (numHoro <= numAnt) {
+          return alert(
+            `El Horómetro inicio (${numHoro}) debe ser mayor al Horómetro anterior registrado (${numAnt}). Debe colocar un valor mayor a ${numAnt}. No se puede guardar la inspección.`
+          );
+        }
+      }
+    }
 
-    if (preguntaFaltante) {
-      return alert(`Por favor responda todas las preguntas del checklist.\n\nFalta responder: "${preguntaFaltante.descripcion}"`);
+    const pregBotonesMhe = [
+      ...pregVisual,
+      ...pregFunciones,
+      ...pregResumen.filter(p => !esPreguntaObservacion(p))
+    ];
+    const pregMheFaltante = pregBotonesMhe.find(p => !respuestas[p.id]?.valor_estado);
+    if (pregMheFaltante) {
+      return alert(
+        `Por favor responda todas las preguntas del checklist.\n\nFalta responder: "${pregMheFaltante.descripcion}"`
+      );
+    }
+
+    const pregObs = preguntas.find(p => esPreguntaObservacion(p));
+    const textoObs = String(
+      pregObs ? respuestas[pregObs.id]?.respuesta_texto || "" : formData.observaciones || ""
+    ).trim();
+
+    if (hayInoperativoOObservado && (!textoObs || textoObs.toUpperCase() === "OPERATIVO")) {
+      return alert(
+        'El campo "Describa las observaciones" es obligatorio porque marcó uno o más puntos en Visual o Funciones como Inoperativo (👎) u Observado (👁️).'
+      );
+    }
+
+    const pregSaludFaltante = preguntasSaludSiNo.find(p => !obtenerRespuestaSiNoSalud(p));
+    if (pregSaludFaltante) {
+      return alert(
+        `Por favor responda todas las preguntas de Estado de Salud.\n\nFalta responder: "${pregSaludFaltante.descripcion}"`
+      );
+    }
+
+    const pregMedDetalle = pregSalud.find(p => esPreguntaMedicamentosDetalle(p));
+    if (respuestaTratamiento === "SI" && pregMedDetalle) {
+      const txtMed = String(respuestas[pregMedDetalle.id]?.respuesta_texto || "").trim();
+      if (!txtMed) {
+        return alert(
+          `El comentario es obligatorio: "${pregMedDetalle.descripcion}"`
+        );
+      }
     }
 
     if (!formData.vb_operador) {
@@ -263,17 +552,24 @@ export default function MheEvaluar() {
 
     try {
       const estadoCalculado = calcularEstadoMaquina();
+      const estadoPersonalFinal = calcularEstadoPersonal();
       const fotoEquipoHistorial = equipoSeleccionado?.foto_url || null;
 
-      const pregObs = preguntas.find(p => esPreguntaObservacion(p));
-      const textoObservacionGeneral = pregObs 
-        ? (respuestas[pregObs.id]?.respuesta_texto?.trim() || formData.observaciones || null)
-        : (formData.observaciones || null);
+      const textoObservacionGeneral = hayInoperativoOObservado
+        ? textoObs
+        : (textoObs || "OPERATIVO");
 
-      const textosSalud = pregSalud
-        .map(p => respuestas[p.id]?.respuesta_texto?.trim())
-        .filter(Boolean)
-        .join(" | ");
+      const detalleMedicamentos =
+        respuestaTratamiento === "SI" && pregMedDetalle
+          ? String(respuestas[pregMedDetalle.id]?.respuesta_texto || "").trim()
+          : null;
+
+      const mapaEstadoPersonalBD = {
+        "APTO": "OPERATIVO",
+        "OBSERVADO": "OBSERVADO",
+        "NO APTO": "INOPERATIVO"
+      };
+      const estadoPersonalParaBD = mapaEstadoPersonalBD[estadoPersonalFinal] || "OPERATIVO";
 
       const datosInspeccion = {
         area_id: currentUser.area_id, 
@@ -283,10 +579,10 @@ export default function MheEvaluar() {
         equipo_id: formData.equipo_id,
         foto_equipo: fotoEquipoHistorial, 
         observaciones_generales: textoObservacionGeneral,
-        entrevista_somnolencia: textosSalud || null,
+        entrevista_somnolencia: detalleMedicamentos,
         vb_operador: formData.vb_operador,
         estado_mhe: estadoCalculado,
-        estado_personal: 'OPERATIVO',
+        estado_personal: estadoPersonalParaBD,
         chk_ant_estado: checklistAnterior?.estado_mhe || null,
         chk_ant_obs: checklistAnterior?.observaciones_generales || null,
         chk_ant_fecha: checklistAnterior?.fecha_hora || null,
@@ -297,24 +593,42 @@ export default function MheEvaluar() {
         const preg = preguntas.find(p => String(p.id) === String(itemId));
         const pregSeccion = preg?.seccion;
         let finalValorEstado = respuestas[itemId]?.valor_estado || "";
+        let finalRespuestaTexto = respuestas[itemId]?.respuesta_texto || "";
 
-        if (pregSeccion === 'BATERIA' || pregSeccion === 'CONTADOR' || esPreguntaObservacion(preg)) {
-          finalValorEstado = 'NO_APLICA'; 
+        if (
+          pregSeccion === 'BATERIA' ||
+          pregSeccion === 'CONTADOR' ||
+          esPreguntaObservacion(preg) ||
+          esPreguntaMedicamentosDetalle(preg)
+        ) {
+          finalValorEstado = 'NO_APLICA';
+        }
+
+        if (esPreguntaObservacion(preg) && !hayInoperativoOObservado && !finalRespuestaTexto.trim()) {
+          finalRespuestaTexto = "OPERATIVO";
+        }
+
+        if (esPreguntaMedicamentosDetalle(preg) && respuestaTratamiento !== "SI") {
+          finalRespuestaTexto = "";
         }
 
         return {
           item_id: itemId,
           valor_estado: finalValorEstado,
-          respuesta_texto: respuestas[itemId]?.respuesta_texto || ""
+          respuesta_texto: finalRespuestaTexto
         };
       });
 
       if (esModoEdicion) {
         await actualizarInspeccionCompleta(inspeccionEditId, datosInspeccion, respuestasArray);
-        alert(`Inspección actualizada exitosamente. Estado Final: ${estadoCalculado}`);
+        alert(
+          `Inspección actualizada exitosamente.\nEstado MHE: ${estadoCalculado}\nEstado Personal: ${estadoPersonalFinal}`
+        );
       } else {
         await guardarInspeccionCompleta(datosInspeccion, respuestasArray);
-        alert(`Inspección guardada exitosamente. Estado Final: ${estadoCalculado}`);
+        alert(
+          `Inspección guardada exitosamente.\nEstado MHE: ${estadoCalculado}\nEstado Personal: ${estadoPersonalFinal}`
+        );
       }
 
       navigate('/mhe/tracking_mhe');
@@ -343,6 +657,42 @@ export default function MheEvaluar() {
         </div>
 
         <form onSubmit={handleSubmit}>
+
+          {/* LEYENDA AL INICIO */}
+          <div className="leyenda-mhe-box">
+            <div className="leyenda-mhe-title">Leyenda:</div>
+            <div className="leyenda-mhe-grid">
+              <div className="leyenda-mhe-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                </svg>
+                <span>Operativo</span>
+              </div>
+
+              <div className="leyenda-mhe-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"></path>
+                </svg>
+                <span>Inoperativo</span>
+              </div>
+
+              <div className="leyenda-mhe-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+                </svg>
+                <span>Observado</span>
+              </div>
+
+              <div className="leyenda-mhe-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                </svg>
+                <span>No/Aplica</span>
+              </div>
+            </div>
+          </div>
           
           {/* 1. DATOS DEL EQUIPO */}
           <div className="section-title">Datos del Equipo</div>
@@ -387,18 +737,19 @@ export default function MheEvaluar() {
                       {pregBateria.map(p => {
                         const valorTxt = respuestas[p.id]?.respuesta_texto || "";
                         const numero = parseInt(valorTxt, 10);
+                        const esBateriaBaja = valorTxt !== '' && !isNaN(numero) && numero < 30;
                         let colorClase = 'bat-default';
                         let anchoBarra = 0;
 
                         if (valorTxt !== '' && !isNaN(numero)) {
-                          colorClase = numero <= 30 ? 'bat-rojo' : 'bat-verde';
+                          colorClase = numero < 30 ? 'bat-rojo' : 'bat-verde';
                           const porcentajeReal = Math.min(Math.max(numero, 0), 100); 
                           anchoBarra = (15 * porcentajeReal) / 100;
                         }
 
                         return (
                           <div className="field" key={p.id}>
-                            <label>{p.descripcion}</label>
+                            <label>{p.descripcion} <span className="field-hint">(Rango permitido: 30% - 100%)</span></label>
                             <div className="input-icon-wrapper">
                               <input 
                                 type="number" 
@@ -406,7 +757,10 @@ export default function MheEvaluar() {
                                 min="0" 
                                 max="100"
                                 value={valorTxt} 
-                                onChange={(e) => handleTextoExtra(p.id, e.target.value)} 
+                                onKeyDown={handleBateriaKeyDown}
+                                onChange={(e) => handleBateriaChange(p.id, e.target.value)} 
+                                onBlur={() => handleBateriaBlur(valorTxt)}
+                                className={esBateriaBaja ? 'input-error-border' : ''}
                                 required 
                               />
                               <span className={`icon-suffix ${colorClase}`}>
@@ -419,6 +773,11 @@ export default function MheEvaluar() {
                                 </svg>
                               </span>
                             </div>
+                            {esBateriaBaja && (
+                              <div className="field-error-msg">
+                                ⚠️ <strong>Cambiar batería:</strong> La carga es menor a 30%. No se puede usar el equipo ni guardar la inspección.
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -427,19 +786,43 @@ export default function MheEvaluar() {
 
                   {pregContador.length > 0 && (
                     <div>
-                      <div className="section-title" style={{marginTop: 0}}>3. Contador</div>
-                      {pregContador.map(p => (
-                        <div className="field" key={p.id}>
-                          <label>{p.descripcion}</label>
-                          <input
-                            type="number"
-                            placeholder="Ej: 12500"
-                            value={respuestas[p.id]?.respuesta_texto || ""}
-                            onChange={(e) => handleTextoExtra(p.id, e.target.value)}
-                            required
-                          />
-                        </div>
-                      ))}
+                      <div className="section-title" style={{marginTop: 0}}>3. Contador / Horómetro</div>
+                      {pregContador.map(p => {
+                        const valorHoro = respuestas[p.id]?.respuesta_texto || "";
+                        const horoInvalido =
+                          valorHoro !== "" &&
+                          horometroAnterior !== null &&
+                          !isNaN(parseFloat(valorHoro)) &&
+                          !isNaN(parseFloat(horometroAnterior)) &&
+                          parseFloat(valorHoro) <= parseFloat(horometroAnterior);
+
+                        return (
+                          <div className="field" key={p.id}>
+                            <label>
+                              {p.descripcion}
+                              {horometroAnterior !== null && (
+                                <span className="horometro-prev-badge">
+                                  Anterior: {horometroAnterior}
+                                </span>
+                              )}
+                            </label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder={horometroAnterior !== null ? `Mayor a ${horometroAnterior}` : "Ej: 12500"}
+                              value={valorHoro}
+                              onChange={(e) => handleTextoExtra(p.id, e.target.value)}
+                              className={horoInvalido ? 'input-error-border' : ''}
+                              required
+                            />
+                            {horoInvalido && (
+                              <div className="field-error-msg">
+                                ⚠️ El horómetro ({valorHoro}) es menor o igual al anterior ({horometroAnterior}). Debe colocar un valor <strong>mayor a {horometroAnterior}</strong>.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -504,34 +887,62 @@ export default function MheEvaluar() {
               {/* 6. RESUMEN DE LA EVALUACIÓN */}
               {pregResumen.length > 0 && (
                 <>
-                  <div className="section-title">6. Resumen de la evaluación del equipo</div>
-                  <div className="form-grid cols-2" style={{marginBottom: '24px'}}>
+                  <div className="section-title-row">
+                    <div className="section-title" style={{marginBottom: 0}}>6. Resumen de la evaluación del equipo</div>
+                    <div className="status-pill-wrapper">
+                      <span className="status-pill-label">Estado MHE:</span>
+                      <span className={`hist-badge ${estadoMheActual}`}>{estadoMheActual}</span>
+                    </div>
+                  </div>
+
+                  <div className="form-grid cols-2" style={{marginBottom: '24px', marginTop: '12px'}}>
                     {pregResumen.map(p => {
-                      const textoMinuscula = p.descripcion.toLowerCase();
-                      const esObservacion = textoMinuscula.includes('describa') || textoMinuscula.includes('observacion');
-                      const esVB = textoMinuscula.includes('vb operador');
+                      const esObservacion = esPreguntaObservacion(p);
+                      const esVB = esPreguntaVB(p);
+                      const textoObsActual = respuestas[p.id]?.respuesta_texto || "";
+                      const faltaObsObligatoria =
+                        esObservacion &&
+                        hayInoperativoOObservado &&
+                        (!textoObsActual.trim() || textoObsActual.trim().toUpperCase() === "OPERATIVO");
 
                       return (
                         <div className="checklist-card-2col" key={p.id} style={esObservacion ? {flexDirection: 'column', alignItems: 'stretch', gap: '10px'} : {}}>
                           {esObservacion ? (
                             <>
-                              <div className="checklist-question-2col" style={{padding: 0}}>{p.descripcion}</div>
+                              <div className="checklist-question-2col" style={{padding: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px'}}>
+                                <span>{p.descripcion}</span>
+                                {hayInoperativoOObservado ? (
+                                  <span className="field-badge manual">OBLIGATORIO</span>
+                                ) : (
+                                  <span className="field-badge optional-ok">OPCIONAL (OPERATIVO)</span>
+                                )}
+                              </div>
                               <input 
                                 type="text" 
-                                placeholder="Escriba aquí sus observaciones..." 
-                                value={respuestas[p.id]?.respuesta_texto || ""} 
+                                placeholder={
+                                  hayInoperativoOObservado
+                                    ? "Obligatorio: Describa el motivo de Inoperativo u Observado..."
+                                    : "OPERATIVO"
+                                }
+                                value={textoObsActual} 
                                 onChange={(e) => handleTextoExtra(p.id, e.target.value)} 
+                                className={faltaObsObligatoria ? 'input-error-border' : ''}
                                 style={{padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '100%', fontSize: '13px', background: '#f8fafc'}}
                               />
+                              {faltaObsObligatoria && (
+                                <div className="field-error-msg">
+                                  ⚠️ Debe describir las observaciones porque marcó ítems con 👎 o 👁️.
+                                </div>
+                              )}
                             </>
                           ) : (
                             <>
                               <div className="checklist-question-2col">{p.descripcion}</div>
                               <div className="checklist-options-2col">
-                                <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Bueno">
+                                <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} title="Operativo">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
                                 </button>
-                                <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Malo">
+                                <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} title="Inoperativo">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"></path></svg>
                                 </button>
                                 {!esVB && (
@@ -549,42 +960,92 @@ export default function MheEvaluar() {
                 </>
               )}
 
-                            {/* 7. ESTADO DE SALUD */}
+              {/* 7. ESTADO DE SALUD */}
               {pregSalud.length > 0 && (
                 <>
-                  <div className="section-title">7. Estado de Salud</div>
-                  <div className="form-grid cols-2" style={{marginBottom: '24px'}}>
-                    {pregSalud.map(p => (
-                      <div className="checklist-card-2col" key={p.id} style={{flexDirection: 'column', alignItems: 'stretch'}}>
-                        
-                        {/* CAMBIO AQUÍ: usamos la clase salud-row en lugar del style en línea */}
-                        <div className="salud-row">
-                          <div className="checklist-question-2col">{p.descripcion}</div>
-                          <div className="checklist-options-2col">
-                            <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'OPERATIVO' ? 'selected OPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'OPERATIVO')} style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}>
-                              SÍ
-                            </button>
-                            <button type="button" className={`icon-btn ${respuestas[p.id]?.valor_estado === 'INOPERATIVO' ? 'selected INOPERATIVO' : ''}`} onClick={() => handleRespuesta(p.id, 'INOPERATIVO')} style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}>
-                              NO
-                            </button>
+                  <div className="section-title-row">
+                    <div className="section-title" style={{marginBottom: 0}}>7. Estado de Salud</div>
+                    <div className="status-pill-wrapper">
+                      <span className="status-pill-label">Condición:</span>
+                      <span className={`salud-badge ${estadoPersonalActual.replace(/\s+/g, '_')}`}>
+                        {estadoPersonalActual}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="form-grid cols-2" style={{marginBottom: '24px', marginTop: '12px'}}>
+                    {pregSalud.map(p => {
+                      const esDetalleMed = esPreguntaMedicamentosDetalle(p);
+                      const esTratamiento = esPreguntaTratamiento(p);
+
+                      if (esDetalleMed) {
+                        if (respuestaTratamiento !== "SI") {
+                          return null;
+                        }
+                        const valorMed = respuestas[p.id]?.respuesta_texto || "";
+                        return (
+                          <div
+                            className="checklist-card-2col salud-med-card"
+                            key={p.id}
+                            style={{flexDirection: 'column', alignItems: 'stretch', gap: '8px'}}
+                          >
+                            <div className="checklist-question-2col" style={{padding: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px'}}>
+                              <span>{p.descripcion}</span>
+                              <span className="field-badge manual">OBLIGATORIO</span>
+                            </div>
+                            <input
+                              type="text"
+                              placeholder="Indique qué medicamentos y por cuánto tiempo..."
+                              value={valorMed}
+                              onChange={(e) => handleTextoExtra(p.id, e.target.value)}
+                              className={!valorMed.trim() ? 'input-error-border' : ''}
+                              style={{padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '100%', fontSize: '13px', background: '#f8fafc'}}
+                              required
+                            />
+                          </div>
+                        );
+                      }
+
+                      const respSiNo = obtenerRespuestaSiNoSalud(p);
+
+                      const claseBotonSi =
+                        respSiNo === "SI"
+                          ? `selected ${esTratamiento ? 'INOPERATIVO' : 'OPERATIVO'}`
+                          : '';
+                      const claseBotonNo =
+                        respSiNo === "NO"
+                          ? `selected ${esTratamiento ? 'OPERATIVO' : 'INOPERATIVO'}`
+                          : '';
+
+                      return (
+                        <div className="checklist-card-2col" key={p.id} style={{flexDirection: 'column', alignItems: 'stretch', justifyContent: 'center'}}>
+                          <div className="salud-row">
+                            <div className="checklist-question-2col">{p.descripcion}</div>
+                            <div className="checklist-options-2col">
+                              <button
+                                type="button"
+                                className={`icon-btn ${claseBotonSi}`}
+                                onClick={() => handleRespuestaSalud(p, 'SI')}
+                                style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}
+                              >
+                                SÍ
+                              </button>
+                              <button
+                                type="button"
+                                className={`icon-btn ${claseBotonNo}`}
+                                onClick={() => handleRespuestaSalud(p, 'NO')}
+                                style={{width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 'bold'}}
+                              >
+                                NO
+                              </button>
+                            </div>
                           </div>
                         </div>
-
-                        {(respuestas[p.id]?.valor_estado || '') !== '' && (
-                          <input
-                            type="text"
-                            placeholder="Detalles adicionales (Opcional)"
-                            value={respuestas[p.id]?.respuesta_texto || ""}
-                            onChange={(e) => handleTextoExtra(p.id, e.target.value)}
-                            style={{marginTop: '12px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', width: '100%', fontSize: '13px'}}
-                          />
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
-
 
               {/* 8. DATOS DEL CHECKLIST ANTERIOR */}
               <div className="section-title">8. Datos del Check List Anterior</div>
@@ -609,6 +1070,7 @@ export default function MheEvaluar() {
                       <span className="hist-label">Operador:</span>
                       <span className="hist-value">{checklistAnterior.registrado_por_nombre || '-'}</span>
                     </div>
+                    
                   </div>
                   
                   <div className="hist-item hist-obs">
@@ -624,7 +1086,7 @@ export default function MheEvaluar() {
                 </div>
               )}
 
-                            {/* DECLARAR */}
+              {/* DECLARAR */}
               <label 
                 htmlFor="vb_operador" 
                 className={`declaracion-card ${formData.vb_operador ? 'is-checked' : ''}`}
@@ -647,7 +1109,6 @@ export default function MheEvaluar() {
                   <p>Declaro que el equipo se encuentra en las condiciones indicadas en este checklist.</p>
                 </div>
               </label>
-
 
               <div className="submit-row">
                 <button type="button" className="secondary-btn" onClick={() => navigate('/mhe/tracking_mhe')}>Cancelar</button>

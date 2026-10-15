@@ -74,11 +74,14 @@ export default function TrackingMHE() {
     return mapaUsuarios[id] || id;
   };
 
-  // Convierte el estado personal a "APTO" o "NO APTO"
+  // Devuelve el estado personal correcto y mapea antiguos valores de BD si fuera necesario
   const obtenerEstadoPersonal = (estado) => {
     const est = String(estado || 'APTO').toUpperCase().trim();
     if (est === 'APTO' || est === 'OPERATIVO') return 'APTO';
-    return 'NO APTO';
+    if (est === 'OBSERVADO') return 'OBSERVADO';
+    if (est === 'NO APTO' || est === 'NO_APTO') return 'NO APTO';
+    if (est === 'INOPERATIVO') return 'NO APTO';
+    return est;
   };
 
 
@@ -608,13 +611,20 @@ export default function TrackingMHE() {
                         {(() => {
                           const estadoTexto = obtenerEstadoPersonal(insp.estado_personal);
                           const esApto = estadoTexto === 'APTO';
+                          const esObservado = estadoTexto === 'OBSERVADO';
+                          
+                          let clasePill = 'no-apto';
+                          if (esApto) clasePill = 'apto';
+                          else if (esObservado) clasePill = 'observado';
+
                           return (
-                            <span className={`estado-personal-pill ${esApto ? 'apto' : 'no-apto'}`}>
+                            <span className={`estado-personal-pill ${clasePill}`}>
                               {estadoTexto}
                             </span>
                           );
                         })()}
                       </td>
+
 
                       {/* 8. Registrado Por */}
                       <td>{insp.registrado_por_nombre || '-'}</td>

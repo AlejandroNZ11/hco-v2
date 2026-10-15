@@ -472,6 +472,11 @@
   opacity: 0.6;
 }
 
+.badge-estado.pendiente-envio {
+  background: #f97316; /* Naranja vivo para identificar que está guardado en el dispositivo esperando internet */
+  color: #ffffff;
+}
+
 
 /* RESPONSIVE MÓVIL Y PANTALLAS PEQUEÑAS (360px o más) */
 @media (max-width: 1150px) {

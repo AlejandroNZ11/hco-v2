@@ -119,6 +119,16 @@ export default function TrackingMHE() {
 
   useEffect(() => {
     cargarInspecciones();
+
+    // Cuando useSync termina de subir datos al volver el internet o al pulsar "Sincronizar"
+    const handleSyncCompleted = () => {
+      cargarInspecciones();
+    };
+
+    window.addEventListener('hco-sync-completed', handleSyncCompleted);
+    return () => {
+      window.removeEventListener('hco-sync-completed', handleSyncCompleted);
+    };
   }, []);
 
   const cargarInspecciones = async () => {
@@ -276,7 +286,8 @@ export default function TrackingMHE() {
     if (!estado) return '';
     const est = estado.toUpperCase();
     if (est === 'OPERATIVO' || est === 'APROBADO') return 'operativo';
-    if (est === 'OBSERVADO' || est === 'PENDIENTE') return 'observado';
+    if (est.includes('ENVÍO') || est.includes('ENVIO')) return 'pendiente-envio';
+    if (est === 'OBSERVADO' || est.includes('PENDIENTE')) return 'observado';
     return 'inoperativo';
   };
 
@@ -326,15 +337,16 @@ export default function TrackingMHE() {
       "N°": idx + 1,
       "Fecha y Hora": formatearFecha(insp.fecha_hora),
       "Área": insp.areas?.nombre || insp.area?.nombre || '-',
-      "Estado Proceso": insp.estado_proceso || 'PENDIENTE',
+      "Estado Proceso": insp.estado_proceso || 'PENDIENTE DE REVISIÓN',
       "Categoría Equipo": insp.equipos?.categorias_equipos?.nombre || 'N/A',
       "Equipo (Serie)": insp.equipos?.serie || 'N/A',
       "Estado MHE": insp.estado_mhe || '-',
-      "Estado Personal": insp.estado_personal || 'OPERATIVO',
+      "Estado Personal": obtenerEstadoPersonal(insp.estado_personal),
+      "Registrado Por": insp.registrado_por_nombre || '-',
       "Aprobado Por": obtenerNombreAprobador(insp) || '-',
-      "Aprobado Por": insp.aprobador?.nombre || insp.aprobado_por_nombre || insp.aprobado_por_id || '-',
       "Revisado El": formatearFecha(insp.revisado_el)
     }));
+
 
     // Creamos la hoja de Excel a partir del JSON
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
@@ -420,11 +432,13 @@ export default function TrackingMHE() {
               onChange={(e) => setFiltrosForm({ ...filtrosForm, estado: e.target.value })}
             >
               <option value="Todos">Todos</option>
-              <option value="PENDIENTE">PENDIENTE</option>
+              <option value="PENDIENTE DE ENVÍO">PENDIENTE DE ENVÍO</option>
+              <option value="PENDIENTE DE REVISIÓN">PENDIENTE DE REVISIÓN</option>
               <option value="APROBADO">APROBADO</option>
               <option value="OPERATIVO">OPERATIVO</option>
               <option value="OBSERVADO">OBSERVADO</option>
               <option value="INOPERATIVO">INOPERATIVO</option>
+
             </select>
           </div>
 

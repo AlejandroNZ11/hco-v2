@@ -45,14 +45,19 @@ export default function MainLayout() {
   const isPedidosPage = currentPage.includes("/almuerzos/pedidos");
   const isAdminPage = currentPage.includes("/almuerzos/admin");
   const isListaPage = currentPage.includes("/almuerzos/lista_platillo");
+  const isMheTrackingPage = currentPage.includes("/mhe/tracking_mhe");
+  const isMheEvaluarPage = currentPage.includes("/mhe/mhe_evaluar");
 
   const { tituloCabecera, subtituloCabecera } = useMemo(() => {
     if (isMenuPage) return { tituloCabecera: "Menú Principal", subtituloCabecera: "Opciones del sistema" };
     if (isPedidosPage) return { tituloCabecera: "Almuerzo", subtituloCabecera: "Registro de almuerzos" };
     if (isAdminPage) return { tituloCabecera: "Administración Global", subtituloCabecera: "Supervisión de pedidos y reportes" };
     if (isListaPage) return { tituloCabecera: "Editar Menú", subtituloCabecera: "Gestión semanal de platillos" };
+    if (isMheTrackingPage) return { tituloCabecera: "Tracking MHE", subtituloCabecera: "Control e historial de inspecciones PIV" };
+    if (isMheEvaluarPage) return { tituloCabecera: "Inspección MHE", subtituloCabecera: "Evaluación pre-uso de equipos" };
     return { tituloCabecera: "Sistema de Control", subtituloCabecera: "Panel principal de operaciones" };
-  }, [isMenuPage, isPedidosPage, isAdminPage, isListaPage]);
+  }, [isMenuPage, isPedidosPage, isAdminPage, isListaPage, isMheTrackingPage, isMheEvaluarPage]);
+
 
   const nombreUsuario = String(authUser?.nombre || "Usuario").trim();
   const cargoRaw = authUser?.cargo?.nombre || authUser?.cargo || "Sin cargo asignado";
@@ -122,47 +127,14 @@ export default function MainLayout() {
     return () => clearInterval(intervalo);
   }, []);
 
-  async function limpiarCacheYActualizar() {
+  function limpiarCacheYActualizar() {
+    setDropdownOpen(false);
     // Protección: Evitar que borren la caché si hay datos sin enviar al servidor
     if (pendingCount > 0) {
       alert("⚠️ Tienes registros pendientes por sincronizar. Por favor, haz clic en el botón 'Sincronizar' primero para no perder tu trabajo.");
       return;
     }
-
     setShowClearCacheModal(true);
-
-    if (!confirmar) return;
-
-    try {
-      // 1. Borrar la caché de la PWA (Archivos HTML, CSS, JS e imágenes estancadas)
-      if ('caches' in window) {
-        const nombresCaches = await caches.keys();
-        await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
-      }
-
-      // 2. Eliminar el "Service Worker" (El motor que hace funcionar el modo offline)
-      if ('serviceWorker' in navigator) {
-        const registros = await navigator.serviceWorker.getRegistrations();
-        for (let registro of registros) {
-          await registro.unregister();
-        }
-      }
-
-      // 3. Borrar la base de datos local (IndexedDB de Dexie)
-      if (window.indexedDB) {
-        // Asegúrate de que el nombre coincida con tu db en Dexie (ej. HCO_OfflineDB)
-        indexedDB.deleteDatabase('HCO_OfflineDB'); 
-      }
-
-      // 4. Limpiar basuras secundarias del localStorage (sin borrar la sesión)
-      localStorage.removeItem('popup_almuerzo_cache_v2');
-
-      // 5. Forzar recarga completa saltándose la caché
-      window.location.reload(true);
-    } catch (error) {
-      console.error("Error al limpiar la caché:", error);
-      alert("Hubo un problema al limpiar la caché. Intenta reiniciar tu navegador.");
-    }
   }
 
   function abrirModalPassword() {

@@ -9,7 +9,7 @@ localDb.version(3).stores({
   jefes: 'id, nombre',
   roles: 'id, nombre', 
   sync_queue: '++id, tabla, operacion, payload',
-  // Nuevas tablas para el modo offline de MHE / PIV
+  // Tablas locales para MHE (PIV)
   inspecciones: 'id, equipo_id, usuario_id, fecha_hora, estado_proceso, _sincronizado',
   respuestas_inspeccion: '++local_id, inspeccion_id, item_id, _sincronizado',
   categorias_equipos: 'id, nombre',

@@ -12,7 +12,6 @@ class ErrorBoundaryInner extends React.Component {
   }
 
   componentDidUpdate(prevProps) {
-    // Si cambias de ruta (ej. con el botón Atrás), limpiamos el estado de error
     if (this.state.hasError && prevProps.locationKey !== this.props.locationKey) {
       this.setState({ hasError: false, error: null });
     }
@@ -22,6 +21,21 @@ class ErrorBoundaryInner extends React.Component {
     console.error("Error capturado en el módulo:", error, errorInfo);
   }
 
+  handleRetry = () => {
+    const msg = String(this.state.error || "");
+    const esErrorDeCargaModulo =
+      msg.includes("Unable to preload CSS") ||
+      msg.includes("Failed to fetch dynamically imported module") ||
+      msg.includes("Importing a module script failed");
+
+    this.setState({ hasError: false, error: null }, () => {
+      // Si falló la descarga de un chunk lazy y ya hay red o caché del SW, recargamos la ruta
+      if (esErrorDeCargaModulo) {
+        window.location.reload();
+      }
+    });
+  };
+
   render() {
     if (this.state.hasError) {
       return (
@@ -29,7 +43,6 @@ class ErrorBoundaryInner extends React.Component {
           <h3>El módulo no está disponible temporalmente.</h3>
           <p>Puedes seguir usando las demás áreas del sistema.</p>
           
-          {/* Muestra el motivo exacto del fallo para depurar rápido en móvil */}
           {this.state.error && (
             <pre style={{ marginTop: '12px', padding: '10px', background: '#ffffff', color: '#b91c1c', borderRadius: '6px', fontSize: '12px', textAlign: 'left', overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
               {this.state.error.toString()}
@@ -38,7 +51,7 @@ class ErrorBoundaryInner extends React.Component {
 
           <button
             type="button"
-            onClick={() => this.setState({ hasError: false, error: null })}
+            onClick={this.handleRetry}
             style={{ marginTop: '14px', padding: '8px 18px', backgroundColor: '#721c24', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
           >
             Reintentar

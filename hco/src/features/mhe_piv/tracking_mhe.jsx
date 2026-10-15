@@ -15,6 +15,10 @@ import * as XLSX from 'xlsx';
 
 // Importamos los servicios
 import { obtenerUltimasInspecciones, aprobarInspeccionMhe } from '../../services/mheService';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { localDb } from '../../services/localDb';
+import { obtenerTodosLosEmpleados } from '../../services/empleadosService';
+
 
 const ITEMS_POR_PAGINA = 50;
 
@@ -37,6 +41,46 @@ export default function TrackingMHE() {
 
   const [inspecciones, setInspecciones] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 1. Leemos los usuarios desde Dexie
+  const usuariosDb = useLiveQuery(() => localDb.usuarios.toArray(), [], []);
+
+  // Si aún no hay usuarios en Dexie, los descargamos en segundo plano
+  useEffect(() => {
+    if (usuariosDb.length === 0) {
+      obtenerTodosLosEmpleados()
+        .then((datos) => {
+          if (datos && datos.length > 0) localDb.usuarios.bulkPut(datos);
+        })
+        .catch((err) => console.error("Error al sincronizar usuarios:", err));
+    }
+  }, [usuariosDb.length]);
+
+  // 2. Diccionario rápido que relaciona UUID -> Nombre
+  const mapaUsuarios = useMemo(() => {
+    const mapa = {};
+    usuariosDb.forEach((u) => {
+      if (u.id) mapa[u.id] = u.nombre;
+    });
+    return mapa;
+  }, [usuariosDb]);
+
+  // 3. Función que devuelve el nombre del aprobador en vez del UUID
+  const obtenerNombreAprobador = (insp) => {
+    if (insp.aprobador?.nombre) return insp.aprobador.nombre;
+    if (insp.aprobado_por_nombre) return insp.aprobado_por_nombre;
+    const id = insp.aprobado_por_id || insp.aprobado_por;
+    if (!id || id === '-') return '-';
+    return mapaUsuarios[id] || id;
+  };
+
+  // Convierte el estado personal a "APTO" o "NO APTO"
+  const obtenerEstadoPersonal = (estado) => {
+    const est = String(estado || 'APTO').toUpperCase().trim();
+    if (est === 'APTO' || est === 'OPERATIVO') return 'APTO';
+    return 'NO APTO';
+  };
+
 
   // Referencia y estados para mover la tabla con la "manito" (drag to scroll)
   const tableContainerRef = useRef(null);
@@ -280,7 +324,7 @@ export default function TrackingMHE() {
       "Equipo (Serie)": insp.equipos?.serie || 'N/A',
       "Estado MHE": insp.estado_mhe || '-',
       "Estado Personal": insp.estado_personal || 'OPERATIVO',
-      "Registrado Por": insp.registrado_por_nombre || '-',
+      "Aprobado Por": obtenerNombreAprobador(insp) || '-',
       "Aprobado Por": insp.aprobador?.nombre || insp.aprobado_por_nombre || insp.aprobado_por_id || '-',
       "Revisado El": formatearFecha(insp.revisado_el)
     }));
@@ -561,21 +605,22 @@ export default function TrackingMHE() {
 
                       {/* 7. Estado Personal */}
                       <td>
-                        <span className={`badge-estado ${getBadgeClass(insp.estado_personal || 'OPERATIVO')}`}>
-                          {insp.estado_personal || 'OPERATIVO'}
-                        </span>
+                        {(() => {
+                          const estadoTexto = obtenerEstadoPersonal(insp.estado_personal);
+                          const esApto = estadoTexto === 'APTO';
+                          return (
+                            <span className={`estado-personal-pill ${esApto ? 'apto' : 'no-apto'}`}>
+                              {estadoTexto}
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* 8. Registrado Por */}
                       <td>{insp.registrado_por_nombre || '-'}</td>
 
                       {/* 9. Aprobado Por */}
-                      <td>
-                        {insp.aprobador?.nombre ||
-                         insp.aprobado_por_nombre ||
-                         insp.aprobado_por_id ||
-                         '-'}
-                      </td>
+                      <td>{obtenerNombreAprobador(insp)}</td>
 
                       {/* 10. Revisado El */}
                       <td>{formatearFecha(insp.revisado_el)}</td>

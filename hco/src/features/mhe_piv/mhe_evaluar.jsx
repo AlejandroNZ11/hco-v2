@@ -69,6 +69,36 @@ export default function MheEvaluar() {
   const [equipoSeleccionado, setEquipoSeleccionado] = useState(null);
   const [checklistAnterior, setChecklistAnterior] = useState(null);
   const [horometroAnterior, setHorometroAnterior] = useState(null);
+  const [equipoInoperativoBloqueado, setEquipoInoperativoBloqueado] = useState(false);
+
+  // Estado para el Aviso Flotante moderno (estilo Tailwind / Bootstrap 5)
+  const [avisoFlotante, setAvisoFlotante] = useState({
+    visible: false,
+    tipo: 'danger', // 'danger' | 'warning' | 'success' | 'info'
+    titulo: '',
+    mensaje: '',
+    detalleExtra: '',
+    onCloseCallback: null
+  });
+
+  const mostrarAviso = (tipo, titulo, mensaje, detalleExtra = '', onCloseCallback = null) => {
+    setAvisoFlotante({
+      visible: true,
+      tipo,
+      titulo,
+      mensaje,
+      detalleExtra,
+      onCloseCallback
+    });
+  };
+
+  const cerrarAviso = () => {
+    const callback = avisoFlotante.onCloseCallback;
+    setAvisoFlotante(prev => ({ ...prev, visible: false, onCloseCallback: null }));
+    if (typeof callback === 'function') {
+      callback();
+    }
+  };
 
   const esPreguntaObservacion = (p) => {
     const texto = normalizarTexto(p?.descripcion);
@@ -107,12 +137,10 @@ export default function MheEvaluar() {
       return valEq !== undefined && valEq !== null && !isNaN(parseFloat(valEq)) ? parseFloat(valEq) : null;
     }
 
-    // 1. Identificamos los IDs de las preguntas de tipo CONTADOR para esta categoría
     const idsContador = (listaPreguntas || [])
       .filter(p => p.seccion === 'CONTADOR')
       .map(p => String(p.id));
 
-    // 2. Buscamos en las respuestas que ya vienen adjuntas en la última inspección
     const arrResp = ultimaInsp.respuestas || [];
     if (Array.isArray(arrResp) && arrResp.length > 0) {
       const itemCont = arrResp.find(r => idsContador.includes(String(r.item_id || r.pregunta_id || r.id)));
@@ -123,7 +151,6 @@ export default function MheEvaluar() {
       }
     }
 
-    // 3. Respaldo por si estuviera guardado directo en columnas de la cabecera
     const camposPosibles = ['horometro', 'horometro_inicio', 'contador', 'valor_contador'];
     for (const campo of camposPosibles) {
       if (ultimaInsp[campo] !== undefined && ultimaInsp[campo] !== null && String(ultimaInsp[campo]).trim() !== "") {
@@ -136,16 +163,8 @@ export default function MheEvaluar() {
     return valEqFallback !== undefined && valEqFallback !== null && !isNaN(parseFloat(valEqFallback)) ? parseFloat(valEqFallback) : null;
   };
 
-
-  const asyncResponseToDetails = (res) => {
-    if (!res) return { respuestas: [] };
-    if (res.respuestas) return res;
-    return { respuestas: res.detalles || res.mhe_respuestas || [] };
-  };
-
   useEffect(() => {
     if (!currentUser) {
-      alert("Inicie sesión para continuar.");
       navigate('/');
       return;
     }
@@ -222,10 +241,36 @@ export default function MheEvaluar() {
         setRespuestas(mapaRespuestas);
       }
     } catch (error) {
-      alert("Error al cargar datos: " + error.message);
+      mostrarAviso('danger', 'Error al cargar datos', error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Verifica si el equipo salió INOPERATIVO en su último checklist y aún no fue habilitado por QHSE/Superadmin
+  const verificarSiEquipoEstaBloqueado = (eqObj, ultimaInsp) => {
+    if (!ultimaInsp) return false;
+
+    const estadoUltimaInsp = String(ultimaInsp.estado_mhe || '').toUpperCase().trim();
+    if (estadoUltimaInsp !== 'INOPERATIVO') return false;
+
+    const estadoOpEquipo = String(
+      ultimaInsp?.equipos?.estado_operativo ?? eqObj?.estado_operativo ?? ''
+    ).toUpperCase().trim();
+
+    const fechaHabRaw = ultimaInsp?.equipos?.fecha_habilitacion ?? eqObj?.fecha_habilitacion ?? null;
+
+    if (estadoOpEquipo === 'INOPERATIVO') return true;
+
+    if (fechaHabRaw && ultimaInsp.fecha_hora) {
+      const tiempoHab = new Date(fechaHabRaw).getTime();
+      const tiempoInsp = new Date(ultimaInsp.fecha_hora).getTime();
+      if (tiempoHab > tiempoInsp) {
+        return false;
+      }
+    }
+
+    return true;
   };
 
   const handleCategoriaChange = (e) => {
@@ -235,6 +280,7 @@ export default function MheEvaluar() {
     setEquipoSeleccionado(null);
     setChecklistAnterior(null);
     setHorometroAnterior(null);
+    setEquipoInoperativoBloqueado(false);
 
     if (!catId) {
       setEquipos([]);
@@ -265,6 +311,7 @@ export default function MheEvaluar() {
 
     setChecklistAnterior(null);
     setHorometroAnterior(null);
+    setEquipoInoperativoBloqueado(false);
     if (!eqId) return;
 
     try {
@@ -273,6 +320,17 @@ export default function MheEvaluar() {
         setChecklistAnterior(data);
         const horoPrevio = await extraerHorometroDeInspeccion(data, todasPreguntas, eq);
         setHorometroAnterior(horoPrevio);
+
+        // Si estamos creando una nueva inspección, validamos si el equipo quedó INOPERATIVO
+        if (!esModoEdicion && verificarSiEquipoEstaBloqueado(eq, data)) {
+          setEquipoInoperativoBloqueado(true);
+          mostrarAviso(
+            'danger',
+            `Equipo ${eq?.serie || ''} Inoperativo`,
+            `Este equipo salió como INOPERATIVO en el Check List Anterior. No se puede realizar otra inspección hasta que el área de QHSE lo habilite como Operativo.`,
+            data.observaciones_generales ? `Motivo registrado: "${data.observaciones_generales}"` : ''
+          );
+        }
       } else {
         const horoPrevio = await extraerHorometroDeInspeccion(null, todasPreguntas, eq);
         setHorometroAnterior(horoPrevio);
@@ -362,7 +420,11 @@ export default function MheEvaluar() {
 
   const handleBateriaBlur = (valorTxt) => {
     if (valorTxt !== "" && !isNaN(Number(valorTxt)) && Number(valorTxt) < 30) {
-      alert("Cambiar batería");
+      mostrarAviso(
+        'warning',
+        'Nivel de Batería Bajo (< 30%)',
+        'Debe cambiar o cargar la batería. No está permitido operar el equipo ni guardar la inspección con menos de 30% de carga.'
+      );
     }
   };
 
@@ -440,73 +502,67 @@ export default function MheEvaluar() {
     const r3 = obtenerRespuestaSiNoSalud(preguntasSaludSiNo[2]);
 
     if (!r1 || !r2 || !r3) return "PENDIENTE";
-
-    // - SÍ SÍ NO = APTO
     if (r1 === "SI" && r2 === "SI" && r3 === "NO") return "APTO";
-
-    // - NO NO SÍ medicamentos = NO APTO
-    if (r1 === "NO" && r2 === "NO" && r3 === "SI") return "NO APTO";
-
-    // - NO SÍ NO = OBSERVADO
-    if (r1 === "NO" && r2 === "SI" && r3 === "NO") return "NO APTO";
-
-    // - SÍ NO NO = OBSERVADO
-    if (r1 === "SI" && r2 === "NO" && r3 === "NO") return "NO APTO";
-
-    // - SÍ SÍ SÍ medicamentos = OBSERVADO
-    if (r1 === "SI" && r2 === "SI" && r3 === "SI") return "NO APTO";
-
-    // - NO NO NO = OBSERVADO
-    if (r1 === "NO" && r2 === "NO" && r3 === "NO") return "NO APTO";
-
-    // Cualquier otra combinación no listada por defecto como OBSERVADO
     return "NO APTO";
   };
-
 
   const estadoMheActual = calcularEstadoMaquina();
   const estadoPersonalActual = calcularEstadoPersonal();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.equipo_id) return alert("Seleccione un equipo.");
+    if (!formData.equipo_id) {
+      return mostrarAviso('warning', 'Equipo requerido', 'Por favor seleccione un equipo antes de continuar.');
+    }
+
+    if (!esModoEdicion && equipoInoperativoBloqueado) {
+      return mostrarAviso(
+        'danger',
+        'Equipo Inoperativo Bloqueado',
+        'No se puede guardar la inspección porque este equipo se encuentra INOPERATIVO. Debe ser habilitado primero por QHSE en el módulo Tracking MHE.'
+      );
+    }
 
     for (const pBat of pregBateria) {
       const valTxt = String(respuestas[pBat.id]?.respuesta_texto || "").trim();
       if (!valTxt) {
-        return alert(`Por favor ingrese el valor de: "${pBat.descripcion}"`);
+        return mostrarAviso('warning', 'Campo requerido', `Por favor ingrese el valor de: "${pBat.descripcion}"`);
       }
       const numBat = Number(valTxt);
       if (isNaN(numBat) || numBat < 0 || numBat > 100) {
-        return alert("El nivel de batería debe estar entre 0 y 100.");
+        return mostrarAviso('warning', 'Valor inválido', 'El nivel de batería debe estar entre 0% y 100%.');
       }
       if (numBat < 30) {
-        return alert("Cambiar batería. No se puede guardar la inspección porque tiene menos de 30% de carga.");
+        return mostrarAviso(
+          'danger',
+          'Cambiar Batería',
+          'No se puede guardar la inspección porque el equipo tiene menos de 30% de carga.'
+        );
       }
     }
 
-        for (const pCont of pregContador) {
+    for (const pCont of pregContador) {
       const valTxt = String(respuestas[pCont.id]?.respuesta_texto || "").trim();
       if (!valTxt) {
-        return alert(`Por favor ingrese el valor de: "${pCont.descripcion}"`);
+        return mostrarAviso('warning', 'Campo requerido', `Por favor ingrese el valor de: "${pCont.descripcion}"`);
       }
       const numHoro = parseFloat(valTxt);
       if (isNaN(numHoro)) {
-        return alert("Ingrese un horómetro válido.");
+        return mostrarAviso('warning', 'Horómetro inválido', 'Por favor ingrese un número de horómetro válido.');
       }
 
-      // SI ESTAMOS EDITANDO: No castigamos si el horómetro es el mismo o mayor al que ya tenía guardado esta inspección.
-      // Si estamos en creación nueva: Validamos estrictamente que sea mayor al anterior.
       if (!esModoEdicion && horometroAnterior !== null && !isNaN(parseFloat(horometroAnterior))) {
         const numAnt = parseFloat(horometroAnterior);
         if (numHoro <= numAnt) {
-          return alert(
-            `El Horómetro inicio (${numHoro}) debe ser mayor al Horómetro anterior registrado (${numAnt}). Debe colocar un valor mayor a ${numAnt}. No se puede guardar la inspección.`
+          return mostrarAviso(
+            'warning',
+            'Horómetro menor o igual al anterior',
+            `El Horómetro inicio (${numHoro}) debe ser mayor al Horómetro anterior registrado (${numAnt}).`,
+            `Coloque un valor superior a ${numAnt} para poder guardar.`
           );
         }
       }
     }
-
 
     const pregBotonesMhe = [
       ...pregVisual,
@@ -515,8 +571,11 @@ export default function MheEvaluar() {
     ];
     const pregMheFaltante = pregBotonesMhe.find(p => !respuestas[p.id]?.valor_estado);
     if (pregMheFaltante) {
-      return alert(
-        `Por favor responda todas las preguntas del checklist.\n\nFalta responder: "${pregMheFaltante.descripcion}"`
+      return mostrarAviso(
+        'warning',
+        'Checklist Incompleto',
+        'Por favor responda todas las preguntas de evaluación del equipo.',
+        `Falta responder: "${pregMheFaltante.descripcion}"`
       );
     }
 
@@ -526,15 +585,20 @@ export default function MheEvaluar() {
     ).trim();
 
     if (hayInoperativoOObservado && (!textoObs || textoObs.toUpperCase() === "OPERATIVO")) {
-      return alert(
+      return mostrarAviso(
+        'warning',
+        'Observación Obligatoria',
         'El campo "Describa las observaciones" es obligatorio porque marcó uno o más puntos en Visual o Funciones como Inoperativo (👎) u Observado (👁️).'
       );
     }
 
     const pregSaludFaltante = preguntasSaludSiNo.find(p => !obtenerRespuestaSiNoSalud(p));
     if (pregSaludFaltante) {
-      return alert(
-        `Por favor responda todas las preguntas de Estado de Salud.\n\nFalta responder: "${pregSaludFaltante.descripcion}"`
+      return mostrarAviso(
+        'warning',
+        'Estado de Salud Incompleto',
+        'Por favor responda todas las preguntas de la sección Estado de Salud.',
+        `Falta responder: "${pregSaludFaltante.descripcion}"`
       );
     }
 
@@ -542,14 +606,20 @@ export default function MheEvaluar() {
     if (respuestaTratamiento === "SI" && pregMedDetalle) {
       const txtMed = String(respuestas[pregMedDetalle.id]?.respuesta_texto || "").trim();
       if (!txtMed) {
-        return alert(
-          `El comentario es obligatorio: "${pregMedDetalle.descripcion}"`
+        return mostrarAviso(
+          'warning',
+          'Detalle de Medicamentos Obligatorio',
+          `Por favor complete: "${pregMedDetalle.descripcion}"`
         );
       }
     }
 
     if (!formData.vb_operador) {
-      return alert("Debe marcar la conformidad (declaración jurada) al final del formulario.");
+      return mostrarAviso(
+        'warning',
+        'Conformidad del Operador',
+        'Debe marcar la casilla de conformidad (declaración jurada) al final del formulario.'
+      );
     }
 
     setLoading(true);
@@ -625,21 +695,27 @@ export default function MheEvaluar() {
 
       if (esModoEdicion) {
         await actualizarInspeccionCompleta(inspeccionEditId, datosInspeccion, respuestasArray);
-        alert(
-          `Inspección actualizada exitosamente.\nEstado MHE: ${estadoCalculado}\nEstado Personal: ${estadoPersonalFinal}`
+        mostrarAviso(
+          'success',
+          'Inspección Actualizada',
+          'Los cambios de la inspección se guardaron correctamente.',
+          `Estado MHE: ${estadoCalculado} | Estado Personal: ${estadoPersonalFinal}`,
+          () => navigate('/mhe/tracking_mhe')
         );
       } else {
         await guardarInspeccionCompleta(datosInspeccion, respuestasArray);
-        alert(
-          `Inspección guardada exitosamente.\nEstado MHE: ${estadoCalculado}\nEstado Personal: ${estadoPersonalFinal}`
+        mostrarAviso(
+          'success',
+          'Inspección Registrada',
+          'La inspección del equipo ha sido registrada exitosamente.',
+          `Estado MHE: ${estadoCalculado} | Estado Personal: ${estadoPersonalFinal}`,
+          () => navigate('/mhe/tracking_mhe')
         );
       }
 
-      navigate('/mhe/tracking_mhe');
-
     } catch (error) {
       console.error(error);
-      alert("Hubo un error al guardar: " + error.message);
+      mostrarAviso('danger', 'Error al guardar', error.message);
     } finally {
       setLoading(false);
     }
@@ -648,6 +724,61 @@ export default function MheEvaluar() {
   return (
     <div className="registro-page">
       {loading && <Loading />}
+
+      {/* AVISO FLOTANTE MODERNO (ESTILO TAILWIND CSS / BOOTSTRAP 5) */}
+      {avisoFlotante.visible && (
+        <div className="tw-modal-backdrop" onClick={cerrarAviso}>
+          <div
+            className={`tw-modal-card tw-modal-${avisoFlotante.tipo}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="tw-modal-header">
+              <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
+                {avisoFlotante.tipo === 'danger' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                  </svg>
+                )}
+                {avisoFlotante.tipo === 'warning' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                )}
+                {avisoFlotante.tipo === 'success' && (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                )}
+              </div>
+
+              <div className="tw-modal-text">
+                <h3 className="tw-modal-title">{avisoFlotante.titulo}</h3>
+                <p className="tw-modal-desc">{avisoFlotante.mensaje}</p>
+                {avisoFlotante.detalleExtra && (
+                  <div className="tw-modal-extra-box">
+                    {avisoFlotante.detalleExtra}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="tw-modal-footer">
+              <button
+                type="button"
+                className={`tw-modal-btn ${avisoFlotante.tipo}`}
+                onClick={cerrarAviso}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="card mb-4">
         <div className="card-head-modern">
@@ -699,7 +830,7 @@ export default function MheEvaluar() {
           </div>
           
           {/* 1. DATOS DEL EQUIPO */}
-          <div className="section-title">Datos del Equipo</div>
+          <div className="section-title">1. Datos del Equipo</div>
           <div className="split-layout datos-equipo-compact">
             <div className="split-panel panel-inputs">
               <div className="field">
@@ -728,6 +859,29 @@ export default function MheEvaluar() {
               )}
             </div>
           </div>
+
+          {/* BANNER DE BLOQUEO ARRIBA (JUSTO DEBAJO DE DATOS DEL EQUIPO) */}
+          {!esModoEdicion && equipoInoperativoBloqueado && (
+            <div className="alerta-equipo-inoperativo">
+              <div className="alerta-inop-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+                </svg>
+              </div>
+              <div className="alerta-inop-content">
+                <div className="alerta-inop-header">
+                  <strong>EQUIPO INOPERATIVO — NO SE PUEDE INSPECCIONAR</strong>
+                  <span className="alerta-inop-pill">BLOQUEADO</span>
+                </div>
+                <p>
+                  El equipo <b>{equipoSeleccionado?.serie}</b> quedó registrado como <b>INOPERATIVO</b> en su último Check List
+                  {checklistAnterior?.observaciones_generales ? ` ("${checklistAnterior.observaciones_generales}")` : ''}.
+                  Para registrar una nueva evaluación, el personal de <b>QHSE</b> debe habilitarlo primero desde la tabla de <b>Tracking MHE</b>.
+                </p>
+              </div>
+            </div>
+          )}
 
           {preguntas.length > 0 && (
             <>
@@ -794,7 +948,6 @@ export default function MheEvaluar() {
                       {pregContador.map(p => {
                         const valorHoro = respuestas[p.id]?.respuesta_texto || "";
                         
-                        // Si estamos editando, no marcamos error visual estricto por el historial anterior
                         const horoInvalido =
                           !esModoEdicion &&
                           valorHoro !== "" &&
@@ -1077,7 +1230,6 @@ export default function MheEvaluar() {
                       <span className="hist-label">Operador:</span>
                       <span className="hist-value">{checklistAnterior.registrado_por_nombre || '-'}</span>
                     </div>
-                    
                   </div>
                   
                   <div className="hist-item hist-obs">
@@ -1119,12 +1271,18 @@ export default function MheEvaluar() {
 
               <div className="submit-row">
                 <button type="button" className="secondary-btn" onClick={() => navigate('/mhe/tracking_mhe')}>Cancelar</button>
-                <button type="submit" className="primary-btn" disabled={loading}>
+                <button 
+                  type="submit" 
+                  className="primary-btn" 
+                  disabled={loading || (!esModoEdicion && equipoInoperativoBloqueado)}
+                >
                   {esModoEdicion ? 'Actualizar Inspección' : 'Guardar Inspección'}
                 </button>
               </div>
+
             </>
           )}
+
         </form>
       </section>
     </div>

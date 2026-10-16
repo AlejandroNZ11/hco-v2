@@ -477,6 +477,40 @@
   color: #ffffff;
 }
 
+/* BOTÓN DE HABILITAR EQUIPO INOPERATIVO (QHSE / SUPERADMIN) */
+.btn-tabla-habilitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 5px;
+  font-size: 11px;
+  border: none;
+  background: #d97706; /* Ámbar / Naranja alerta cuando requiere habilitación */
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-tabla-habilitar:hover:not(:disabled) {
+  background: #b45309;
+}
+
+.btn-tabla-habilitar.is-enabled {
+  background: #16a34a; /* Verde cuando QHSE/Superadmin ya lo habilitó */
+  color: #ffffff;
+  cursor: default;
+}
+
+.btn-tabla-habilitar.disabled-by-role {
+  background: #e2e8f0 !important;
+  color: #94a3b8 !important;
+  border-color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}
 
 /* RESPONSIVE MÓVIL Y PANTALLAS PEQUEÑAS (360px o más) */
 @media (max-width: 1150px) {

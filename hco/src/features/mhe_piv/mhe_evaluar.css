@@ -437,6 +437,248 @@
 }
 
 /* =========================================
+   BANNER SUPERIOR DE EQUIPO INOPERATIVO (TAILWIND / BS5 ALERT)
+   ========================================= */
+.alerta-equipo-inoperativo {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+  border: 1px solid #fecdd3;
+  border-left: 5px solid #e11d48;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: -6px;
+  margin-bottom: 22px;
+  box-shadow: 0 4px 12px -2px rgba(225, 29, 72, 0.12);
+  animation: twSlideDown 0.25s ease-out;
+}
+
+.alerta-inop-icon {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 10px;
+  background-color: #ffe4e6;
+  border: 1px solid #fda4af;
+  color: #be123c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alerta-inop-content {
+  flex: 1;
+}
+
+.alerta-inop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.alerta-inop-header strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: #881337;
+  letter-spacing: 0.2px;
+}
+
+.alerta-inop-pill {
+  background-color: #be123c;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.4px;
+}
+
+.alerta-inop-content p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #9f1239;
+}
+
+/* =========================================
+   AVISO FLOTANTE MODERNO (TAILWIND CSS + BOOTSTRAP 5 MODAL)
+   ========================================= */
+.tw-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: twFadeIn 0.2s ease-out;
+}
+
+.tw-modal-card {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+  overflow: hidden;
+  animation: twScaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tw-modal-card.tw-modal-danger {
+  border-top: 5px solid #dc2626;
+}
+.tw-modal-card.tw-modal-warning {
+  border-top: 5px solid #d97706;
+}
+.tw-modal-card.tw-modal-success {
+  border-top: 5px solid #16a34a;
+}
+
+.tw-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 22px 16px;
+}
+
+.tw-modal-icon-circle {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tw-modal-icon-circle.danger {
+  background-color: #fee2e2;
+  color: #dc2626;
+  box-shadow: 0 0 0 6px #fef2f2;
+}
+
+.tw-modal-icon-circle.warning {
+  background-color: #fef3c7;
+  color: #d97706;
+  box-shadow: 0 0 0 6px #fffbeb;
+}
+
+.tw-modal-icon-circle.success {
+  background-color: #dcfce7;
+  color: #16a34a;
+  box-shadow: 0 0 0 6px #f0fdf4;
+}
+
+.tw-modal-text {
+  flex: 1;
+}
+
+.tw-modal-title {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.tw-modal-desc {
+  margin: 0;
+  font-size: 13.5px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.tw-modal-extra-box {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.tw-modal-footer {
+  background-color: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  padding: 12px 22px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tw-modal-btn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.tw-modal-btn.danger {
+  background-color: #dc2626;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+.tw-modal-btn.danger:hover {
+  background-color: #b91c1c;
+}
+
+.tw-modal-btn.warning {
+  background-color: #d97706;
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+}
+.tw-modal-btn.warning:hover {
+  background-color: #b45309;
+}
+
+.tw-modal-btn.success {
+  background-color: #16a34a;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+}
+.tw-modal-btn.success:hover {
+  background-color: #15803d;
+}
+
+@keyframes twFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes twScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes twSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* =========================================
    CELULARES: DISEÑO RESPONSIVO 
    ========================================= */
 
@@ -492,5 +734,47 @@
   }
   .declaracion-texto p {
     font-size: 12.5px;
+  }
+  /* 1. Modal Flotante en Celular (Ícono X arriba centrado y texto abajo) */
+  .tw-modal-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 22px 18px 16px;
+    gap: 12px;
+  }
+
+  .tw-modal-text {
+    width: 100%;
+  }
+
+  .tw-modal-extra-box {
+    text-align: left; /* Mantiene el motivo fácil de leer o puedes poner center */
+  }
+
+  .tw-modal-footer {
+    padding: 12px 18px;
+  }
+
+  .tw-modal-btn {
+    width: 100%; /* Botón "Entendido" a todo el ancho estilo móvil */
+    height: 40px;
+  }
+
+  /* 2. Banner de Equipo Inoperativo en Celular (Ícono arriba y texto abajo) */
+  .alerta-equipo-inoperativo {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 16px 14px;
+  }
+
+  .alerta-inop-header {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 8px;
   }
 }

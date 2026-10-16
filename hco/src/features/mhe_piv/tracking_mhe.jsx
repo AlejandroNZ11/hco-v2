@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   FaEdit, 
   FaCheck, 
+  FaWrench,
   FaPlus, 
   FaSearch, 
   FaUndo, 
@@ -13,12 +14,15 @@ import Loading from '../../layouts/Loading';
 import './tracking_mhe.css';
 import * as XLSX from 'xlsx';
 
-// Importamos los servicios
-import { obtenerUltimasInspecciones, aprobarInspeccionMhe } from '../../services/mheService';
+// Importamos los servicios (agregamos habilitarEquipoMhe)
+import { 
+  obtenerUltimasInspecciones, 
+  aprobarInspeccionMhe,
+  habilitarEquipoMhe 
+} from '../../services/mheService';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '../../services/localDb';
 import { obtenerTodosLosEmpleados } from '../../services/empleadosService';
-
 
 const ITEMS_POR_PAGINA = 50;
 
@@ -32,24 +36,12 @@ export default function TrackingMHE() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
 
-  // Validamos si el rol del usuario es superadmin o supervisor
-  const rolUsuario = String(
-    currentUser?.rol || currentUser?.role || currentUser?.roles?.nombre || ''
-  ).toLowerCase().trim();
-
-  const puedeExportar = rolUsuario === 'superadmin' || rolUsuario === 'supervisor';
-
-  // Roles permitidos para cada acción
-  const esSuperAdminOSupervisor = rolUsuario === 'superadmin' || rolUsuario === 'supervisor';
-  const esAdminSupervisorSuperAdmin = esSuperAdminOSupervisor || rolUsuario === 'admin';
-
   const [inspecciones, setInspecciones] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // 1. Leemos los usuarios desde Dexie
   const usuariosDb = useLiveQuery(() => localDb.usuarios.toArray(), [], []);
 
-  // Si aún no hay usuarios en Dexie, los descargamos en segundo plano
   useEffect(() => {
     if (usuariosDb.length === 0) {
       obtenerTodosLosEmpleados()
@@ -59,6 +51,52 @@ export default function TrackingMHE() {
         .catch((err) => console.error("Error al sincronizar usuarios:", err));
     }
   }, [usuariosDb.length]);
+
+  // Validamos rol del usuario
+  const rolUsuario = String(
+    currentUser?.rol || currentUser?.role || currentUser?.roles?.nombre || ''
+  ).toLowerCase().trim();
+
+  // Validamos el área del usuario (soporta objeto directo en authUser, Dexie o relación con áreas)
+  const areaUsuario = useMemo(() => {
+    const directo =
+      currentUser?.area_nombre ||
+      currentUser?.area?.nombre ||
+      currentUser?.areas?.nombre ||
+      (typeof currentUser?.area === 'string' ? currentUser.area : '');
+
+    if (directo) return String(directo).toUpperCase().trim();
+
+    // Respaldo buscando al usuario en Dexie
+    const userLocal = usuariosDb.find((u) => String(u.id) === String(currentUser?.id));
+    const desdeDexie =
+      userLocal?.area_nombre ||
+      userLocal?.area?.nombre ||
+      userLocal?.areas?.nombre ||
+      (typeof userLocal?.area === 'string' ? userLocal.area : '');
+
+    if (desdeDexie) return String(desdeDexie).toUpperCase().trim();
+
+    // Respaldo buscando el area_id en las inspecciones cargadas
+    if (currentUser?.area_id && inspecciones.length > 0) {
+      const inspConMismaArea = inspecciones.find(
+        (i) => String(i.area_id) === String(currentUser.area_id)
+      );
+      const nombreAreaInsp = inspConMismaArea?.areas?.nombre || inspConMismaArea?.area?.nombre;
+      if (nombreAreaInsp) return String(nombreAreaInsp).toUpperCase().trim();
+    }
+
+    return '';
+  }, [currentUser, usuariosDb, inspecciones]);
+
+  const puedeExportar = rolUsuario === 'superadmin' || rolUsuario === 'supervisor';
+
+  // Roles permitidos para cada acción
+  const esSuperAdminOSupervisor = rolUsuario === 'superadmin' || rolUsuario === 'supervisor';
+  const esAdminSupervisorSuperAdmin = esSuperAdminOSupervisor || rolUsuario === 'admin';
+  
+  // Permiso exclusivo para habilitar equipos inoperativos: Área QHSE o Rol SUPERADMIN
+  const puedeHabilitarEquipo = rolUsuario === 'superadmin' || areaUsuario.includes('QHSE');
 
   // 2. Diccionario rápido que relaciona UUID -> Nombre
   const mapaUsuarios = useMemo(() => {
@@ -78,7 +116,6 @@ export default function TrackingMHE() {
     return mapaUsuarios[id] || id;
   };
 
-  // Devuelve el estado personal correcto y mapea antiguos valores de BD si fuera necesario
   const obtenerEstadoPersonal = (estado) => {
     const est = String(estado || 'APTO').toUpperCase().trim();
     if (est === 'APTO' || est === 'OPERATIVO') return 'APTO';
@@ -88,13 +125,29 @@ export default function TrackingMHE() {
     return est;
   };
 
+  // Verifica si una inspección INOPERATIVA ya tuvo su equipo rehabilitado posteriormente
+  const verificarEquipoYaHabilitado = (insp) => {
+    const estMhe = String(insp.estado_mhe || '').toUpperCase().trim();
+    if (estMhe !== 'INOPERATIVO') return false;
 
-  // Referencia y estados para mover la tabla con la "manito" (drag to scroll)
+    const eq = insp.equipos;
+    if (!eq) return false;
+
+    const estadoOpActual = String(eq.estado_operativo || '').toUpperCase().trim();
+    if (estadoOpActual === 'INOPERATIVO') return false;
+
+    if (eq.fecha_habilitacion && insp.fecha_hora) {
+      return new Date(eq.fecha_habilitacion).getTime() > new Date(insp.fecha_hora).getTime();
+    }
+
+    return false;
+  };
+
+  // Referencia y estados para mover la tabla con la "manito"
   const tableContainerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragData = useRef({ startX: 0, scrollLeft: 0 });
 
-  // Estados de los inputs de filtro
   const [filtrosForm, setFiltrosForm] = useState({
     categoria: 'Todos',
     estado: 'Todos',
@@ -104,7 +157,6 @@ export default function TrackingMHE() {
     buscar: ''
   });
 
-  // Estado de filtros aplicados
   const [filtrosActivos, setFiltrosActivos] = useState({
     categoria: 'Todos',
     estado: 'Todos',
@@ -114,13 +166,11 @@ export default function TrackingMHE() {
     buscar: ''
   });
 
-  // Paginación
   const [paginaActual, setPaginaActual] = useState(1);
 
   useEffect(() => {
     cargarInspecciones();
 
-    // Cuando useSync termina de subir datos al volver el internet o al pulsar "Sincronizar"
     const handleSyncCompleted = () => {
       cargarInspecciones();
     };
@@ -143,9 +193,7 @@ export default function TrackingMHE() {
     }
   };
 
-  // Funciones para arrastrar la tabla con el mouse (manito)
   const handleMouseDown = (e) => {
-    // Evita arrastrar si el usuario hace clic sobre un botón de acción
     if (e.target.closest('button')) return;
     const container = tableContainerRef.current;
     if (!container) return;
@@ -166,11 +214,10 @@ export default function TrackingMHE() {
     if (!container) return;
 
     const x = e.pageX - container.offsetLeft;
-    const walk = (x - dragData.current.startX) * 1.4; // Velocidad de arrastre
+    const walk = (x - dragData.current.startX) * 1.4;
     container.scrollLeft = dragData.current.scrollLeft - walk;
   };
 
-  // Listas dinámicas para los desplegables de Categoría y Área
   const listaCategorias = useMemo(() => {
     const nombres = inspecciones
       .map(i => i.equipos?.categorias_equipos?.nombre)
@@ -185,7 +232,6 @@ export default function TrackingMHE() {
     return [...new Set(nombres)].sort();
   }, [inspecciones]);
 
-  // Contadores para las tarjetas superiores derechas
   const misRegistrosCount = useMemo(() => {
     if (!currentUser) return 0;
     return inspecciones.filter(i => 
@@ -198,7 +244,6 @@ export default function TrackingMHE() {
     return inspecciones.filter(i => (i.estado_proceso || 'PENDIENTE') !== 'APROBADO').length;
   }, [inspecciones]);
 
-  // Filtrado de datos de la tabla
   const inspeccionesFiltradas = useMemo(() => {
     return inspecciones.filter((insp) => {
       const nombreCategoria = insp.equipos?.categorias_equipos?.nombre || 'N/A';
@@ -208,36 +253,30 @@ export default function TrackingMHE() {
       const serieEquipo = insp.equipos?.serie || '';
       const operador = insp.registrado_por_nombre || '';
 
-      // 1. Filtro Categoría
       if (filtrosActivos.categoria !== 'Todos' && nombreCategoria !== filtrosActivos.categoria) {
         return false;
       }
 
-      // 2. Filtro Estado
       if (filtrosActivos.estado !== 'Todos') {
         if (!estadoProceso.includes(filtrosActivos.estado) && estadoMhe !== filtrosActivos.estado) {
           return false;
         }
       }
 
-      // 3. Filtro Área
       if (filtrosActivos.area !== 'Todas' && nombreArea !== filtrosActivos.area) {
         return false;
       }
 
-      // 4. Filtro Fecha Inicio
       if (filtrosActivos.fechaIni && insp.fecha_hora) {
         const fechaRegistro = new Date(insp.fecha_hora).toISOString().split('T')[0];
         if (fechaRegistro < filtrosActivos.fechaIni) return false;
       }
 
-      // 5. Filtro Fecha Fin
       if (filtrosActivos.fechaFin && insp.fecha_hora) {
         const fechaRegistro = new Date(insp.fecha_hora).toISOString().split('T')[0];
         if (fechaRegistro > filtrosActivos.fechaFin) return false;
       }
 
-      // 6. Buscador general en toda la tabla
       if (filtrosActivos.buscar.trim() !== '') {
         const q = filtrosActivos.buscar.toLowerCase().trim();
         const textoFila = [
@@ -258,7 +297,6 @@ export default function TrackingMHE() {
     });
   }, [inspecciones, filtrosActivos]);
 
-  // Cálculo de paginación
   const totalPaginas = Math.max(1, Math.ceil(inspeccionesFiltradas.length / ITEMS_POR_PAGINA));
   const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA;
   const inspeccionesPaginadas = inspeccionesFiltradas.slice(indiceInicio, indiceInicio + ITEMS_POR_PAGINA);
@@ -323,7 +361,32 @@ export default function TrackingMHE() {
     }
   };
 
-// Exportar a archivo Excel (.xlsx) real
+  // NUEVA ACCIÓN: Habilitar equipo que salió INOPERATIVO sin modificar la tabla inspecciones
+  const handleHabilitarEquipo = async (insp) => {
+    const equipoId = insp.equipo_id || insp.equipos?.id;
+    const serie = insp.equipos?.serie || 'seleccionado';
+
+    if (!equipoId) {
+      return alert("No se encontró el ID del equipo para habilitar.");
+    }
+
+    const confirmar = window.confirm(
+      `¿Confirma que el equipo ${serie} ya se encuentra OPERATIVO?\n\nEsto no modificará este registro histórico, pero permitirá que los operadores puedan realizar nuevas inspecciones al equipo.`
+    );
+    if (!confirmar) return;
+
+    try {
+      setLoading(true);
+      await habilitarEquipoMhe(equipoId, currentUser?.id || null);
+      alert(`El equipo ${serie} ha sido habilitado como OPERATIVO para nuevas inspecciones.`);
+      await cargarInspecciones();
+    } catch (error) {
+      alert("Error al habilitar el equipo: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleExportarExcel = () => {
     if (!puedeExportar) {
       return alert("No tienes permisos para exportar. Solo Superadmin y Supervisor pueden realizar esta acción.");
@@ -347,26 +410,22 @@ export default function TrackingMHE() {
       "Revisado El": formatearFecha(insp.revisado_el)
     }));
 
-
-    // Creamos la hoja de Excel a partir del JSON
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
 
-    // Ajustamos el ancho de cada columna para que se lea limpio al abrir el Excel
     worksheet['!cols'] = [
-      { wch: 6 },  // N°
-      { wch: 20 }, // Fecha y Hora
-      { wch: 18 }, // Área
-      { wch: 22 }, // Estado Proceso
-      { wch: 22 }, // Categoría Equipo
-      { wch: 18 }, // Equipo (Serie)
-      { wch: 15 }, // Estado MHE
-      { wch: 16 }, // Estado Personal
-      { wch: 28 }, // Registrado Por
-      { wch: 28 }, // Aprobado Por
-      { wch: 20 }  // Revisado El
+      { wch: 6 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 16 },
+      { wch: 28 },
+      { wch: 28 },
+      { wch: 20 }
     ];
 
-    // Creamos el libro y descargamos el archivo .xlsx
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Tracking MHE");
 
@@ -438,7 +497,6 @@ export default function TrackingMHE() {
               <option value="OPERATIVO">OPERATIVO</option>
               <option value="OBSERVADO">OBSERVADO</option>
               <option value="INOPERATIVO">INOPERATIVO</option>
-
             </select>
           </div>
 
@@ -551,7 +609,6 @@ export default function TrackingMHE() {
           </button>
         </div>
 
-        {/* CONTENEDOR CON ARRASTRE DE MANITO Y SIN BARRA DE SCROLL */}
         <div
           ref={tableContainerRef}
           className={`table-container ${isDragging ? 'dragging' : ''}`}
@@ -587,44 +644,38 @@ export default function TrackingMHE() {
               ) : (
                 inspeccionesPaginadas.map((insp, index) => {
                   const yaAprobado = insp.estado_proceso === 'APROBADO';
+                  const esFilaInoperativa = String(insp.estado_mhe || '').toUpperCase().trim() === 'INOPERATIVO';
+                  const equipoYaFueHabilitado = verificarEquipoYaHabilitado(insp);
                   const numeroFila = indiceInicio + index + 1;
 
                   return (
                     <tr key={insp.id}>
-                      {/* 0. N° Correlativo */}
                       <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>
                         {numeroFila}
                       </td>
 
-                      {/* 1. Fecha y Hora */}
                       <td>{formatearFecha(insp.fecha_hora)}</td>
 
-                      {/* 2. Área */}
                       <td>{insp.areas?.nombre || insp.area?.nombre || '-'}</td>
 
-                      {/* 3. Estado Proceso */}
                       <td>
                         <span className={`badge-estado ${getBadgeClass(insp.estado_proceso || 'PENDIENTE')}`}>
                           {insp.estado_proceso || 'PENDIENTE'}
                         </span>
                       </td>
 
-                      {/* 4. Categoría Equipo */}
                       <td>{insp.equipos?.categorias_equipos?.nombre || 'N/A'}</td>
 
-                      {/* 5. Equipo (Serie) */}
                       <td style={{ fontWeight: '800', color: '#0f172a' }}>
                         {insp.equipos?.serie || 'N/A'}
                       </td>
 
-                      {/* 6. Estado MHE */}
                       <td>
                         <span className={`badge-estado ${getBadgeClass(insp.estado_mhe)}`}>
                           {insp.estado_mhe}
                         </span>
                       </td>
 
-                      {/* 7. Estado Personal */}
                       <td>
                         {(() => {
                           const estadoTexto = obtenerEstadoPersonal(insp.estado_personal);
@@ -643,19 +694,16 @@ export default function TrackingMHE() {
                         })()}
                       </td>
 
-
-                      {/* 8. Registrado Por */}
                       <td>{insp.registrado_por_nombre || '-'}</td>
 
-                      {/* 9. Aprobado Por */}
                       <td>{obtenerNombreAprobador(insp)}</td>
 
-                      {/* 10. Revisado El */}
                       <td>{formatearFecha(insp.revisado_el)}</td>
 
-                                            {/* 11. Acciones (Visibles pero bloqueadas según rol) */}
+                      {/* 11. Acciones */}
                       <td style={{ textAlign: 'center' }}>
                         <div className="acciones-cell">
+                          {/* Botón Editar */}
                           <button
                             type="button"
                             className={`btn-tabla-editar ${!esSuperAdminOSupervisor ? 'disabled-by-role' : ''}`}
@@ -674,6 +722,7 @@ export default function TrackingMHE() {
                             <FaEdit />
                           </button>
 
+                          {/* Botón Aprobar */}
                           <button
                             type="button"
                             className={`btn-tabla-aprobar ${yaAprobado ? 'is-approved' : ''} ${!esAdminSupervisorSuperAdmin ? 'disabled-by-role' : ''}`}
@@ -694,10 +743,32 @@ export default function TrackingMHE() {
                           >
                             <FaCheck />
                           </button>
+
+                          {/* NUEVO BOTÓN: Habilitar equipo cuando salió INOPERATIVO (Exclusivo QHSE y SUPERADMIN) */}
+                          {esFilaInoperativa && (
+                            <button
+                              type="button"
+                              className={`btn-tabla-habilitar ${equipoYaFueHabilitado ? 'is-enabled' : ''} ${!puedeHabilitarEquipo ? 'disabled-by-role' : ''}`}
+                              disabled={equipoYaFueHabilitado}
+                              onClick={() => {
+                                if (!puedeHabilitarEquipo) {
+                                  return alert("No tienes permisos para pasar el equipo a Operativo. Acción exclusiva para el área QHSE y rol Superadmin.");
+                                }
+                                handleHabilitarEquipo(insp);
+                              }}
+                              title={
+                                equipoYaFueHabilitado
+                                  ? "Equipo ya habilitado como Operativo para nuevas inspecciones"
+                                  : puedeHabilitarEquipo
+                                  ? "Habilitar equipo (Pasar a Operativo)"
+                                  : "No autorizado: Exclusivo para área QHSE y Superadmin"
+                              }
+                            >
+                              <FaWrench />
+                            </button>
+                          )}
                         </div>
                       </td>
-
-                      
                     </tr>
                   );
                 })

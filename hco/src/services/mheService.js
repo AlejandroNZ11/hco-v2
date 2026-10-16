@@ -2,6 +2,40 @@ import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
 
 /**
+ * Función interna para mantener sincronizado el estado_operativo en la tabla 'equipos'
+ * cuando se registra o edita una inspección, sin alterar el historial.
+ */
+const actualizarEstadoOperativoEquipo = async (equipoId, estadoMhe) => {
+  if (!equipoId) return;
+
+  const nuevoEstadoOp =
+    String(estadoMhe || '').toUpperCase().trim() === 'INOPERATIVO'
+      ? 'INOPERATIVO'
+      : 'OPERATIVO';
+
+  // 1. Actualizamos en Dexie local inmediatamente (funciona Online y Offline)
+  try {
+    await localDb.equipos.update(equipoId, {
+      estado_operativo: nuevoEstadoOp
+    });
+  } catch (errDexie) {
+    console.warn("No se pudo actualizar estado_operativo en Dexie:", errDexie);
+  }
+
+  // 2. Si hay internet, actualizamos en Supabase
+  if (navigator.onLine) {
+    try {
+      await supabase
+        .from('equipos')
+        .update({ estado_operativo: nuevoEstadoOp })
+        .eq('id', equipoId);
+    } catch (errSupa) {
+      console.warn("No se pudo actualizar estado_operativo en Supabase:", errSupa);
+    }
+  }
+};
+
+/**
  * Sincroniza las inspecciones guardadas en la cola offline hacia Supabase
  * respetando la fecha_hora capturada originalmente.
  */
@@ -55,7 +89,13 @@ export const sincronizarInspeccionesPendientes = async () => {
 
           if (errorResp) throw errorResp;
 
-          // 3. Reemplazar el registro temporal "local_..." por el oficial ya sincronizado
+          // 3. Actualizar el estado_operativo del equipo en Supabase según esta inspección
+          await actualizarEstadoOperativoEquipo(
+            datosParaSupabase.equipo_id,
+            datosParaSupabase.estado_mhe
+          );
+
+          // 4. Reemplazar el registro temporal "local_..." por el oficial ya sincronizado
           if (idLocal) {
             await localDb.inspecciones.delete(idLocal);
             await localDb.respuestas_inspeccion.where('inspeccion_id').equals(idLocal).delete();
@@ -89,7 +129,8 @@ export const obtenerUltimasInspecciones = async () => {
       const [resInsp, resAreas, resEq, resCat] = await Promise.all([
         supabase.from('inspecciones').select('*').order('fecha_hora', { ascending: false }).limit(50),
         supabase.from('areas').select('id, nombre'),
-        supabase.from('equipos').select('id, serie, categoria_id'),
+        // Traemos '*' de equipos para incluir estado_operativo, fecha_habilitacion, habilitado_por_id y foto_url
+        supabase.from('equipos').select('*'),
         supabase.from('categorias_equipos').select('id, nombre')
       ]);
 
@@ -191,6 +232,40 @@ export const aprobarInspeccionMhe = async (inspeccionId, usuarioId) => {
 };
 
 /**
+ * Habilita un equipo que había quedado INOPERATIVO (Exclusivo QHSE y SUPERADMIN).
+ * Se guarda en la tabla 'equipos' para NO alterar el registro histórico de 'inspecciones'.
+ */
+export const habilitarEquipoMhe = async (equipoId, usuarioId = null) => {
+  if (!navigator.onLine) {
+    throw new Error("Necesita conexión a internet para habilitar un equipo inoperativo.");
+  }
+
+  const fechaHab = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('equipos')
+    .update({
+      estado_operativo: 'OPERATIVO',
+      fecha_habilitacion: fechaHab,
+      habilitado_por_id: usuarioId
+    })
+    .eq('id', equipoId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Error al habilitar el equipo: ${error.message}`);
+
+  // Actualizamos también en Dexie local
+  await localDb.equipos.update(equipoId, {
+    estado_operativo: 'OPERATIVO',
+    fecha_habilitacion: fechaHab,
+    habilitado_por_id: usuarioId
+  });
+
+  return data;
+};
+
+/**
  * Carga los catálogos base: Categorías, Equipos, Preguntas y Áreas (con caché en Dexie)
  */
 export const obtenerDatosMaestrosMhe = async () => {
@@ -231,6 +306,7 @@ export const obtenerDatosMaestrosMhe = async () => {
 
 /**
  * Obtiene la última inspección realizada a un equipo específico (Online + Offline)
+ * e incluye los datos actualizados del equipo (estado_operativo y fecha_habilitacion).
  */
 export const obtenerUltimaInspeccionEquipo = async (equipoId) => {
   // Buscamos primero en Dexie por si el operador acaba de registrar este equipo en modo offline
@@ -238,17 +314,33 @@ export const obtenerUltimaInspeccionEquipo = async (equipoId) => {
     .filter(i => String(i.equipo_id) === String(equipoId))
     .sort((a, b) => new Date(b.fecha_hora || 0).getTime() - new Date(a.fecha_hora || 0).getTime());
 
+  let equipoActual = await localDb.equipos.get(equipoId);
+
   if (navigator.onLine) {
     try {
-      const { data, error } = await supabase
-        .from('inspecciones')
-        .select('id, estado_mhe, observaciones_generales, fecha_hora, registrado_por_nombre')
-        .eq('equipo_id', equipoId)
-        .order('fecha_hora', { ascending: false })
-        .limit(1)
-        .single();
+      // Consultamos en paralelo la última inspección y el estado actual del equipo en Supabase
+      const [resUltimaInsp, resEquipo] = await Promise.all([
+        supabase
+          .from('inspecciones')
+          .select('id, estado_mhe, observaciones_generales, fecha_hora, registrado_por_nombre')
+          .eq('equipo_id', equipoId)
+          .order('fecha_hora', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from('equipos')
+          .select('*')
+          .eq('id', equipoId)
+          .maybeSingle()
+      ]);
 
-      if (!error && data) {
+      if (!resEquipo.error && resEquipo.data) {
+        equipoActual = resEquipo.data;
+        await localDb.equipos.put(resEquipo.data);
+      }
+
+      const data = resUltimaInsp.data;
+      if (!resUltimaInsp.error && data) {
         const localMasReciente = todasLocales[0];
         if (
           localMasReciente &&
@@ -258,7 +350,11 @@ export const obtenerUltimaInspeccionEquipo = async (equipoId) => {
             .where('inspeccion_id')
             .equals(localMasReciente.id)
             .toArray();
-          return { ...localMasReciente, respuestas: respLocal };
+          return {
+            ...localMasReciente,
+            equipos: equipoActual || null,
+            respuestas: respLocal
+          };
         }
 
         const { data: respData } = await supabase
@@ -266,7 +362,11 @@ export const obtenerUltimaInspeccionEquipo = async (equipoId) => {
           .select('*')
           .eq('inspeccion_id', data.id);
 
-        return { ...data, respuestas: respData || [] };
+        return {
+          ...data,
+          equipos: equipoActual || null,
+          respuestas: respData || []
+        };
       }
     } catch (e) {
       console.warn("Leyendo última inspección del equipo desde Dexie...", e);
@@ -281,7 +381,11 @@ export const obtenerUltimaInspeccionEquipo = async (equipoId) => {
     .equals(ultima.id)
     .toArray();
 
-  return { ...ultima, respuestas: respLocal };
+  return {
+    ...ultima,
+    equipos: equipoActual || null,
+    respuestas: respLocal
+  };
 };
 
 /**
@@ -314,6 +418,12 @@ export const guardarInspeccionCompleta = async (datosInspeccion, respuestasArray
           .insert(respuestasConId);
 
         if (!errorResp) {
+          // Actualizamos estado_operativo del equipo en Supabase y Dexie
+          await actualizarEstadoOperativoEquipo(
+            datosConFecha.equipo_id,
+            datosConFecha.estado_mhe
+          );
+
           await localDb.inspecciones.put({ ...inspGuardada, _sincronizado: true });
           const respLocales = respuestasConId.map(r => ({ ...r, _sincronizado: true }));
           await localDb.respuestas_inspeccion.bulkPut(respLocales);
@@ -335,6 +445,12 @@ export const guardarInspeccionCompleta = async (datosInspeccion, respuestasArray
   };
 
   await localDb.inspecciones.put(inspeccionOffline);
+
+  // Actualizamos también el equipo en Dexie local para que refleje si quedó INOPERATIVO
+  await actualizarEstadoOperativoEquipo(
+    datosConFecha.equipo_id,
+    datosConFecha.estado_mhe
+  );
 
   const respLocales = respuestasArray.map(resp => ({
     ...resp,
@@ -411,6 +527,12 @@ export const actualizarInspeccionCompleta = async (inspeccionId, datosInspeccion
       respuestasArray.map(r => ({ ...r, inspeccion_id: inspeccionId, _sincronizado: false }))
     );
 
+    // Actualizamos el estado_operativo del equipo localmente
+    await actualizarEstadoOperativoEquipo(
+      datosInspeccion.equipo_id,
+      datosInspeccion.estado_mhe
+    );
+
     // Actualizamos también el item en sync_queue
     const itemsCola = await localDb.sync_queue
       .filter(i => i.tabla === 'inspecciones' && i.payload?.idLocal === inspeccionId)
@@ -456,6 +578,12 @@ export const actualizarInspeccionCompleta = async (inspeccionId, datosInspeccion
     .insert(respuestasConId);
 
   if (errorResp) throw new Error(`Error al guardar respuestas actualizadas: ${errorResp.message}`);
+
+  // Actualizamos también el estado_operativo en la tabla equipos
+  await actualizarEstadoOperativoEquipo(
+    datosInspeccion.equipo_id,
+    datosInspeccion.estado_mhe
+  );
 
   await localDb.inspecciones.put({ ...inspActualizada, _sincronizado: true });
   return inspActualizada;

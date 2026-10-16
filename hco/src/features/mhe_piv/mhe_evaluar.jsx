@@ -448,19 +448,19 @@ export default function MheEvaluar() {
     if (r1 === "NO" && r2 === "NO" && r3 === "SI") return "NO APTO";
 
     // - NO SÍ NO = OBSERVADO
-    if (r1 === "NO" && r2 === "SI" && r3 === "NO") return "OBSERVADO";
+    if (r1 === "NO" && r2 === "SI" && r3 === "NO") return "NO APTO";
 
     // - SÍ NO NO = OBSERVADO
-    if (r1 === "SI" && r2 === "NO" && r3 === "NO") return "OBSERVADO";
+    if (r1 === "SI" && r2 === "NO" && r3 === "NO") return "NO APTO";
 
     // - SÍ SÍ SÍ medicamentos = OBSERVADO
-    if (r1 === "SI" && r2 === "SI" && r3 === "SI") return "OBSERVADO";
+    if (r1 === "SI" && r2 === "SI" && r3 === "SI") return "NO APTO";
 
     // - NO NO NO = OBSERVADO
-    if (r1 === "NO" && r2 === "NO" && r3 === "NO") return "OBSERVADO";
+    if (r1 === "NO" && r2 === "NO" && r3 === "NO") return "NO APTO";
 
     // Cualquier otra combinación no listada por defecto como OBSERVADO
-    return "OBSERVADO";
+    return "NO APTO";
   };
 
 

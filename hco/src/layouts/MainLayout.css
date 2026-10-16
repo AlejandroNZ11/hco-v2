@@ -30,7 +30,6 @@
   font-family: Arial, sans-serif;
 
   /* FIX: Truco de Aceleración por Hardware para Safari (iOS) */
-  /* Obliga al procesador gráfico del iPhone a renderizar esto fijamente */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
@@ -45,7 +44,9 @@
   display: none !important;
 }
 
-/* HEADER PRINCIPAL */
+/* ================================================= */
+/* HEADER PRINCIPAL Y SUB-BARRA                      */
+/* ================================================= */
 
 .header-wrapper {
   width: 100%;
@@ -254,33 +255,6 @@
   z-index: 1;
 }
 
-.logout-btn-desktop {
-  width: auto !important;
-  min-width: 150px !important;
-  height: 46px !important;
-  min-height: 46px !important;
-  padding: 0 20px !important;
-  margin: 0 !important;
-  border: none !important;
-  border-radius: 14px !important;
-  background: #ffffff !important;
-  color: #0f4c81 !important;
-  font-size: 17px !important;
-  font-weight: 800 !important;
-  line-height: 1 !important;
-  white-space: nowrap;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  cursor: pointer;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14) !important;
-}
-
-.logout-btn-desktop:hover {
-  background: #eef4f9 !important;
-  transform: translateY(-1px);
-}
-
 /* BARRA SECUNDARIA */
 
 .sub-topbar {
@@ -420,7 +394,6 @@
     opacity: 0;
     transform: translateY(-5px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -497,7 +470,7 @@
   color: #b91c1c !important;
 }
 
-/* MODAL CERRAR SESIÓN */
+/* MODALES */
 
 .custom-modal-overlay {
   position: fixed;
@@ -524,7 +497,6 @@
     opacity: 0;
     transform: translateY(-8px) scale(0.98);
   }
-
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -626,8 +598,6 @@
   color: #ffffff !important;
 }
 
-/* MODAL PASSWORD BOOTSTRAP */
-
 .cabecera-modal {
   z-index: 10050 !important;
 }
@@ -651,8 +621,121 @@
   justify-content: center !important;
 }
 
-/* RESPONSIVE movil celular */
 
+/* ================================================= */
+/* 1. AJUSTES FIJOS DE CABECERA (COMPUTADORA / BASE) */
+/* ================================================= */
+
+/* Contenedor izquierdo y Botón Atrás en PC */
+.header-container .topbar-left {
+  height: 64px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+}
+
+.header-container .btn-atras {
+  align-self: center !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  width: 105px !important;
+  min-width: 105px !important;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  border-radius: 10px !important;
+  line-height: 1 !important;
+}
+
+.header-container .btn-atras:hover {
+  transform: translateY(-1px) !important;
+}
+
+.header-container .back-icon-svg {
+  display: block !important;
+  font-size: 14px !important;
+  margin: 0 !important;
+}
+
+.header-container .back-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  font-size: 14px !important;
+  margin: 0 !important;
+}
+
+/* Contenedor derecho y Foto en tamaño original (50px) */
+.header-container .session-box {
+  height: 70px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+}
+
+.header-container .user-menu-container,
+.header-container .avatar-trigger {
+  height: 70px !important;
+  width: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.header-container .session-avatar {
+  width: 50px !important;
+  height: 50px !important;
+  min-width: 50px !important;
+}
+
+/* Botón de Campana SOLA y más grande (Sin borde ni fondo) */
+.header-container .btn-notificaciones {
+  position: relative !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transition: transform 0.2s ease, opacity 0.2s ease !important;
+}
+
+.header-container .btn-notificaciones:hover {
+  background: transparent !important;
+  opacity: 0.85;
+  transform: scale(1.08);
+}
+
+.header-container .bell-icon-svg {
+  font-size: 34px !important;
+  color: #ffffff !important;
+}
+
+.header-container .notif-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 10px;
+  height: 10px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  border: 1.5px solid #0d3a66;
+}
+
+
+/* ================================================= */
+/* 2. MODO TABLET Y CELULAR ESTÁNDAR (Máx. 768px)    */
+/* ================================================= */
 @media (max-width: 768px) {
   :root {
     --header-total-height: 106px;
@@ -661,11 +744,16 @@
   .topbar {
     height: 70px;
     min-height: 70px;
-    padding: 0 14px;
+    padding: 0 12px;
   }
 
-  .topbar-left {
-    gap: 10px;
+  .header-container .topbar-left {
+    height: 62px !important;
+    gap: 8px !important;
+  }
+
+  .header-container .session-box {
+    gap: 10px !important;
   }
 
   .session-text,
@@ -673,15 +761,26 @@
     display: none !important;
   }
 
-  .btn-atras {
-    padding: 0 10px;
-    min-width: 38px;
+  /* Botón ATRÁS delgado en móvil (28x34px) */
+  .header-container .btn-atras {
+    height: 34px !important;
+    min-height: 34px !important;
+    width: 28px !important;
+    min-width: 28px !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
   }
 
-  .back-text {
-    display: none;
+  .header-container .btn-atras .back-text {
+    display: none !important;
   }
 
+  .header-container .btn-atras .back-icon-svg {
+    font-size: 13px !important;
+    margin: 0 auto !important;
+  }
+
+  /* Logo y Textos de Cabecera */
   .brand-mark {
     width: 38px;
     height: 38px;
@@ -689,26 +788,51 @@
   }
 
   .brand-text h1 {
-    font-size: 16px;
-    max-width: 150px;
+    font-size: 16px !important;
+    max-width: 155px !important;
   }
 
   .brand-text p {
-    font-size: 11px;
-    max-width: 150px;
+    font-size: 11px !important;
+    max-width: 155px !important;
   }
 
-  .session-avatar,
-  .avatar-trigger {
-    width: 42px !important;
-    height: 42px !important;
-    min-width: 42px !important;
+  /* La foto MANTIENE su tamaño grande de 50px en móvil */
+  .header-container .session-avatar,
+  .header-container .avatar-trigger {
+    width: 50px !important;
+    height: 50px !important;
+    min-width: 50px !important;
   }
 
+  /* Campana limpia y más grande en móvil (25px) */
+  .header-container .btn-notificaciones {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+  }
+
+  .header-container .bell-icon-svg {
+    font-size: 34px !important;
+  }
+
+  .header-container .notif-dot {
+    top: 5px;
+    right: 5px;
+    width: 9px;
+    height: 9px;
+  }
+
+  .user-dropdown-card {
+    right: -4px;
+    width: 240px;
+  }
+
+  /* Sub-barra gris secundaria */
   .sub-topbar {
     height: 36px;
     min-height: 36px;
-    padding: 0 14px;
+    padding: 0 12px;
   }
 
   .sub-left,
@@ -721,193 +845,39 @@
     font-size: 13px;
   }
 
+  /* Botones Sincronizar y Administrar (Solo iconos) */
   .btn-sync-pendientes,
-  .btn-administrar {
+  .header-container .btn-administrar {
     height: 30px !important;
     min-height: 30px !important;
-    padding: 0 10px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    padding: 0 !important;
     font-size: 12px !important;
   }
 
-  .btn-sync-pendientes .btn-sync-text {
-    display: none;
-  }
-
-  .user-dropdown-card {
-    right: -4px;
-    width: 240px;
-  }
-}
-
-@media (max-width: 560px) {
-  .brand-text h1,
-  .brand-text p {
-    max-width: 130px;
-  }
-}
-
-
-/* FIX DEFINITIVO BOTÓN CERRAR SESIÓN */
-
-.header-container .session-box {
-  height: 70px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 14px !important;
-}
-
-.header-container button#logoutBtnDesktop.logout-btn-desktop.header-logout-button {
-  all: unset !important;
-  box-sizing: border-box !important;
-
-  width: auto !important;
-  min-width: 146px !important;
-  height: 46px !important;
-  min-height: 46px !important;
-
-  padding: 0 20px !important;
-  border-radius: 14px !important;
-
-  background: #ffffff !important;
-  color: #0f4c81 !important;
-
-  font-family: Arial, sans-serif !important;
-  font-size: 17px !important;
-  font-weight: 800 !important;
-  line-height: 1 !important;
-  text-align: center !important;
-
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-
-  cursor: pointer !important;
-  white-space: nowrap !important;
-
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14) !important;
-}
-
-.header-container button#logoutBtnDesktop.logout-btn-desktop.header-logout-button:hover {
-  background: #eef4f9 !important;
-  color: #0f4c81 !important;
-  transform: translateY(-1px);
-}
-
-.header-container .user-menu-container,
-.header-container .avatar-trigger {
-  height: 70px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.header-container .session-avatar {
-  width: 50px !important;
-  height: 50px !important;
-  min-width: 50px !important;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .header-container button#logoutBtnDesktop.logout-btn-desktop.header-logout-button {
-    display: none !important;
-  }
-}
-
-/* ============================= */
-/* FIX CENTRADO BOTÓN ATRÁS */
-/* ============================= */
-
-.header-container .topbar-left {
-  height: 64px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-}
-
-.header-container .btn-atras {
-  align-self: center !important;
-  height: 42px !important;
-  min-height: 42px !important;
-  width: 118px !important;
-  min-width: 118px !important;
-
-  margin: 0 !important;
-  padding: 0 16px !important;
-
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 9px !important;
-
-  border-radius: 10px !important;
-  line-height: 1 !important;
-  transform: none !important;
-  position: relative !important;
-  top: 0 !important;
-}
-
-.header-container .btn-atras:hover {
-  transform: translateY(-1px) !important;
-}
-
-.header-container .back-icon-svg {
-  display: block !important;
-  font-size: 15px !important;
-  line-height: 1 !important;
-  margin: 0 !important;
-}
-
-.header-container .back-text {
-  display: inline-flex !important;
-  align-items: center !important;
-  line-height: 1 !important;
-  margin: 0 !important;
-}
-
-/* Si estás en móvil */
-/* Si estás en móvil */
-@media (max-width: 768px) {
-  .header-container .topbar-left {
-    height: 62px !important;
-  }
-
-  /* 1. Ajuste del botón ATRÁS (Solo icono) */
-  .header-container .btn-atras {
-    height: 38px !important;
-    min-height: 38px !important;
-    width: 38px !important; /* Hacemos el botón cuadrado */
-    min-width: 38px !important;
-    padding: 0 !important; /* Quitamos el relleno sobrante */
-  }
-
-  /* Ocultamos el texto "Atrás" */
-  .header-container .btn-atras .back-text {
-    display: none !important;
-  }
-  
-  /* Centramos perfectamente la flechita */
-  .header-container .btn-atras .back-icon-svg {
-    font-size: 16px !important;
-    margin: 0 auto !important;
-  }
-
-  /* 2. Ajuste del botón ADMINISTRAR (Solo icono) */
-  .header-container .btn-administrar {
-    width: 30px !important; /* Botón cuadrado pequeño */
-    min-width: 30px !important;
-    padding: 0 !important;
-  }
-
-  /* Ocultamos el texto "Administrar" */
+  .btn-sync-pendientes .btn-sync-text,
   .header-container .btn-administrar span:not(.layout-icon) {
     display: none !important;
   }
 
-  /* Centramos perfectamente el engranaje */
   .header-container .btn-administrar .layout-icon {
     margin: 0 auto !important;
-    font-size: 15px !important;
+    font-size: 14px !important;
+  }
+}
+
+
+/* ================================================= */
+/* 3. CELULARES PEQUEÑOS / ANGOSTOS (Máx. 480px)     */
+/* ================================================= */
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0 10px;
+  }
+
+  .brand-text h1,
+  .brand-text p {
+    max-width: 130px !important;
   }
 }

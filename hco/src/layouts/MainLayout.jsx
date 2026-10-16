@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  FaHome, FaSyncAlt, FaCog, FaKey, FaSignOutAlt, FaExchangeAlt, FaArrowLeft, FaBroom
+  FaHome, FaSyncAlt, FaCog, FaKey, FaSignOutAlt, FaExchangeAlt, FaArrowLeft, FaBroom, FaBell
 } from "react-icons/fa";
 
 import "./MainLayout.css";
@@ -41,22 +41,21 @@ export default function MainLayout() {
     return location.pathname.toLowerCase().replace(/\/$/, "").replace(/\.html$/, "");
   }, [location.pathname]);
 
-  const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opciones/menu");
+const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opciones/menu");
   const isPedidosPage = currentPage.includes("/almuerzos/pedidos");
-  const isAdminPage = currentPage.includes("/almuerzos/admin");
-  const isListaPage = currentPage.includes("/almuerzos/lista_platillo");
-  const isMheTrackingPage = currentPage.includes("/mhe/tracking_mhe");
-  const isMheEvaluarPage = currentPage.includes("/mhe/mhe_evaluar");
 
   const { tituloCabecera, subtituloCabecera } = useMemo(() => {
-    if (isMenuPage) return { tituloCabecera: "Menú Principal", subtituloCabecera: "Opciones del sistema" };
-    if (isPedidosPage) return { tituloCabecera: "Almuerzo", subtituloCabecera: "Registro de almuerzos" };
-    if (isAdminPage) return { tituloCabecera: "Administración Global", subtituloCabecera: "Supervisión de pedidos y reportes" };
-    if (isListaPage) return { tituloCabecera: "Editar Menú", subtituloCabecera: "Gestión semanal de platillos" };
-    if (isMheTrackingPage) return { tituloCabecera: "Tracking MHE", subtituloCabecera: "Control e historial de inspecciones PIV" };
-    if (isMheEvaluarPage) return { tituloCabecera: "Inspección MHE", subtituloCabecera: "Evaluación pre-uso de equipos" };
-    return { tituloCabecera: "Sistema de Control", subtituloCabecera: "Panel principal de operaciones" };
-  }, [isMenuPage, isPedidosPage, isAdminPage, isListaPage, isMheTrackingPage, isMheEvaluarPage]);
+    if (isMenuPage) {
+      return { 
+        tituloCabecera: "Menú Principal", 
+        subtituloCabecera: "Opciones del sistema" 
+      };
+    }
+    return { 
+      tituloCabecera: "HCO", 
+      subtituloCabecera: "Herramientas de Control Operacional" 
+    };
+  }, [isMenuPage]);
 
 
   const nombreUsuario = String(authUser?.nombre || "Usuario").trim();
@@ -304,9 +303,19 @@ export default function MainLayout() {
 
               </div>
 
-                <button type="button" id="logoutBtnDesktop" className="logout-btn-desktop header-logout-button" onClick={() => setShowLogoutModal(true)}>
-                Cerrar sesión
-                </button>
+                {/* BOTÓN DE NOTIFICACIONES (Visible en Laptop y Móvil) */}
+              <button
+                type="button"
+                id="notificationBtn"
+                className="btn-notificaciones"
+                aria-label="Notificaciones"
+                title="Notificaciones"
+                onClick={() => console.log("Abrir notificaciones")}
+              >
+                <FaBell className="bell-icon-svg" />
+                {/* Punto rojo indicador (puedes ocultarlo si no hay alertas) */}
+                <span className="notif-dot"></span>
+              </button>
             </div>
           </header>
 

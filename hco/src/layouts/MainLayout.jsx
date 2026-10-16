@@ -53,7 +53,7 @@ const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opcion
     }
     return { 
       tituloCabecera: "HCO", 
-      subtituloCabecera: "Herramientas de Control Operacional" 
+      subtituloCabecera: "Smart life is automated" 
     };
   }, [isMenuPage]);
 

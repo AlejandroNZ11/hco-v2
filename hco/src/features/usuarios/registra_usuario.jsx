@@ -10,10 +10,17 @@ import { useLiveQuery } from 'dexie-react-hooks';
 
 // Importamos supabase para Auth y RPC
 import { supabase } from '../../config/supabaseClient';
-// ¡NUEVO!: Importamos las funciones para traer los catálogos
-import { 
-  crearEmpleado, actualizarEmpleado, 
-  obtenerAreas, obtenerCargos, obtenerJefes, obtenerRoles 
+// Importamos todas las funciones necesarias de empleadosService
+import {
+  crearEmpleado,
+  actualizarEmpleado,
+  obtenerEmpleadoPorId,
+  verificarDniExistente,
+  verificarUsuarioExistente,
+  obtenerAreas,
+  obtenerCargos,
+  obtenerJefes,
+  obtenerRoles
 } from '../../services/empleadosService';
 
 function getStoredAuthUser() {
@@ -42,7 +49,7 @@ const UBIGEO = {
 
 const formatearNombre = (text) => {
   if (!text) return "";
-  return text.toLowerCase().split(',').map(parte => 
+  return text.toLowerCase().split(',').map(parte =>
     parte.trim().split(/\s+/).map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1)).join(" ")
   ).join(", ");
 };
@@ -61,6 +68,11 @@ const convertirDriveUrl = (url) => {
   return url;
 };
 
+const parseId = (val) => {
+  if (val === "" || val === null || val === undefined) return null;
+  return /^\d+\$/.test(String(val)) ? parseInt(val, 10) : val;
+};
+
 export default function RegistrarUsuario() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -74,40 +86,35 @@ export default function RegistrarUsuario() {
   const [formErrors, setFormErrors] = useState([]);
   const normalize = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-  // =========================================================
-  // NUEVO: Sincronización de Catálogos (Independientes)
-  // =========================================================
+  // Sincronización de Catálogos
   useEffect(() => {
     const sincronizarCatalogos = async () => {
       if (isOnline) {
-        // Ejecutamos cada uno en su propio try-catch.
-        // Así, si 'cargos' falla, igual se guardan 'jefes' y 'roles'.
-        try { 
-          const areas = await obtenerAreas(); 
-          if (areas) await localDb.areas.bulkPut(areas); 
+        try {
+          const areas = await obtenerAreas();
+          if (areas) await localDb.areas.bulkPut(areas);
         } catch (e) { console.error("Error áreas", e); }
 
-        try { 
-          const cargos = await obtenerCargos(); 
-          if (cargos) await localDb.cargos.bulkPut(cargos); 
+        try {
+          const cargos = await obtenerCargos();
+          if (cargos) await localDb.cargos.bulkPut(cargos);
         } catch (e) { console.error("Error cargos", e); }
 
-        try { 
-          const jefes = await obtenerJefes(); 
-          if (jefes) await localDb.jefes.bulkPut(jefes); 
+        try {
+          const jefes = await obtenerJefes();
+          if (jefes) await localDb.jefes.bulkPut(jefes);
         } catch (e) { console.error("Error jefes", e); }
 
-        try { 
-          const roles = await obtenerRoles(); 
-          if (roles) await localDb.roles.bulkPut(roles); 
+        try {
+          const roles = await obtenerRoles();
+          if (roles) await localDb.roles.bulkPut(roles);
         } catch (e) { console.error("Error roles", e); }
       }
     };
     sincronizarCatalogos();
   }, [isOnline]);
 
-
-  // 1. OBTENEMOS LOS CATÁLOGOS DIRECTO DE DEXIE (Dinámicos y Offline)
+  // Catálogos desde Dexie
   const listaAreas = useLiveQuery(() => localDb.areas.toArray()) || [];
   const listaCargos = useLiveQuery(() => localDb.cargos.toArray()) || [];
   const listaJefes = useLiveQuery(() => localDb.jefes.toArray()) || [];
@@ -122,7 +129,7 @@ export default function RegistrarUsuario() {
     area: "", jefeDirecto: "", rol: "", usuario: "", clave: "", fechaNacimiento: "", edad: "",
     hijos: "", celular: "", departamento: "", provincia: "", distrito: "", direccion: "",
     urlCasa: "", coordenadas: "", grupoSanguineo: "", contactoEmergencia: "", rubrica: "",
-    correo: "", correoCeva: "", correo3m: "", codMainchart: "", 
+    correo: "", correoCeva: "", correo3m: "", codMainchart: "",
     fechaIngreso: "", rutaMovilidad: "", fechaSalida: "", permanencia: "", motivoSalida: "", foto: ""
   });
 
@@ -137,7 +144,23 @@ export default function RegistrarUsuario() {
   const cargarUsuarioEditar = async (id) => {
     setLoading(true);
     try {
-      const data = await localDb.usuarios.get(id);
+      let data = null;
+
+      // 1. Si estamos online, traemos la versión real de Supabase para no leer datos desactualizados
+      if (isOnline) {
+        try {
+          data = await obtenerEmpleadoPorId(id);
+          if (data) await localDb.usuarios.put(data);
+        } catch (errOnline) {
+          console.warn("No se pudo leer de Supabase, usando caché local:", errOnline);
+        }
+      }
+
+      // 2. Respaldo desde localDb si está offline o falló la red
+      if (!data) {
+        data = await localDb.usuarios.get(id);
+      }
+
       if (data) {
         let edadCalculada = "", permanenciaCalculada = "";
         if (data.fch_nacimiento) {
@@ -156,22 +179,52 @@ export default function RegistrarUsuario() {
           permanenciaCalculada = String(Math.max(0, Math.floor((fin.getTime() - inicio.getTime()) / 86400000)));
         }
 
+        const esFotoBase64 = String(data.foto_url || "").startsWith("data:image/");
+
         setFormData({
-          id: data.id || "", estado: data.estado || "Activo", dni: data.dni || "",
-          nombre: data.nombre || "", sexo: data.sexo || "", tipo: data.tipo || "",
-          cargo: data.cargo_id || "", area: data.area_id || "", jefeDirecto: data.jefe_directo_id || "",
-          rol: data.rol || "", usuario: data.usuario || "", clave: data.cl || "", 
-          fechaNacimiento: data.fch_nacimiento || "", fechaSalida: data.fch_salida || "",
-          fechaIngreso: data.fecha_ingreso || "", hijos: data.hijos !== null && data.hijos !== undefined ? data.hijos : "", 
-          celular: data.celular || "", departamento: data.departamento || "", provincia: data.provincia || "",
-          distrito: data.distrito || "", direccion: data.direccion || "", urlCasa: data.url_casa || "",
-          coordenadas: data.coordenadas || "", grupoSanguineo: data.grupo_sanguineo || "",
-          contactoEmergencia: data.contacto_emergencia || "", rubrica: data.rubrica || "",
-          correo: data.correo_personal || "", correoCeva: data.correo_ceva || "", correo3m: data.correo_3m || "", codMainchart: data.cod_mainchart || "",
-          rutaMovilidad: data.ruta_movilidad || "", motivoSalida: data.motivo_salida || "", foto: data.foto_url || "",
-          edad: edadCalculada, permanencia: permanenciaCalculada
+          id: data.id || "",
+          estado: data.fch_salida ? "Inactivo" : (data.estado || "Activo"),
+          dni: data.dni || "",
+          nombre: data.nombre || "",
+          sexo: data.sexo || "",
+          tipo: data.tipo || "",
+          cargo: data.cargo_id !== null && data.cargo_id !== undefined ? String(data.cargo_id) : "",
+          area: data.area_id !== null && data.area_id !== undefined ? String(data.area_id) : "",
+          jefeDirecto: data.jefe_directo_id !== null && data.jefe_directo_id !== undefined ? String(data.jefe_directo_id) : "",
+          rol: data.rol || "",
+          usuario: data.usuario || "",
+          clave: data.cl || "",
+          fechaNacimiento: data.fch_nacimiento || "",
+          fechaSalida: data.fch_salida || "",
+          fechaIngreso: data.fecha_ingreso || "",
+          hijos: data.hijos !== null && data.hijos !== undefined ? String(data.hijos) : "",
+          celular: data.celular || "",
+          departamento: data.departamento || "",
+          provincia: data.provincia || "",
+          distrito: data.distrito || "",
+          direccion: data.direccion || "",
+          urlCasa: data.url_casa || "",
+          coordenadas: data.coordenadas || "",
+          grupoSanguineo: data.grupo_sanguineo || "",
+          contactoEmergencia: data.contacto_emergencia || "",
+          rubrica: data.rubrica || "",
+          correo: data.correo_personal || "",
+          correoCeva: data.correo_ceva || "",
+          correo3m: data.correo_3m || "",
+          codMainchart: data.cod_mainchart || "",
+          rutaMovilidad: data.ruta_movilidad || "",
+          motivoSalida: data.motivo_salida || "",
+          foto: esFotoBase64 ? "" : (data.foto_url || ""),
+          edad: edadCalculada,
+          permanencia: permanenciaCalculada
         });
-        if (data.foto_url) setPhotoPreview(convertirDriveUrl(data.foto_url));
+
+        if (data.foto_url) {
+          if (esFotoBase64) setPhotoDataUrl(data.foto_url);
+          setPhotoPreview(convertirDriveUrl(data.foto_url));
+        }
+      } else {
+        setMessage({ text: "No se encontró el usuario solicitado.", type: "error" });
       }
     } catch (err) {
       console.error(err);
@@ -191,7 +244,6 @@ export default function RegistrarUsuario() {
     }
   }, [formData.nombre, formData.dni, editingId]);
 
-  
   useEffect(() => {
     if (formData.fechaNacimiento) {
       const nacimiento = new Date(formData.fechaNacimiento + "T00:00:00");
@@ -206,15 +258,16 @@ export default function RegistrarUsuario() {
   }, [formData.fechaNacimiento]);
 
   useEffect(() => {
+    const nuevoEstado = formData.fechaSalida ? "Inactivo" : "Activo";
     if (formData.fechaIngreso) {
       const inicio = new Date(formData.fechaIngreso + "T00:00:00");
       const fin = formData.fechaSalida ? new Date(formData.fechaSalida + "T00:00:00") : new Date();
       inicio.setHours(0, 0, 0, 0);
       fin.setHours(0, 0, 0, 0);
       const diff = Math.floor((fin.getTime() - inicio.getTime()) / 86400000);
-      setFormData(prev => ({ ...prev, permanencia: String(Math.max(0, diff)) }));
+      setFormData(prev => ({ ...prev, permanencia: String(Math.max(0, diff)), estado: nuevoEstado }));
     } else {
-      setFormData(prev => ({ ...prev, permanencia: "" }));
+      setFormData(prev => ({ ...prev, permanencia: "", estado: nuevoEstado }));
     }
   }, [formData.fechaIngreso, formData.fechaSalida]);
 
@@ -249,9 +302,9 @@ export default function RegistrarUsuario() {
     if (id === "foto") { setPhotoDataUrl(""); setPhotoPreview(convertirDriveUrl(value)); }
     if (formErrors.includes(id)) setFormErrors(prev => prev.filter(field => field !== id));
   };
-  
+
   const handleNombreBlur = () => setFormData(prev => ({ ...prev, nombre: formatearNombre(prev.nombre) }));
-  
+
   const handlePhotoSelected = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -286,10 +339,10 @@ export default function RegistrarUsuario() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ text: '', type: '' });
-    setFormErrors([]); 
+    setFormErrors([]);
 
     const requiredFields = [
-      { key: 'dni', label: 'DNI' }, { key: 'nombre', label: 'Nombre' }, { key: 'sexo', label: 'Sexo' }, 
+      { key: 'dni', label: 'DNI' }, { key: 'nombre', label: 'Nombre' }, { key: 'sexo', label: 'Sexo' },
       { key: 'tipo', label: 'Tipo' }, { key: 'cargo', label: 'Cargo' }, { key: 'area', label: 'Área' },
       { key: 'jefeDirecto', label: 'Jefe directo' }, { key: 'rol', label: 'Rol' }
     ];
@@ -304,16 +357,22 @@ export default function RegistrarUsuario() {
     setLoading(true);
 
     try {
-      const duplicadoDni = await localDb.usuarios.where('dni').equals(formData.dni.trim()).first();
-      if (duplicadoDni && duplicadoDni.id !== editingId) {
+      const dniLimpio = String(formData.dni || "").trim();
+      const usuarioLimpio = String(formData.usuario || "").trim();
+
+      // 1. Validación de duplicados en localDb y en Supabase (si está online)
+      const duplicadoDniLocal = await localDb.usuarios.where('dni').equals(dniLimpio).first();
+      const existeDniRemoto = isOnline ? await verificarDniExistente(dniLimpio, editingId) : false;
+      if ((duplicadoDniLocal && String(duplicadoDniLocal.id) !== String(editingId)) || existeDniRemoto) {
         setFormErrors(prev => [...prev, 'dni']);
-        throw new Error('⚠️ ERROR: El DNI ingresado ya existe localmente.');
+        throw new Error('⚠️ ERROR: El DNI ingresado ya está registrado.');
       }
-      
-      const duplicadoUsuario = await localDb.usuarios.where('usuario').equals(formData.usuario.trim()).first();
-      if (duplicadoUsuario && duplicadoUsuario.id !== editingId) {
+
+      const duplicadoUsuarioLocal = await localDb.usuarios.where('usuario').equals(usuarioLimpio).first();
+      const existeUsuarioRemoto = isOnline ? await verificarUsuarioExistente(usuarioLimpio, editingId) : false;
+      if ((duplicadoUsuarioLocal && String(duplicadoUsuarioLocal.id) !== String(editingId)) || existeUsuarioRemoto) {
         setFormErrors(prev => [...prev, 'nombre']);
-        throw new Error(`⚠️ ERROR: El Usuario/Email (${formData.usuario}) ya está ocupado.`);
+        throw new Error(`⚠️ ERROR: El Usuario/Email (${usuarioLimpio}) ya está ocupado.`);
       }
 
       let finalUserId = editingId;
@@ -322,10 +381,11 @@ export default function RegistrarUsuario() {
       if (!editingId) {
         if (isOnline) {
           const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: formData.usuario.trim(), password: formData.clave.trim(),
+            email: usuarioLimpio,
+            password: String(formData.clave || "").trim(),
           });
           if (authError) throw new Error(`Error Auth: ${authError.message}`);
-          finalUserId = authData.user.id;
+          finalUserId = authData?.user?.id || crypto.randomUUID();
         } else {
           finalUserId = crypto.randomUUID();
           needsAuthCreation = true;
@@ -333,32 +393,60 @@ export default function RegistrarUsuario() {
       }
 
       const recordData = {
-        id: finalUserId, estado: formData.estado, dni: formData.dni.trim(), nombre: formData.nombre.trim(),
-        sexo: formData.sexo, tipo: formData.tipo, cargo_id: formData.cargo ? parseInt(formData.cargo) : null,
-        area_id: formData.area ? parseInt(formData.area) : null, jefe_directo_id: formData.jefeDirecto || null, 
-        rol: formData.rol, usuario: formData.usuario.trim(), cl: formData.clave.trim(), 
-        fch_nacimiento: formData.fechaNacimiento || null, fch_salida: formData.fechaSalida || null,
-        fecha_ingreso: formData.fechaIngreso || null, correo_personal: formData.correo.trim(),
-        correo_ceva: formData.correoCeva.trim(), correo_3m: formData.correo3m.trim(),
-        cod_mainchart: formData.codMainchart.trim(), hijos: formData.hijos !== "" ? parseInt(formData.hijos) : 0, 
-        celular: formData.celular.trim(), departamento: formData.departamento, provincia: formData.provincia,
-        distrito: formData.distrito, direccion: formData.direccion.trim(), url_casa: formData.urlCasa.trim(),
-        coordenadas: formData.coordenadas.trim(), grupo_sanguineo: formData.grupoSanguineo.trim(),
-        contacto_emergencia: formData.contactoEmergencia.trim(), rubrica: formData.rubrica.trim(),
-        ruta_movilidad: formData.rutaMovilidad || null, motivo_salida: formData.motivoSalida.trim(),
+        id: finalUserId,
+        estado: formData.fechaSalida ? "Inactivo" : (formData.estado || "Activo"),
+        dni: dniLimpio,
+        nombre: String(formData.nombre || "").trim(),
+        sexo: formData.sexo,
+        tipo: formData.tipo,
+        cargo_id: parseId(formData.cargo),
+        area_id: parseId(formData.area),
+        jefe_directo_id: parseId(formData.jefeDirecto),
+        rol: formData.rol,
+        usuario: usuarioLimpio,
+        cl: String(formData.clave || "").trim(),
+        fch_nacimiento: formData.fechaNacimiento || null,
+        fch_salida: formData.fechaSalida || null,
+        fecha_ingreso: formData.fechaIngreso || null,
+        correo_personal: String(formData.correo || "").trim() || null,
+        correo_ceva: String(formData.correoCeva || "").trim() || null,
+        correo_3m: String(formData.correo3m || "").trim() || null,
+        cod_mainchart: String(formData.codMainchart || "").trim() || null,
+        hijos: formData.hijos !== "" && formData.hijos !== null ? parseInt(formData.hijos, 10) : 0,
+        celular: String(formData.celular || "").trim() || null,
+        departamento: formData.departamento || null,
+        provincia: formData.provincia || null,
+        distrito: formData.distrito || null,
+        direccion: String(formData.direccion || "").trim() || null,
+        url_casa: String(formData.urlCasa || "").trim() || null,
+        coordenadas: String(formData.coordenadas || "").trim() || null,
+        grupo_sanguineo: String(formData.grupoSanguineo || "").trim() || null,
+        contacto_emergencia: String(formData.contactoEmergencia || "").trim() || null,
+        rubrica: String(formData.rubrica || "").trim() || null,
+        ruta_movilidad: formData.rutaMovilidad || null,
+        motivo_salida: String(formData.motivoSalida || "").trim() || null,
         foto_url: photoDataUrl ? photoDataUrl : (formData.foto ? convertirDriveUrl(formData.foto) : null)
       };
 
-      if (editingId) await localDb.usuarios.update(finalUserId, recordData);
-      else await localDb.usuarios.add(recordData);
-
+      // 2. Guardamos PRIMERO en Supabase cuando estamos Online y luego actualizamos localDb
       if (isOnline) {
-        if (editingId) await actualizarEmpleado(editingId, recordData);
-        else await crearEmpleado(recordData);
+        let savedRecord;
+        if (editingId) {
+          savedRecord = await actualizarEmpleado(editingId, recordData);
+        } else {
+          savedRecord = await crearEmpleado(recordData);
+        }
+
+        // Guardamos en localDb exactamente lo que confirmó Supabase
+        await localDb.usuarios.put(savedRecord || recordData);
         setMessage({ text: "Usuario guardado correctamente en el servidor.", type: "success" });
       } else {
+        await localDb.usuarios.put(recordData);
         await localDb.sync_queue.add({
-          tabla: 'usuarios', operacion: editingId ? 'UPDATE' : 'INSERT', needsAuth: needsAuthCreation, payload: recordData
+          tabla: 'empleados',
+          operacion: editingId ? 'UPDATE' : 'INSERT',
+          needsAuth: needsAuthCreation,
+          payload: recordData
         });
         setMessage({ text: "Modo Offline: Guardado localmente, se sincronizará luego.", type: "warning" });
       }
@@ -392,11 +480,11 @@ export default function RegistrarUsuario() {
 
       await actualizarEmpleado(editingId, { cl: formData.dni });
       await localDb.usuarios.update(editingId, { cl: formData.dni });
-      
+
       setFormData(prev => ({ ...prev, clave: formData.dni }));
       setMessage({ text: "Contraseña restablecida exitosamente.", type: "success" });
     } catch (error) {
-      setMessage({ text: "Error al restablecer.", type: "error" });
+      setMessage({ text: error.message || "Error al restablecer.", type: "error" });
     } finally { setLoading(false); }
   };
 
@@ -448,7 +536,7 @@ export default function RegistrarUsuario() {
               <select id="area" className={formErrors.includes('area') ? 'input-error' : ''} value={formData.area} onChange={handleChange} required>
                 <option value="">Seleccione área</option>
                 {listaAreas.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-            </select>
+              </select>
             </div>
           </div>
 
@@ -473,26 +561,25 @@ export default function RegistrarUsuario() {
             </div>
             <div className="field field-manual">
               <label>Cargo <span className="field-badge manual">OBLIGATORIO</span></label>
-                <select id="cargo" className={formErrors.includes('cargo') ? 'input-error' : ''} value={formData.cargo} onChange={handleChange} required>
-                    <option value="">Seleccione cargo</option>
-                    {listaCargos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
+              <select id="cargo" className={formErrors.includes('cargo') ? 'input-error' : ''} value={formData.cargo} onChange={handleChange} required>
+                <option value="">Seleccione cargo</option>
+                {listaCargos.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
             </div>
           </div>
 
           <div className="form-grid cols-4">
             <div className="field field-manual">
               <label>Jefe directo <span className="field-badge manual">OBLIGATORIO</span></label>
-                <select id="jefeDirecto" className={formErrors.includes('jefeDirecto') ? 'input-error' : ''} value={formData.jefeDirecto} onChange={handleChange} required>
-                    <option value="">Seleccione jefe directo</option>
-                    {listaJefes.map(j => <option key={j.id} value={j.id}>{j.nombre}</option>)}
-                </select>
+              <select id="jefeDirecto" className={formErrors.includes('jefeDirecto') ? 'input-error' : ''} value={formData.jefeDirecto} onChange={handleChange} required>
+                <option value="">Seleccione jefe directo</option>
+                {listaJefes.map(j => <option key={j.id} value={j.id}>{j.nombre}</option>)}
+              </select>
             </div>
             <div className="field field-manual">
               <label>Rol <span className="field-badge manual">OBLIGATORIO</span></label>
               <select id="rol" className={formErrors.includes('rol') ? 'input-error' : ''} value={formData.rol} onChange={handleChange} required>
                 <option value="">Seleccione rol</option>
-                {/* CAMBIO AQUÍ: Intenta leer r.nombre, y si no existe, intenta leer r.rol */}
                 {listaRoles.map(r => (
                   <option key={r.id} value={r.nombre || r.rol}>
                     {r.nombre || r.rol}
@@ -515,7 +602,7 @@ export default function RegistrarUsuario() {
             <div className="section-title">FOTO</div>
             <div className="section-title">CORREOS</div>
           </div>
-          
+
           <div className="split-layout">
             <div className="split-panel">
               <div className="photo-content-split">
@@ -559,7 +646,7 @@ export default function RegistrarUsuario() {
             </div>
           </div>
 
-          <div className="section-title">Datos personales</div> 
+          <div className="section-title">Datos personales</div>
           <div className="form-grid cols-4">
             <div className="field field-manual"><label>Fch. Nacimiento</label><input type="date" id="fechaNacimiento" value={formData.fechaNacimiento} onChange={handleChange} /></div>
             <div className="field field-auto"><label>Edad <span className="field-badge auto">AUTO</span></label><input type="text" value={formData.edad} readOnly /></div>

@@ -744,12 +744,11 @@ export default function TrackingMHE() {
                             <FaCheck />
                           </button>
 
-                          {/* NUEVO BOTÓN: Habilitar equipo cuando salió INOPERATIVO (Exclusivo QHSE y SUPERADMIN) */}
-                          {esFilaInoperativa && (
+                          {/* SE MUESTRA ÚNICAMENTE SI EL EQUIPO SIGUE INOPERATIVO Y NO HA SIDO HABILITADO */}
+                          {esFilaInoperativa && !equipoYaFueHabilitado && (
                             <button
                               type="button"
-                              className={`btn-tabla-habilitar ${equipoYaFueHabilitado ? 'is-enabled' : ''} ${!puedeHabilitarEquipo ? 'disabled-by-role' : ''}`}
-                              disabled={equipoYaFueHabilitado}
+                              className={`btn-tabla-habilitar ${!puedeHabilitarEquipo ? 'disabled-by-role' : ''}`}
                               onClick={() => {
                                 if (!puedeHabilitarEquipo) {
                                   return alert("No tienes permisos para pasar el equipo a Operativo. Acción exclusiva para el área QHSE y rol Superadmin.");
@@ -757,9 +756,7 @@ export default function TrackingMHE() {
                                 handleHabilitarEquipo(insp);
                               }}
                               title={
-                                equipoYaFueHabilitado
-                                  ? "Equipo ya habilitado como Operativo para nuevas inspecciones"
-                                  : puedeHabilitarEquipo
+                                puedeHabilitarEquipo
                                   ? "Habilitar equipo (Pasar a Operativo)"
                                   : "No autorizado: Exclusivo para área QHSE y Superadmin"
                               }
@@ -769,6 +766,7 @@ export default function TrackingMHE() {
                           )}
                         </div>
                       </td>
+
                     </tr>
                   );
                 })

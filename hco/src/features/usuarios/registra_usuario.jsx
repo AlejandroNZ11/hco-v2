@@ -55,17 +55,25 @@ const formatearNombre = (text) => {
 };
 
 const extraerIdDrive = (url) => {
-  if (!url) return null;
-  const match = url.match(/\/file\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/) || url.match(/thumbnail\?id=([^&]+)/);
+  if (!url || typeof url !== "string") return null;
+  const cleanUrl = url.trim();
+  const match =
+    cleanUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+    cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+    cleanUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   return match ? match[1] : null;
 };
 
 const convertirDriveUrl = (url) => {
-  if (!url) return "";
-  if (url.startsWith("data:image/")) return url;
-  const driveId = extraerIdDrive(url);
-  if (driveId) return `https://drive.google.com/thumbnail?id=${driveId}&sz=w1000`;
-  return url;
+  if (!url || typeof url !== "string") return "";
+  const cleanUrl = url.trim();
+  if (cleanUrl.startsWith("data:image/")) return cleanUrl;
+  const driveId = extraerIdDrive(cleanUrl);
+  if (driveId) {
+    // Usa directamente el CDN de imágenes de Google en lugar de drive.google.com
+    return `https://lh3.googleusercontent.com/d/${driveId}=w1000`;
+  }
+  return cleanUrl;
 };
 
 const parseId = (val) => {
@@ -135,6 +143,7 @@ export default function RegistrarUsuario() {
 
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoDataUrl, setPhotoDataUrl] = useState("");
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   useEffect(() => {
     if (editingId) cargarUsuarioEditar(editingId);
@@ -626,7 +635,29 @@ export default function RegistrarUsuario() {
                 <div className="photo-preview-split">
                   {photoPreview ? (
                     <div className="preview-card-split">
-                      <img src={photoPreview} alt="Vista previa" onError={(e) => { if (!e.target.dataset.retried) { e.target.dataset.retried = "true"; const driveId = extraerIdDrive(formData.foto); if (driveId) { e.target.src = `https://docs.google.com/thumbnail?id=${driveId}&sz=w800`; } } }} />
+                      <img
+                        key={photoPreview}
+                        src={photoPreview}
+                        alt="Vista previa"
+                        title="Clic para ampliar foto"
+                        style={{ cursor: 'zoom-in' }}
+                        onClick={() => setIsZoomOpen(true)}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          const driveId = extraerIdDrive(formData.foto || photoPreview);
+                          if (!driveId) return;
+
+                          const step = Number(e.target.dataset.fallbackStep || 0);
+                          if (step === 0) {
+                            e.target.dataset.fallbackStep = "1";
+                            e.target.src = `https://lh3.googleusercontent.com/d/${driveId}=w1000`;
+                          } else if (step === 1) {
+                            e.target.dataset.fallbackStep = "2";
+                            e.target.src = `https://drive.google.com/uc?export=view&id=${driveId}`;
+                          }
+                        }}
+                      />
                       <button type="button" onClick={clearPhoto} className="btn-quitar-foto-force">Quitar</button>
                     </div>
                   ) : (
@@ -725,6 +756,26 @@ export default function RegistrarUsuario() {
           </div>
         </form>
       </section>
+      {isZoomOpen && photoPreview && (
+        <div className="photo-zoom-overlay" onClick={() => setIsZoomOpen(false)}>
+          <div className="photo-zoom-container" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="photo-zoom-close"
+              onClick={() => setIsZoomOpen(false)}
+              title="Cerrar (Esc)"
+            >
+              ✕
+            </button>
+            <img
+              src={photoPreview}
+              alt="Vista ampliada"
+              className="photo-zoom-img"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

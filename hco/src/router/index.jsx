@@ -1,13 +1,13 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
-import Login from "../features/auth/Login"; // Asegúrate de que la ruta sea correcta
+import Login from "../features/auth/Login";
 import MainLayout from "../layouts/MainLayout";
 import Menu from "../features/dashboard/Menu";
 
-// Importamos los arrays de rutas de cada módulo
 import { almuerzosRoutes } from "./almuerzosRoutes";
 import { usuariosRoutes } from "./usuariosRoutes";
 import { mheRoutes } from "./mheRoutes";
+import { cuadroQRoutes } from "./cuadroQRoutes"; // <-- 1. Importar
 
 export const router = createBrowserRouter([
   {
@@ -15,18 +15,16 @@ export const router = createBrowserRouter([
     element: <Login />,
   },
   {
-    // Rutas protegidas que comparten el MainLayout
     element: <MainLayout />,
     children: [
       { path: "menu", element: <Menu /> },
       ...almuerzosRoutes,
       ...usuariosRoutes,
       ...mheRoutes,
-      // Si en el futuro agregas "inventario", solo sumas: ...inventarioRoutes
+      ...cuadroQRoutes, // <-- 2. Agregar aquí
     ],
   },
   {
-    // Ruta no encontrada (Catch-all)
     path: "*",
     element: <Navigate to="/menu" replace />,
   },

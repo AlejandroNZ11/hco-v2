@@ -280,7 +280,7 @@ export default function Menu() {
             accent: "accent-slate",
             buttonText: "Entrar",
             image: "/img/cuadro-Q.jpg",
-            url: "/Cuadro-Q/trackingCuadroQ.html",
+            url: "/cuadro_q/trackingCuadroQ",
             estado: "Activo",
           },
           {

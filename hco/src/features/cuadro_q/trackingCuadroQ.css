@@ -1,0 +1,13 @@
+/* =========================================
+   ESTILOS - TRACKING CUADRO Q (Basado en MHE)
+   ========================================= */
+
+@import '../mhe_piv/tracking_mhe.css';
+
+/* Truncar textos largos en celdas con tooltip al pasar el mouse */
+.td-truncate {
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

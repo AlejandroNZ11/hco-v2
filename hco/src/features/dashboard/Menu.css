@@ -543,17 +543,6 @@ html, body {
   display: none;
 }
 
-/* RESPONSIVE */
-@media (max-width: 1024px) {
-  .hero-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .apps-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 
 
 /* =========================================
@@ -634,10 +623,114 @@ button, a, .app-category-tab, .app-card, .recordatorio-btn {
   -webkit-tap-highlight-color: transparent !important;
 }
 
+/* =========================================
+   DISEÑO MÓDULOS INACTIVOS (BLANCO Y NEGRO + BLOQUEADO)
+   ========================================= */
+
+.app-card.app-card-inactivo {
+  cursor: not-allowed !important;
+  background: #f8fafc !important;
+  border: 1px dashed #cbd5e1 !important;
+  box-shadow: none !important;
+  opacity: 0.82 !important;
+}
+
+/* Evitar que la tarjeta suba o haga zoom al pasar el mouse */
+.app-card.app-card-inactivo:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.app-card.app-card-inactivo:hover .app-media img {
+  transform: none !important;
+}
+
+/* Imagen en blanco y negro (escala de grises) */
+.app-card.app-card-inactivo .app-media img {
+  filter: grayscale(100%) contrast(0.9) brightness(0.85);
+}
+
+/* Oscurecer un poco más el fondo de la foto para que resalte el candado */
+.app-card.app-card-inactivo .app-media-overlay {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.35) 0%,
+    rgba(15, 23, 42, 0.72) 100%
+  );
+}
+
+/* Sello central "PRÓXIMAMENTE" sobre la imagen */
+.app-badge-proximamente {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(6px);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.badge-lock-icon {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+/* Ícono de la esquina inferior derecha en tono gris */
+.app-card.app-card-inactivo .app-media-icon {
+  background: rgba(15, 23, 42, 0.55);
+  color: #cbd5e1;
+}
+
+/* Textos y etiquetas internas en tonos grises */
+.app-card.app-card-inactivo .app-pill {
+  background: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+.app-card.app-card-inactivo .app-card-body h3 {
+  color: #64748b !important;
+}
+
+.app-card.app-card-inactivo .app-card-body p {
+  color: #94a3b8 !important;
+}
+
+.app-card.app-card-inactivo .app-card-bottom {
+  color: #94a3b8 !important;
+}
+
+/* Ajuste del sello "Próximamente" en pantallas de celular */
+@media (max-width: 600px) {
+  .app-badge-proximamente {
+    padding: 5px 10px;
+    font-size: 9px;
+    gap: 5px;
+  }
+
+  .badge-lock-icon {
+    font-size: 10px;
+  }
+}
+
 
 /* =========================================
 Responsive  movil celular 
 ========================================= */
+
+
 @media (max-width: 1200px) {
   .apps-section-tabs .apps-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -654,6 +747,25 @@ Responsive  movil celular
     font-size: 15px;
   }
 }
+
+
+
+
+
+
+
+
+/* RESPONSIVE */
+@media (max-width: 1024px) {
+  .hero-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .apps-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 
 
 /* =========================================

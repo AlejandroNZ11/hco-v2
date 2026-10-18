@@ -17,8 +17,7 @@ import {
   FaBusAlt,
   FaBus,
   FaUsers,
-
-
+  FaLock, // <-- Agregado para el bloqueo
 } from "react-icons/fa";
 
 import "./Menu.css";
@@ -82,7 +81,7 @@ function toTitleCase(value) {
   return String(value || "")
     .toLowerCase()
     .split(/\s+/)
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
 
@@ -212,7 +211,6 @@ export default function Menu() {
   const [recordatorioDia, setRecordatorioDia] = useState("...");
   const [activeTab, setActiveTab] = useState("excelencia");
 
-
   useEffect(() => {
     if (!authUser) {
       navigate(LOGIN_URL, { replace: true });
@@ -239,282 +237,301 @@ export default function Menu() {
   const esAdmin = rol === "SUPERADMIN" || rol === "SUPERVISOR";
 
   const menuTabs = useMemo(() => {
-  const tabs = [
-    {
-      key: "excelencia",
-      label: "Excelencia Operativa",
-      shortLabel: "BPE",
-      items: [
-        {
-          title: "Tarjetas de Anomalía",
-          description: "Crear y dar seguimiento a incidencias.",
-          Icon: FaExclamationTriangle,
-          accent: "accent-blue",
-          buttonText: "Ingresar",
-          image: "/img/ANOMALIA.jpg",
-          url: "/apps-tarjetas/anomalias",
-        },
-        {
-          title: "Gestión de Pedidos",
-          description: "Registrar y revisar pedidos operativos del día.",
-          Icon: FaUtensils,
-          accent: "accent-cyan",
-          buttonText: "Abrir",
-          image: "/img/almuerzo.jpg",
-          url: "/almuerzos/pedidos",
-        },
-        {
-          title: "Tarjetas de Sugerencia",
-          description: "Recolectar y gestionar ideas o propuestas de mejora.",
-          Icon: FaBoxes,
-          accent: "accent-slate",
-          buttonText: "Entrar",
-          image: "/img/SUGERENCIA.jpg",
-          url: "/tarjetas-sugerencias/sugerencias",
-        },
-        {
-          title: "Cuadro Q",
-          description: "Registrar y dar seguimiento a incidencias.",
-          Icon: FaExclamationTriangle,
-          accent: "accent-slate",
-          buttonText: "Entrar",
-          image: "/img/cuadro-Q.jpg",
-          url: "/Cuadro-Q/trackingCuadroQ.html",
-        },
-        {
-          title: "Inspección MHE",
-          description: "Realizar y registrar inspecciones MHE.",
-          Icon: FaSearch,
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/insp_piv.jpg",
-          url: "/mhe/tracking_mhe",
-        },
-        {
-          title: "Auditoría 5S",
-          description: "Realizar y registrar auditorías 5S.",
-          Icon: FaClipboardCheck,
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/5S.jpg",
-          url: "#",
-        },
-        {
-          title: "Gestión de Rutas",
-          description: "Planificar y optimizar rutas de personal.",
-          Icon: FaBus,
-          accent: "accent-blue", // Puedes cambiar el color según tu paleta
-          buttonText: "Entrar",
-          image: "/img/movil.jpg",
-          url: "#",
-        }
-      ],
-    },
-    {
-      key: "inbound",
-      label: "Inbound",
-      shortLabel: "INB",
-      items: [
-        {
-          title: "Inspección de Contenedores",
-          description: "Registrar inspecciones de contenedores.",
-          Icon: FaSearch,
-          accent: "accent-blue",
-          buttonText: "Entrar",
-          image: "/img/inspecion-contenedor.jpg",
-          url: "#",
-        },
-      ],
-    },
-    {
-      key: "outbound",
-      label: "Outbound",
-      shortLabel: "OUT",
-      items: [
-        {
-          title: "Préstamos de Pallet",
-          description: "Controlar los préstamos de pallets a transportistas.",
-          Icon: FaPallet,
-          accent: "accent-slate",
-          buttonText: "Entrar",
-          image: "/img/palet.jpg",
-          url: "/Prestamos-Pallet/trackingprestamos.html",
-        },
-      ],
-    },
-    {
-      key: "inventario",
-      label: "Logistics Support - Inventario",
-      shortLabel: "LSI",
-      items: [
-        {
-          title: "Conteos Cíclico",
-          description: "Gestionar conteos cíclicos de inventario.",
-          Icon: FaWarehouse,
-          accent: "accent-cyan",
-          buttonText: "Entrar",
-          image: "/img/ciclico.jpg",
-          url: "#",
-        },
-        {
-          title: "Auditoría Ciega Principal",
-          description: "Registrar auditorías de Principal.",
-          Icon: FaBoxOpen,
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/auditoria-despachos.jpg",
-          url: "#",
-        },
-        {
-          title: "Auditoría Retail",
-          description: "Registrar auditorías de Retail.",
-          Icon: FaBoxOpen,
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/auditoria-despachos.jpg",
-          url: "#",
-        },
-        {
-          title: "Auditoría de Costos",
-          description: "Registrar auditorías de costos.",
-          Icon: FaBoxOpen,
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/auditoria-costos.jpg",
-          url: "#",
-        },
-      ],
-    },
-    {
-      key: "vas",
-      label: "VAS",
-      shortLabel: "VAS",
-      items: [
-        {
-          title: "Reporte de Discrepancia Labeling",
-          description: "Gestionar y registrar reportes de Discrepancia.",
-          Icon: FaBoxOpen,
-          accent: "accent-cyan",
-          buttonText: "Entrar",
-          image: "/img/discrepancia.jpg",
-          url: "#",
-        },
-        {
-          title: "Auditoría de Despachos Laboratorio",
-          description: "Registrar auditorías de despachos.",
-          Icon: FaBoxOpen,
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/discrepancia.jpg",
-          url: "#",
-        },
-      ],
-    },
-    {
-      key: "aseguramiento_calidad",
-      label: "Aseguramiento de la Calidad",
-      shortLabel: "ASC",
-      items: [
-        {
-          title: "Inspección del Personal",
-          description: "Inspeccionar la limpieza y orden.",
-          Icon: FaUsers, 
-          accent: "accent-cyan",
-          buttonText: "Entrar",
-          image: "/img/insp_personal.jpg",
-          url: "#",
-        },
-        {
-          title: "Autoinspecciones",
-          description: "Autoinspecciones a procesos de almacenamiento de productos regulados.",
-          Icon: FaBoxOpen,
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/auditoria-despachos.jpg",
-          url: "#",
-        },
-        {
-          title: "Inspección de casilleros",
-          description: "Inspeccionar la limpieza y orden de casilleros.", 
-          Icon: FaBoxOpen,  
-          accent: "accent-violet",
-          buttonText: "Entrar",
-          image: "/img/casilleros.jpg",
-          url: "#",
-        },
-      ],
-    },
-  ];
+    const tabs = [
+      {
+        key: "excelencia",
+        label: "Excelencia Operativa",
+        shortLabel: "BPE",
+        items: [
+          {
+            title: "Tarjetas de Anomalía",
+            description: "Crear y dar seguimiento a incidencias.",
+            Icon: FaExclamationTriangle,
+            accent: "accent-blue",
+            buttonText: "Ingresar",
+            image: "/img/ANOMALIA.jpg",
+            url: "/apps-tarjetas/anomalias",
+            estado: "Inactivo",
+          },
+          {
+            title: "Gestión de Pedidos",
+            description: "Registrar y revisar pedidos operativos del día.",
+            Icon: FaUtensils,
+            accent: "accent-cyan",
+            buttonText: "Abrir",
+            image: "/img/almuerzo.jpg",
+            url: "/almuerzos/pedidos",
+            estado: "Activo",
+          },
+          {
+            title: "Tarjetas de Sugerencia",
+            description: "Recolectar y gestionar ideas o propuestas de mejora.",
+            Icon: FaBoxes,
+            accent: "accent-slate",
+            buttonText: "Entrar",
+            image: "/img/SUGERENCIA.jpg",
+            url: "/tarjetas-sugerencias/sugerencias",
+            estado: "Inactivo",
+          },
+          {
+            title: "Cuadro Q",
+            description: "Registrar y dar seguimiento a incidencias.",
+            Icon: FaExclamationTriangle,
+            accent: "accent-slate",
+            buttonText: "Entrar",
+            image: "/img/cuadro-Q.jpg",
+            url: "/Cuadro-Q/trackingCuadroQ.html",
+            estado: "Activo",
+          },
+          {
+            title: "Inspección MHE",
+            description: "Realizar y registrar inspecciones MHE.",
+            Icon: FaSearch,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/insp_piv.jpg",
+            url: "/mhe/tracking_mhe",
+            estado: "Activo",
+          },
+          {
+            title: "Auditoría 5S",
+            description: "Realizar y registrar auditorías 5S.",
+            Icon: FaClipboardCheck,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/5S.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Gestión de Rutas",
+            description: "Planificar y optimizar rutas de personal.",
+            Icon: FaBus,
+            accent: "accent-blue",
+            buttonText: "Entrar",
+            image: "/img/movil.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+        ],
+      },
+      {
+        key: "inbound",
+        label: "Inbound",
+        shortLabel: "INB",
+        items: [
+          {
+            title: "Inspección de Contenedores",
+            description: "Registrar inspecciones de contenedores.",
+            Icon: FaSearch,
+            accent: "accent-blue",
+            buttonText: "Entrar",
+            image: "/img/inspecion-contenedor.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+        ],
+      },
+      {
+        key: "outbound",
+        label: "Outbound",
+        shortLabel: "OUT",
+        items: [
+          {
+            title: "Préstamos de Pallet",
+            description: "Controlar los préstamos de pallets a transportistas.",
+            Icon: FaPallet,
+            accent: "accent-slate",
+            buttonText: "Entrar",
+            image: "/img/palet.jpg",
+            url: "/Prestamos-Pallet/trackingprestamos.html",
+            estado: "Inactivo",
+          },
+        ],
+      },
+      {
+        key: "inventario",
+        label: "Logistics Support - Inventario",
+        shortLabel: "LSI",
+        items: [
+          {
+            title: "Conteos Cíclico",
+            description: "Gestionar conteos cíclicos de inventario.",
+            Icon: FaWarehouse,
+            accent: "accent-cyan",
+            buttonText: "Entrar",
+            image: "/img/ciclico.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Auditoría Ciega Principal",
+            description: "Registrar auditorías de Principal.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/auditoria-despachos.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Auditoría Retail",
+            description: "Registrar auditorías de Retail.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/auditoria-despachos.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Auditoría de Costos",
+            description: "Registrar auditorías de costos.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/auditoria-costos.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+        ],
+      },
+      {
+        key: "vas",
+        label: "VAS",
+        shortLabel: "VAS",
+        items: [
+          {
+            title: "Reporte de Discrepancia Labeling",
+            description: "Gestionar y registrar reportes de Discrepancia.",
+            Icon: FaBoxOpen,
+            accent: "accent-cyan",
+            buttonText: "Entrar",
+            image: "/img/discrepancia.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Auditoría de Despachos Laboratorio",
+            description: "Registrar auditorías de despachos.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/discrepancia.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+        ],
+      },
+      {
+        key: "aseguramiento_calidad",
+        label: "Aseguramiento de la Calidad",
+        shortLabel: "ASC",
+        items: [
+          {
+            title: "Inspección del Personal",
+            description: "Inspeccionar la limpieza y orden.",
+            Icon: FaUsers,
+            accent: "accent-cyan",
+            buttonText: "Entrar",
+            image: "/img/insp_personal.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Autoinspecciones",
+            description: "Autoinspecciones a procesos de almacenamiento de productos regulados.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/auditoria-despachos.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Inspección de casilleros",
+            description: "Inspeccionar la limpieza y orden de casilleros.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/casilleros.jpg",
+            url: "#",
+            estado: "Inactivo",
+          },
+        ],
+      },
+    ];
 
-  let filteredTabs = tabs;
+    let filteredTabs = tabs;
 
-  if (rol === "EXTERNO") {
-    filteredTabs = tabs
-      .map((tab) => ({
-        ...tab,
-        items: tab.items.filter((app) => app.title === "Préstamos de Pallet"),
-      }))
-      .filter((tab) => tab.items.length > 0);
-  }
+    if (rol === "EXTERNO") {
+      filteredTabs = tabs
+        .map((tab) => ({
+          ...tab,
+          items: tab.items.filter((app) => app.title === "Préstamos de Pallet"),
+        }))
+        .filter((tab) => tab.items.length > 0);
+    }
 
-const sistemaTab = {
-  key: "sistema",
-  label: "Sistema",
-  shortLabel: "SIST.",
-  items: esAdmin
-    ? [
-        {
-          title: "Configuración",
-          description: "Administrar parámetros y accesos del sistema.",
-          Icon: FaCog,
-          accent: "accent-violet",
-          buttonText: "Gestionar",
-          image: "/img/conf.jpg",
-          url: "/Configuracion/configuracion.html",
-        },
-        // Nuevo elemento agregado para administradores
-        {
-          title: "Usuarios y Roles",
-          description: "Crear y gestionar usuarios y roles en el sistema.",
-          Icon: FaUsers, 
-          accent: "accent-slate",
-          buttonText: "Entrar",
-          image: "../img/useer.jpg",
-          url: "/usuarios/tracking_usuarios",
-        },
-      ]
-    : [
-        {
-          title: "Cerrar Sesión",
-          description: "Salir de forma segura del sistema.",
-          Icon: FaSignOutAlt,
-          accent: "accent-red",
-          buttonText: "Salir",
-          image: "",
-          action: "logout",
-        },
-      ],
-};
+    const sistemaTab = {
+      key: "sistema",
+      label: "Sistema",
+      shortLabel: "SIST.",
+      items: esAdmin
+        ? [
+            {
+              title: "Configuración",
+              description: "Administrar parámetros y accesos del sistema.",
+              Icon: FaCog,
+              accent: "accent-violet",
+              buttonText: "Gestionar",
+              image: "/img/conf.jpg",
+              url: "/Configuracion/configuracion.html",
+              estado: "Activo",
+            },
+            {
+              title: "Usuarios y Roles",
+              description: "Crear y gestionar usuarios y roles en el sistema.",
+              Icon: FaUsers,
+              accent: "accent-slate",
+              buttonText: "Entrar",
+              image: "../img/useer.jpg",
+              url: "/usuarios/tracking_usuarios",
+              estado: "Activo",
+            },
+          ]
+        : [
+            {
+              title: "Cerrar Sesión",
+              description: "Salir de forma segura del sistema.",
+              Icon: FaSignOutAlt,
+              accent: "accent-red",
+              buttonText: "Salir",
+              image: "",
+              action: "logout",
+              estado: "Activo",
+            },
+          ],
+    };
 
-  return [...filteredTabs, sistemaTab];
-}, [rol, esAdmin]);
+    return [...filteredTabs, sistemaTab];
+  }, [rol, esAdmin]);
 
-const apps = useMemo(() => {
-  return menuTabs.flatMap((tab) => tab.items);
-}, [menuTabs]);
+  const apps = useMemo(() => {
+    return menuTabs.flatMap((tab) => tab.items);
+  }, [menuTabs]);
 
-const currentTab = useMemo(() => {
-  return menuTabs.find((tab) => tab.key === activeTab) || menuTabs[0];
-}, [menuTabs, activeTab]);
+  const currentTab = useMemo(() => {
+    return menuTabs.find((tab) => tab.key === activeTab) || menuTabs[0];
+  }, [menuTabs, activeTab]);
 
-const visibleApps = currentTab?.items || [];
+  const visibleApps = currentTab?.items || [];
 
-useEffect(() => {
-  if (menuTabs.length && !menuTabs.some((tab) => tab.key === activeTab)) {
-    setActiveTab(menuTabs[0].key);
-  }
-}, [menuTabs, activeTab]);
-
+  useEffect(() => {
+    if (menuTabs.length && !menuTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(menuTabs[0].key);
+    }
+  }, [menuTabs, activeTab]);
 
   useEffect(() => {
     if (!authUser) return;
@@ -635,6 +652,9 @@ useEffect(() => {
   }
 
   function abrirApp(app) {
+    const esInactivo = String(app.estado || "Activo").trim().toLowerCase() === "inactivo";
+    if (esInactivo) return; // Bloquea cualquier acción si está inactivo
+
     if (app.action === "logout") {
       cerrarSesion();
       return;
@@ -676,7 +696,7 @@ useEffect(() => {
               <div className="hero-mini-card">
                 <small>Aplicativos</small>
                 <strong>
-                  {apps.filter((app) => app.action !== "logout").length} módulos
+                  {apps.filter((app) => app.action !== "logout" && String(app.estado || "Activo").toLowerCase() !== "inactivo").length} activos
                 </strong>
               </div>
             </div>
@@ -736,7 +756,6 @@ useEffect(() => {
               >
                 <span className="tab-label-full">{tab.label}</span>
                 <span className="tab-label-short">{tab.shortLabel || tab.label}</span>
-
               </button>
             ))}
           </div>
@@ -752,12 +771,17 @@ useEffect(() => {
             {visibleApps.map((app) => {
               const Icon = app.Icon;
               const imgSrc = app.image || buildFallbackSvg(app.title, app.accent);
+              const esInactivo =
+                String(app.estado || "Activo").trim().toLowerCase() === "inactivo";
 
               return (
                 <button
                   key={app.title}
                   type="button"
-                  className={`app-card ${app.accent || ""}`}
+                  disabled={esInactivo}
+                  className={`app-card ${app.accent || ""} ${
+                    esInactivo ? "app-card-inactivo" : ""
+                  }`}
                   aria-label={app.title}
                   onClick={() => abrirApp(app)}
                 >
@@ -775,19 +799,31 @@ useEffect(() => {
 
                     <div className="app-media-overlay"></div>
 
+                    {/* Etiqueta flotante sobre la imagen cuando está inactivo */}
+                    {esInactivo && (
+                      <div className="app-badge-proximamente">
+                        <FaLock className="badge-lock-icon" />
+                        <span>Próximamente</span>
+                      </div>
+                    )}
+
                     <div className="app-media-icon">
-                      <Icon />
+                      {esInactivo ? <FaLock /> : <Icon />}
                     </div>
                   </div>
 
                   <div className="app-card-body">
-                    <span className="app-pill">{app.buttonText}</span>
+                    <span className="app-pill">
+                      {esInactivo ? "En desarrollo" : app.buttonText}
+                    </span>
                     <h3>{app.title}</h3>
                     <p>{app.description}</p>
 
                     <div className="app-card-bottom">
-                      <span className="app-link-text">{app.buttonText}</span>
-                      <FaArrowRight />
+                      <span className="app-link-text">
+                        {esInactivo ? "No disponible" : app.buttonText}
+                      </span>
+                      {esInactivo ? <FaLock /> : <FaArrowRight />}
                     </div>
                   </div>
                 </button>
@@ -795,7 +831,6 @@ useEffect(() => {
             })}
           </div>
         </section>
-
       </main>
 
       {showRecordatorio && (

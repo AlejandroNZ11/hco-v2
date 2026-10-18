@@ -11,3 +11,59 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* =========================================
+   COLORES DE ESTADO PERSONALIZADOS (CUADRO Q)
+   ========================================= */
+
+.badge-estado.cq-estado-cancelado {
+  background: #0f172a !important; /* Negro / Gris oscuro corporativo */
+  color: #ffffff !important;
+}
+
+.badge-estado.cq-estado-pendiente {
+  background: #0284c7 !important; /* Azul con letra blanca */
+  color: #ffffff !important;
+}
+
+.badge-estado.cq-estado-concluido {
+  background: #16a34a !important; /* Verde para concluido */
+  color: #ffffff !important;
+}
+
+/* =========================================
+   INDICADOR DE PÁGINA (Página X de Y)
+   ========================================= */
+
+.pagination-text-indicator {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+/* Ajuste visual de los botones de paginación para que se parezcan a tu imagen */
+.page-nav-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #0f4c81;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.page-nav-btn:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.page-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

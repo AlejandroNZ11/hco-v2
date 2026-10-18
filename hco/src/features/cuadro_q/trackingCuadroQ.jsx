@@ -240,12 +240,15 @@ export default function TrackingCuadroQ() {
     setPaginaActual(1);
   };
 
+  // Nuevos colores para la columna Estado
   const getEstadoBadgeClass = (estado) => {
     const est = String(estado || 'PENDIENTE').toUpperCase();
-    if (est === 'CONCLUIDO' || est === 'APROBADO') return 'operativo';
-    if (est === 'PENDIENTE') return 'observado';
-    return 'inoperativo';
+    if (est === 'CONCLUIDO' || est === 'APROBADO') return 'cq-estado-concluido';
+    if (est === 'PENDIENTE') return 'cq-estado-pendiente';
+    if (est === 'CANCELADO') return 'cq-estado-cancelado';
+    return 'cq-estado-default';
   };
+
 
   const getImpactoPillClass = (impacto) => {
     const imp = String(impacto || '').toUpperCase();
@@ -473,9 +476,13 @@ export default function TrackingCuadroQ() {
                 disabled={paginaActual <= 1}
                 onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
               >
-                <span>Anterior</span>
                 <FaChevronLeft className="nav-chevron" />
+                <span>Anterior</span>
               </button>
+
+              <span className="pagination-text-indicator">
+                Página {paginaActual} de {totalPaginas}
+              </span>
 
               <button
                 type="button"
@@ -483,10 +490,12 @@ export default function TrackingCuadroQ() {
                 disabled={paginaActual >= totalPaginas}
                 onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
               >
-                <FaChevronRight className="nav-chevron" />
                 <span>Siguiente</span>
+                <FaChevronRight className="nav-chevron" />
               </button>
             </div>
+
+
           </div>
 
           <button
@@ -516,22 +525,14 @@ export default function TrackingCuadroQ() {
                 <th>ID Cuadro Q</th>
                 <th>Fecha Registro</th>
                 <th>Estado</th>
+                <th>Registrado Por</th>
+                <th>Área Reg.</th>
                 <th>Área Error</th>
                 <th>Proceso</th>
                 <th>Error</th>
-                <th>Descripción</th>
-                <th>Registrado Por</th>
-                <th>Área Reg.</th>
-                <th>Evaluación</th>
-                <th>Resp.</th>
-                <th>Impacto</th>
-                <th>PDCA</th>
-                <th>Responsable</th>
+                <th>Descripción</th>                
                 <th>F. Planificada</th>
-                <th>Causa Raíz</th>
-                <th>Medida</th>
-                <th>F. Cierre</th>
-                <th>Actualizado Por</th>
+             
                 <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
@@ -555,38 +556,15 @@ export default function TrackingCuadroQ() {
                           {reg.estado || 'PENDIENTE'}
                         </span>
                       </td>
+                      <td>{reg.nombre_registrador || '-'}</td>
+                      <td>{reg.area_registrador || '-'}</td>
                       <td style={{ fontWeight: '700' }}>{reg.area_error || '-'}</td>
                       <td>{reg.proceso || '-'}</td>
                       <td className="td-truncate" title={reg.error}>{reg.error || '-'}</td>
                       <td className="td-truncate" title={reg.descripcion_error}>{reg.descripcion_error || '-'}</td>
-                      <td>{reg.nombre_registrador || '-'}</td>
-                      <td>{reg.area_registrador || '-'}</td>
-                      <td>
-                        {reg.evaluacion ? (
-                          <span className={`badge-estado ${getEstadoBadgeClass(reg.evaluacion)}`}>
-                            {reg.evaluacion}
-                          </span>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                      <td style={{ fontWeight: '700' }}>{reg.responsabilidad || '-'}</td>
-                      <td>
-                        {reg.impacto ? (
-                          <span className={`estado-personal-pill ${getImpactoPillClass(reg.impacto)}`}>
-                            {reg.impacto}
-                          </span>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                      <td>{reg.pdca || '-'}</td>
-                      <td>{reg.responsable || '-'}</td>
-                      <td>{formatearSoloFecha(reg.fecha_planificada)}</td>
-                      <td className="td-truncate" title={reg.causa_raiz}>{reg.causa_raiz || '-'}</td>
-                      <td className="td-truncate" title={reg.medida}>{reg.medida || '-'}</td>
-                      <td>{formatearFecha(reg.fecha_cierre)}</td>
-                      <td>{reg.usuario_actualiza || '-'}</td>
+                      
+                      <td>{formatearFecha(reg.fecha_planificada)}</td>
+                      
                       <td style={{ textAlign: 'center' }}>
                         <div className="acciones-cell">
                           <button

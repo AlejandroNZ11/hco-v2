@@ -597,19 +597,16 @@ export default function RegistroCuadroQ() {
             </div>
           </div>
 
-          <div className="field" style={{ marginBottom: '24px' }}>
+          <div className="field">
             <div className="label-with-counter">
               <label style={{ marginBottom: 0 }}>
                 Descripción del Error <span className="field-badge manual">OBLIGATORIO</span>
               </label>
-              <small className="char-counter">
-                {formData.descripcion_error.length} / 500 caracteres
-              </small>
             </div>
             <textarea
               rows="3"
               maxLength={500}
-              placeholder="Describa con detalle el hallazgo, código, ubicación o documento involucrado..."
+              placeholder="Detalles del error: SKU, picker, QTY, número de pedido, entre otros"
               value={formData.descripcion_error}
               onChange={(e) => setFormData({ ...formData, descripcion_error: e.target.value })}
               required

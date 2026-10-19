@@ -299,7 +299,8 @@ export default function TrackingUsuarios() {
         <p>Consulte, filtre, edite, active o inactive usuarios registrados en la planilla operativa.</p>
       </section>
 
-      <section className="card">
+      <section className="tracking-card">
+
         <div className="toolbar">
           <div className="toolbar-info">
             <h2>Usuarios</h2>

@@ -17,8 +17,7 @@ const MONTHS = [
   "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
 ];
 
-// Matriz de posiciones para el calendario anual en grilla
-// Matriz de posiciones exacta corregida para la forma de la "Q"
+// Matriz de posiciones exacta para formar la "Q"
 const Q_POSITIONS = {
   1: [1, 7],   2: [1, 8],   3: [2, 9],   4: [3, 10],  5: [4, 11],  6: [5, 11],
   7: [6, 11],  8: [7, 11],  9: [8, 11],  10: [9, 11], 11: [10, 11], 12: [11, 11],
@@ -27,7 +26,6 @@ const Q_POSITIONS = {
   25: [8, 4],   26: [7, 4],  27: [6, 4],  28: [5, 4],  29: [4, 4],  30: [3, 5],
   31: [2, 6]
 };
-
 
 export default function RadarCuadroQ() {
   const navigate = useNavigate();
@@ -60,21 +58,35 @@ export default function RadarCuadroQ() {
     }
   };
 
-  // Lista de años disponibles en base a los registros (o rango actual)
+  // Extraer ÚNICAMENTE los años que existen en la base de datos
   const listaAnios = useMemo(() => {
-    const aniosSet = new Set([currentYearNum, currentYearNum - 1, currentYearNum - 2]);
+    const aniosSet = new Set();
     registros.forEach((reg) => {
       const fecha = reg.fecha_registro || reg.fecha_hora_actualiza;
       if (fecha) {
-        const match = fecha.match(/^(\d{4})-(\d{2})-(\d{2})/) || fecha.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        const match =
+          String(fecha).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/) ||
+          String(fecha).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
         if (match) {
           const anio = match[1].length === 4 ? match[1] : match[3];
           aniosSet.add(Number(anio));
         }
       }
     });
+
+    if (aniosSet.size === 0) {
+      aniosSet.add(currentYearNum);
+    }
+
     return Array.from(aniosSet).sort((a, b) => b - a);
   }, [registros, currentYearNum]);
+
+  // Ajustar año seleccionado si no está en la lista de años de la BD
+  useEffect(() => {
+    if (listaAnios.length > 0 && !listaAnios.includes(Number(selectedYear))) {
+      setSelectedYear(listaAnios[0]);
+    }
+  }, [listaAnios, selectedYear]);
 
   // Lista única de áreas de error para el filtro
   const listaAreas = useMemo(() => {
@@ -85,17 +97,22 @@ export default function RadarCuadroQ() {
     return Array.from(areasSet).sort();
   }, [registros]);
 
-  // Filtrar registros según año seleccionado y área seleccionada
+  // Filtrar registros por año y área seleccionada
   const registrosFiltrados = useMemo(() => {
     return registros.filter((reg) => {
-      // Filtro por Área
+      const fechaTxt = reg.fecha_registro || reg.fecha_hora_actualiza || '';
+      const date = parseDateText(fechaTxt);
+      if (date && date.getFullYear() !== Number(selectedYear)) {
+        return false;
+      }
+
       if (selectedArea) {
         const areaReg = String(reg.area_error || '').trim().toLowerCase();
         if (areaReg !== selectedArea.toLowerCase()) return false;
       }
       return true;
     });
-  }, [registros, selectedArea]);
+  }, [registros, selectedArea, selectedYear]);
 
   // Construir índice de días
   const dayIndex = useMemo(() => {
@@ -206,7 +223,15 @@ export default function RadarCuadroQ() {
   function isApproved(item) {
     const ev = normalize(item.evaluacion);
     const est = normalize(item.estado);
-    return ev === "aprobado" || est === "aprobado" || est === "pendiente" || est === "en proceso" || est === "atrazado" || est === "concluido";
+    return (
+      ev === "aprobado" ||
+      est === "aprobado" ||
+      est === "pendiente" ||
+      est === "en proceso" ||
+      est === "atrazado" ||
+      est === "atrasado" ||
+      est === "concluido"
+    );
   }
 
   function isCanceled(item) {
@@ -221,7 +246,7 @@ export default function RadarCuadroQ() {
 
   function isParoProgramado(date, holidaysMap) {
     const day = date.getDay();
-    if (day === 0 || day === 6) return true; // Sábado y Domingo
+    if (day === 0 || day === 6) return true;
     return !!holidaysMap[dateKey(date)];
   }
 
@@ -231,7 +256,7 @@ export default function RadarCuadroQ() {
     const today = stripTime(new Date());
 
     if (stripTime(date).getTime() > today.getTime()) {
-      return "empty";
+      return "future";
     }
 
     if (isParoProgramado(date, holidaysMap)) {
@@ -240,14 +265,14 @@ export default function RadarCuadroQ() {
 
     const info = dayIndex[key];
     if (!info || info.approved <= 0) {
-      return "quality"; // Verde (Calidad Total)
+      return "quality";
     }
 
     if (info.rejection > 0) {
-      return "rejection"; // Rojo (Rechazos)
+      return "rejection";
     }
 
-    return "internal"; // Amarillo (Errores Internos)
+    return "internal";
   }
 
   function getStatusLabel(status) {
@@ -255,7 +280,7 @@ export default function RadarCuadroQ() {
     if (status === "internal") return "Errores Internos";
     if (status === "rejection") return "Rechazos";
     if (status === "stop") return "Paro programado";
-    if (status === "empty") return "Día futuro / No existente";
+    if (status === "future") return "Día futuro";
     return "";
   }
 
@@ -307,12 +332,15 @@ export default function RadarCuadroQ() {
     <div className="radar-page">
       {loading && <Loading />}
 
+      {/* CABECERA COMPACTA ESTILO CUADRO Q */}
       <section className="radar-header-card">
-        <div>
-          <span className="page-chip">CUADRO Q</span>
-          <h1>Radar de Q</h1>
+        <div className="radar-head-left">
+          <div className="radar-title-row">
+            <span className="field-badge auto">CUADRO Q</span>
+            <h1>Radar de Q</h1>
+          </div>
           <p id="radarStatus">
-            Radar anual {selectedYear}{areaTextoLabel} - {registrosFiltrados.length} registros
+            Radar anual <strong>{selectedYear}</strong>{areaTextoLabel} — <strong>{registrosFiltrados.length}</strong> registros
           </p>
         </div>
 
@@ -344,35 +372,41 @@ export default function RadarCuadroQ() {
           >
             Actualizar
           </button>
-
-          <button
-            type="button"
-            id="btnBack"
-            className="secondary-btn"
-            onClick={() => navigate('/cuadro_q/trackingCuadroQ')}
-          >
-            Volver
-          </button>
         </div>
       </section>
 
-      {/* PANEL DE RESUMEN */}
+      {/* PANEL DE RESUMEN DELGADO CON COLORES EN ETIQUETAS */}
       <section id="summaryPanel" className="summary-panel">
-        <div className="summary-card">
+        <div className="summary-card quality">
+          <div className="summary-card-top">
+            <span className="summary-tag quality">Calidad Total</span>
+            <span className="summary-dot quality"></span>
+          </div>
           <strong>{resultadosAnuales.totales.quality}</strong>
-          <span>Calidad Total</span>
         </div>
-        <div className="summary-card">
+
+        <div className="summary-card internal">
+          <div className="summary-card-top">
+            <span className="summary-tag internal">Errores Internos</span>
+            <span className="summary-dot internal"></span>
+          </div>
           <strong>{resultadosAnuales.totales.internal}</strong>
-          <span>Errores Internos</span>
         </div>
-        <div className="summary-card">
+
+        <div className="summary-card rejection">
+          <div className="summary-card-top">
+            <span className="summary-tag rejection">Rechazos</span>
+            <span className="summary-dot rejection"></span>
+          </div>
           <strong>{resultadosAnuales.totales.rejection}</strong>
-          <span>Rechazos</span>
         </div>
-        <div className="summary-card">
+
+        <div className="summary-card stop">
+          <div className="summary-card-top">
+            <span className="summary-tag stop">Paro Programado</span>
+            <span className="summary-dot stop"></span>
+          </div>
           <strong>{resultadosAnuales.totales.stop}</strong>
-          <span>Paro programado</span>
         </div>
       </section>
 
@@ -386,34 +420,32 @@ export default function RadarCuadroQ() {
               <div className="month-title">{mesNombre}</div>
               <div className="month-body">
                 <div className="q-board">
-                    {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
-                        const pos = Q_POSITIONS[day];
-                        if (!pos) return null;
-                        const row = pos[0];
-                        const col = pos[1];
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                    const pos = Q_POSITIONS[day];
+                    if (!pos) return null;
+                    const row = pos[0];
+                    const col = pos[1];
 
-                        let className = "empty-box"; // Clase para los cuadrados vacíos de relleno
-                        let label = "";
+                    let className = "empty-box";
+                    let label = "";
 
-                        if (day <= daysInMonth) {
-                        className = getDayStatus(selectedYear, monthIndex, day, holidaysMap);
-                        label = String(day);
-                        }
+                    if (day <= daysInMonth) {
+                      className = getDayStatus(selectedYear, monthIndex, day, holidaysMap);
+                      label = String(day);
+                    }
 
-                        return (
-                        <div
-                            key={day}
-                            className={`q-day ${className}`}
-                            style={{ gridRow: row, gridColumn: col }}
-                            title={day <= daysInMonth ? `${mesNombre} ${day} - ${getStatusLabel(className)}` : ""}
-                        >
-                            {label}
-                        </div>
-                        );
-                    })}
+                    return (
+                      <div
+                        key={day}
+                        className={`q-day ${className}`}
+                        style={{ gridRow: row, gridColumn: col }}
+                        title={day <= daysInMonth ? `${mesNombre} ${day} - ${getStatusLabel(className)}` : ""}
+                      >
+                        {label}
+                      </div>
+                    );
+                  })}
                 </div>
-
-
 
                 <div className="month-legend">
                   <span className="legend-box quality"></span>

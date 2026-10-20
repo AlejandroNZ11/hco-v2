@@ -464,6 +464,15 @@ export default function TrackingCuadroQ() {
             <FaUndo />
             <span>Limpiar</span>
           </button>
+        <button
+            type="button"
+            className="btn-action-primary"
+            style={{ background: '#0284c7' }}
+            onClick={() => navigate('/cuadro_q/pizarraCuadroQ')}
+        >
+            <span>📊 Ver Gráficos</span>
+        </button>
+
         </div>
       </section>
 

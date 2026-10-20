@@ -69,6 +69,8 @@
 }
 
 
+
+
 /* =========================================
    ADAPTACIÓN RESPONSIVA PARA MÓVILES (360px)
    ========================================= */
@@ -119,5 +121,10 @@
     font-size: 24px !important; 
     line-height: 1 !important;
     margin: 0 !important;
+  }
+
+    /* Ocultar filtros innecesarios en celular (Impacto, Fechas, etc.) */
+  .mobile-hidden-filter {
+    display: none !important;
   }
 }

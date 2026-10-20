@@ -398,7 +398,8 @@ export default function TrackingCuadroQ() {
             </select>
           </div>
 
-          <div className="filter-group">
+          {/* Le agregamos la clase mobile-hidden-filter al div */}
+          <div className="filter-group mobile-hidden-filter">
             <label>Impacto</label>
             <select
               value={filtrosForm.impacto}
@@ -410,6 +411,7 @@ export default function TrackingCuadroQ() {
               <option value="BAJO">BAJO</option>
             </select>
           </div>
+
 
           <div className="filter-group mobile-hidden-filter">
             <label>Fecha ini</label>

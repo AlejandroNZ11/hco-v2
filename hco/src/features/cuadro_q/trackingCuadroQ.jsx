@@ -242,10 +242,14 @@ export default function TrackingCuadroQ() {
 
   // Nuevos colores para la columna Estado
   const getEstadoBadgeClass = (estado) => {
-    const est = String(estado || 'PENDIENTE').toUpperCase();
-    if (est === 'CONCLUIDO' || est === 'APROBADO') return 'cq-estado-concluido';
+    const est = String(estado || 'PENDIENTE').toUpperCase().trim();
+    
+    if (est === 'CONCLUIDO') return 'cq-estado-concluido';
     if (est === 'PENDIENTE') return 'cq-estado-pendiente';
     if (est === 'CANCELADO') return 'cq-estado-cancelado';
+    if (est === 'EN PROCESO') return 'cq-estado-proceso';
+    if (est === 'ATRAZADO' || est === 'ATRASADO') return 'cq-estado-atrasado';
+    
     return 'cq-estado-default';
   };
 

@@ -258,8 +258,17 @@ export const actualizarRegistroCuadroQ = async (id, datosAnalisis) => {
     })
     .eq('id', id)
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) throw new Error(`Error al actualizar Cuadro Q: ${error.message}`);
+  if (error) {
+    throw new Error(`Error al actualizar Cuadro Q: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error(
+      'No se pudo actualizar el registro (0 filas afectadas). Verifique los permisos RLS (política UPDATE) en Supabase para la tabla cuadro_q.'
+    );
+  }
+
   return data;
 };

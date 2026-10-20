@@ -477,6 +477,23 @@
 .tw-modal-btn.warning { background-color: #d97706; }
 .tw-modal-btn.success { background-color: #16a34a; }
 
+/* =========================================
+   FIX PARA INPUTS DE FECHA EN IPHONE (iOS)
+   ========================================= */
+.field input[type="date"],
+.field input[type="datetime-local"] {
+  height: 38px; /* Fuerza la misma altura que los inputs normales */
+  min-height: 38px;
+  -webkit-appearance: none; /* Desactiva el estilo desproporcionado de Apple */
+  appearance: none;
+  box-sizing: border-box;
+  
+  /* Centra el texto verticalmente en celulares */
+  display: flex;
+  align-items: center;
+}
+
+
 @media (max-width: 900px) {
   .form-grid.cols-4,
   .form-grid.cols-3 {

@@ -68,7 +68,23 @@
   cursor: not-allowed;
 }
 
+/* =========================================
+   COLORES DE ESTADO PERSONALIZADOS (CUADRO Q)
+   ========================================= */
 
+/* ... (los que ya tenías de pendiente, concluido, cancelado) ... */
+
+/* Nuevo: EN PROCESO (Amarillo/Ámbar con letra blanca) */
+.badge-estado.cq-estado-proceso {
+  background: #f36f03 !important; 
+  color: #ffffff !important;
+}
+
+/* Nuevo: ATRAZADO o ATRASADO (Rojo con letra blanca) */
+.badge-estado.cq-estado-atrasado {
+  background: #dc2626 !important; 
+  color: #ffffff !important;
+}
 
 
 /* =========================================

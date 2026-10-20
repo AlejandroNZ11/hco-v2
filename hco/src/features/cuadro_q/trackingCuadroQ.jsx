@@ -138,24 +138,27 @@ export default function TrackingCuadroQ() {
     return registros.filter((r) => r.estado === 'CONCLUIDO').length;
   }, [registros]);
 
-  function formatearFecha(fecha) {
+
+function formatearFecha(fecha) {
     if (!fecha) return '-';
     return new Date(fecha)
-      .toLocaleString('es-PE', {
+    .toLocaleString('es-PE', {
         dateStyle: 'short',
         timeStyle: 'short'
-      })
-      .replace(',', '');
-  }
+    })
+    .replace(',', '');
+}
 
-  function formatearSoloFecha(fecha) {
-    if (!fecha) return '-';
-    const partes = String(fecha).split('T')[0].split('-');
-    if (partes.length === 3) return `${partes[2]}/${partes[1]}/${partes[0]}`;
-    return fecha;
-  }
+function formatearSoloFecha(fechaStr) {
+    if (!fechaStr) return "-";
+    const soloFecha = String(fechaStr).slice(0, 10);
+    const partes = soloFecha.split('-');
+    if (partes.length !== 3) return fechaStr;
+    const [anio, mes, dia] = partes;
+    return `${dia}/${mes}/${anio}`;
+}
 
-  const registrosFiltrados = useMemo(() => {
+const registrosFiltrados = useMemo(() => {
     return registros.filter((reg) => {
       const estadoReg = (reg.estado || 'PENDIENTE').toUpperCase();
       const areaErr = reg.area_error || '';
@@ -174,12 +177,12 @@ export default function TrackingCuadroQ() {
       }
 
       if (filtrosActivos.fechaIni && reg.fecha_registro) {
-        const fechaIso = new Date(reg.fecha_registro).toISOString().split('T')[0];
+        const fechaIso = String(reg.fecha_registro).slice(0, 10);
         if (fechaIso < filtrosActivos.fechaIni) return false;
       }
 
       if (filtrosActivos.fechaFin && reg.fecha_registro) {
-        const fechaIso = new Date(reg.fecha_registro).toISOString().split('T')[0];
+        const fechaIso = String(reg.fecha_registro).slice(0, 10);
         if (fechaIso > filtrosActivos.fechaFin) return false;
       }
 
@@ -586,9 +589,7 @@ export default function TrackingCuadroQ() {
                       <td>{reg.proceso || '-'}</td>
                       <td className="td-truncate" title={reg.error}>{reg.error || '-'}</td>
                       <td className="td-truncate" title={reg.descripcion_error}>{reg.descripcion_error || '-'}</td>
-                      
-                      <td>{formatearFecha(reg.fecha_planificada)}</td>
-                      
+                      <td>{formatearSoloFecha(reg.fecha_planificada)}</td>
                       <td style={{ textAlign: 'center' }}>
                         <div className="acciones-cell">
                           <button
@@ -621,3 +622,4 @@ export default function TrackingCuadroQ() {
     </div>
   );
 }
+

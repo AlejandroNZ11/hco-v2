@@ -5,6 +5,14 @@ import { localDb } from './localDb';
  * Función interna para mantener sincronizado el estado_operativo en la tabla 'equipos'
  * cuando se registra o edita una inspección, sin alterar el historial.
  */
+
+// Genera fecha y hora local real (YYYY-MM-DD HH:mm:ss) sin desfase UTC
+const obtenerFechaHoraLocal = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 const actualizarEstadoOperativoEquipo = async (equipoId, estadoMhe) => {
   if (!equipoId) return;
 
@@ -207,7 +215,7 @@ export const aprobarInspeccionMhe = async (inspeccionId, usuarioId) => {
     throw new Error("Esta inspección está 'Pendiente de Envío'. Sincronice primero antes de aprobarla.");
   }
 
-  const fechaRev = new Date().toISOString();
+  const fechaRev = obtenerFechaHoraLocal();
   const { data, error } = await supabase
     .from('inspecciones')
     .update({
@@ -240,7 +248,7 @@ export const habilitarEquipoMhe = async (equipoId, usuarioId = null) => {
     throw new Error("Necesita conexión a internet para habilitar un equipo inoperativo.");
   }
 
-  const fechaHab = new Date().toISOString();
+  const fechaHab = obtenerFechaHoraLocal();
 
   const { data, error } = await supabase
     .from('equipos')
@@ -393,7 +401,7 @@ export const obtenerUltimaInspeccionEquipo = async (equipoId) => {
  */
 export const guardarInspeccionCompleta = async (datosInspeccion, respuestasArray) => {
   // Capturamos la fecha y hora exacta en que se llenó el checklist
-  const fechaCapturada = datosInspeccion.fecha_hora || new Date().toISOString();
+  const fechaCapturada = datosInspeccion.fecha_hora || obtenerFechaHoraLocal();
   const datosConFecha = {
     ...datosInspeccion,
     fecha_hora: fechaCapturada
@@ -542,7 +550,7 @@ export const actualizarInspeccionCompleta = async (inspeccionId, datosInspeccion
       await localDb.sync_queue.update(item.id, {
         payload: {
           idLocal: inspeccionId,
-          inspeccion: { ...datosInspeccion, fecha_hora: existente?.fecha_hora || new Date().toISOString() },
+          inspeccion: { ...datosInspeccion, fecha_hora: existente?.fecha_hora || obtenerFechaHoraLocal() },
           respuestas: respuestasArray
         }
       });

@@ -113,6 +113,15 @@ export const ERRORES_POR_AREA = {
   ]
 };
 
+
+// Genera fecha y hora local (YYYY-MM-DD HH:mm:ss) sin adelanto UTC
+const obtenerFechaHoraLocal = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+
 /**
  * Devuelve la lista de errores correspondiente al nombre del área
  */
@@ -231,7 +240,6 @@ export const crearRegistroCuadroQ = async (datosRegistro) => {
     error: datosRegistro.error,
     descripcion_error: datosRegistro.descripcion_error,
     estado: 'PENDIENTE',
-    fecha_registro: new Date().toISOString()
   };
 
   const { data, error } = await supabase
@@ -254,7 +262,7 @@ export const actualizarRegistroCuadroQ = async (id, datosAnalisis) => {
     .from('cuadro_q')
     .update({
       ...camposActualizar,
-      fecha_hora_actualiza: new Date().toISOString()
+      fecha_hora_actualiza: obtenerFechaHoraLocal() // ⬅️ Usar hora local en lugar de toISOString()
     })
     .eq('id', id)
     .select()
@@ -262,12 +270,6 @@ export const actualizarRegistroCuadroQ = async (id, datosAnalisis) => {
 
   if (error) {
     throw new Error(`Error al actualizar Cuadro Q: ${error.message}`);
-  }
-
-  if (!data) {
-    throw new Error(
-      'No se pudo actualizar el registro (0 filas afectadas). Verifique los permisos RLS (política UPDATE) en Supabase para la tabla cuadro_q.'
-    );
   }
 
   return data;

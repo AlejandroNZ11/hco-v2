@@ -517,9 +517,10 @@ export default function RegistroCuadroQ() {
           fecha_cierre: esCancelado ? "" : formData.fecha_cierre
         });
 
-        const fechaCierreISO =
-          !esCancelado && formData.fecha_cierre
-            ? new Date(formData.fecha_cierre).toISOString()
+        //  AHORA (Mantiene la hora exacta seleccionada en el formulario):
+        const fechaCierreFormateada =
+        !esCancelado && formData.fecha_cierre
+            ? formData.fecha_cierre.replace('T', ' ') + (formData.fecha_cierre.length === 16 ? ':00' : '')
             : null;
 
         const actualizado = await actualizarRegistroCuadroQ(registroEditId, {
@@ -542,7 +543,7 @@ export default function RegistroCuadroQ() {
           fecha_planificada: esCancelado ? null : (formData.fecha_planificada || null),
           medida: esCancelado ? null : (formData.medida.trim() || null),
           causa_raiz: esCancelado ? null : (formData.causa_raiz.trim() || null),
-          fecha_cierre: fechaCierreISO,
+          fecha_cierre: fechaCierreFormateada,
           usuario_actualiza: currentUser?.nombre || "Usuario"
         });
 

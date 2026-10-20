@@ -473,6 +473,15 @@ export default function TrackingCuadroQ() {
             <span>📊 Ver Gráficos</span>
         </button>
 
+        <button
+            type="button"
+            className="btn-action-primary"
+            style={{ background: '#7c3aed' }}
+            onClick={() => navigate('/cuadro_q/radarCuadroQ')}
+          >
+            <span>🎯 Radar</span>
+        </button>
+
         </div>
       </section>
 

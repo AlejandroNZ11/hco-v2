@@ -1,0 +1,350 @@
+/* =========================================
+   ESTILOS - RADAR DE CUADRO Q (CURBEADO Y COMPLETO)
+   ========================================= */
+
+:root {
+  --blue: #072B5C;
+  --red: #ff0000;
+  --green: #4cff28;
+  --yellow: #fff200;
+  --gray: #bfbfbf;
+  --bg: #f3f6fb;
+  --card: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --border: #111111;
+}
+
+.radar-page {
+  width: 100%;
+  padding: 18px 24px 45px;
+  color: var(--text);
+  background-color: var(--bg);
+  min-height: calc(100vh - 110px);
+  box-sizing: border-box;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Cabecera */
+.radar-header-card {
+  background: linear-gradient(135deg, var(--blue), #0f4c81);
+  color: #fff;
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  box-shadow: 0 8px 22px rgba(7, 43, 92, 0.22);
+}
+
+.page-chip {
+  display: inline-block;
+  background: #fff;
+  color: var(--blue);
+  font-weight: 800;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  margin-bottom: 8px;
+}
+
+.radar-header-card h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.radar-header-card p {
+  margin: 6px 0 0;
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.radar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.radar-actions select,
+.radar-actions button {
+  height: 38px;
+  border-radius: 10px;
+  border: 0;
+  padding: 0 14px;
+  font-weight: 800;
+  font-size: 13px;
+  outline: none;
+}
+
+.radar-actions select {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+}
+
+.primary-btn {
+  background: #d50000;
+  color: #fff;
+  cursor: pointer;
+  border: none;
+}
+
+.primary-btn:hover {
+  background: #b91c1c;
+}
+
+.secondary-btn {
+  background: #fff;
+  color: var(--blue);
+  cursor: pointer;
+  border: none;
+}
+
+.secondary-btn:hover {
+  background: #f1f5f9;
+}
+
+/* Panel de Resumen (Totales) */
+.summary-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summary-card {
+  background: #fff;
+  border-left: 7px solid var(--blue);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-card strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--blue);
+}
+
+.summary-card span {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+/* Grilla de Meses (Calendario) */
+.radar-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.month-card {
+  background: var(--card);
+  border: 1px solid #111;
+  border-radius: 12px; /* Tarjeta del mes curbeada */
+  overflow: hidden;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+}
+
+.month-title {
+  background: var(--blue);
+  color: #fff;
+  text-align: center;
+  font-weight: 900;
+  font-size: 18px;
+  padding: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.month-body {
+  position: relative;
+  min-height: 380px;
+  padding: 18px 8px 105px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* Tablero con forma de Q (13 columnas x 16 filas) */
+.q-board {
+  --q-cell-w: clamp(22px, 1.9vw, 32px);
+  --q-cell-h: clamp(16px, 1.3vw, 21px);
+
+  width: max-content;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(13, var(--q-cell-w));
+  grid-template-rows: repeat(16, var(--q-cell-h));
+  gap: 2px;
+}
+
+.q-day {
+  width: var(--q-cell-w);
+  height: var(--q-cell-h);
+  border: 1.5px solid var(--border);
+  border-radius: 5px; /* Puntas curbeadas en los días */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(10px, 0.85vw, 13px);
+  font-weight: 700;
+  color: #000;
+  background: #fff;
+  line-height: 1;
+}
+
+/* Estados de los días con sus colores correspondientes */
+.q-day.quality {
+  background: var(--green);
+}
+
+.q-day.internal {
+  background: var(--yellow);
+}
+
+.q-day.rejection {
+  background: var(--red);
+  color: #fff;
+}
+
+.q-day.stop {
+  background: var(--gray);
+}
+
+.q-day.empty-hidden {
+  background: transparent;
+  border: none;
+}
+
+/* Leyenda inferior de cada mes */
+.month-legend {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: grid;
+  grid-template-columns: 30px auto;
+  align-items: center;
+  row-gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.legend-box {
+  width: 26px;
+  height: 16px;
+  border: 1.5px solid #111;
+  border-radius: 3px;
+}
+
+.legend-box.quality { background: var(--green); }
+.legend-box.internal { background: var(--yellow); }
+.legend-box.rejection { background: var(--red); }
+.legend-box.stop { background: var(--gray); }
+
+.legend-label {
+  padding-left: 6px;
+  white-space: nowrap;
+  color: #111;
+}
+
+/* Overlay de Carga */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.68);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-overlay.hidden {
+  display: none;
+}
+
+.loading-card {
+  background: #fff;
+  padding: 24px 30px;
+  border-radius: 16px;
+  text-align: center;
+  min-width: 230px;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 4px solid #dbeafe;
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  margin: 0 auto 12px;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Cuadrado vacío para completar la forma de la "Q" en meses cortos (ej. Febrero) */
+.q-day.empty-box {
+  background: #ffffff;
+  border: 1.5px solid var(--border);
+  border-radius: 5px;
+  color: transparent;
+}
+
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================================
+   ADAPTACIÓN RESPONSIVA PARA MÓVILES (360px)
+   ========================================= */
+
+@media (max-width: 1024px) {
+  .radar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .radar-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .radar-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .radar-actions select,
+  .radar-actions button {
+    width: 100%;
+  }
+
+  .radar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .month-body {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}

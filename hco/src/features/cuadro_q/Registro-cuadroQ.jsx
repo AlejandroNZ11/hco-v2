@@ -19,6 +19,47 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+// Obtener fecha local actual en formato YYYY-MM-DD
+function obtenerFechaHoyLocal() {
+  const hoy = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${hoy.getFullYear()}-${pad(hoy.getMonth() + 1)}-${pad(hoy.getDate())}`;
+}
+
+// Convertir ISO a formato YYYY-MM-DDTHH:mm para input datetime-local
+function isoADatetimeLocal(isoStr) {
+  if (!isoStr) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(isoStr)) return isoStr;
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Cálculo automático del Estado del Cuadro Q
+function calcularEstadoAutomatico({ evaluacion, fecha_planificada, fecha_cierre }) {
+  if (evaluacion === "CANCELADO") {
+    return "CANCELADO";
+  }
+
+  if (fecha_cierre && String(fecha_cierre).trim() !== "") {
+    return "CONCLUIDO";
+  }
+
+  const hoyStr = obtenerFechaHoyLocal();
+  const planStr = fecha_planificada ? String(fecha_planificada).slice(0, 10) : "";
+
+  if (planStr && hoyStr > planStr) {
+    return "ATRAZADO";
+  }
+
+  if (evaluacion === "APROBADO") {
+    return "EN PROCESO";
+  }
+
+  return "PENDIENTE";
+}
+
 export default function RegistroCuadroQ() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,6 +74,10 @@ export default function RegistroCuadroQ() {
   const [todasAreas, setTodasAreas] = useState([]);
   const [areasError, setAreasError] = useState([]);
   const [personalWhite, setPersonalWhite] = useState([]);
+
+  // Controla si el registro ya vino CONCLUIDO desde la BD o si el usuario confirmó la Fecha de Cierre
+  const [yaEstabaConcluidoEnBD, setYaEstabaConcluidoEnBD] = useState(false);
+  const [cierreConfirmadoUI, setCierreConfirmadoUI] = useState(false);
 
   const usuariosDb = useLiveQuery(
     () => (localDb?.usuarios ? localDb.usuarios.toArray() : []),
@@ -71,7 +116,7 @@ export default function RegistroCuadroQ() {
     usuario_actualiza: ""
   });
 
-  // Modal de aviso flotante (mismo estilo que mhe_evaluar)
+  // Modal de aviso flotante
   const [avisoFlotante, setAvisoFlotante] = useState({
     visible: false,
     tipo: 'danger',
@@ -125,6 +170,41 @@ export default function RegistroCuadroQ() {
     return "GENERAL";
   }, [currentUser, todasAreas, usuariosDb]);
 
+  // Resolver el rol del usuario logueado
+  const rolDelUsuarioLogueado = useMemo(() => {
+    if (!currentUser) return "";
+
+    const userLocal = usuariosDb.find((u) => String(u.id) === String(currentUser?.id));
+
+    const rawRol =
+      currentUser?.rol_nombre ||
+      currentUser?.rol?.nombre ||
+      currentUser?.roles?.nombre ||
+      (typeof currentUser?.rol === 'string' ? currentUser.rol : '') ||
+      (typeof currentUser?.role === 'string' ? currentUser.role : '') ||
+      currentUser?.tipo_usuario ||
+      currentUser?.perfil ||
+      userLocal?.rol_nombre ||
+      userLocal?.rol?.nombre ||
+      userLocal?.roles?.nombre ||
+      (typeof userLocal?.rol === 'string' ? userLocal.rol : '') ||
+      (typeof userLocal?.role === 'string' ? userLocal.role : '') ||
+      "";
+
+    return String(rawRol).toUpperCase().trim();
+  }, [currentUser, usuariosDb]);
+
+  // Verificar si pertenece al área BPE o tiene rol SUPERADMIN
+  const esBpeOSuperAdmin = useMemo(() => {
+    const areaNorm = areaDelUsuarioLogueado.toUpperCase().trim();
+    const rolNorm = rolDelUsuarioLogueado.replace(/[\s_-]+/g, '');
+
+    const esBPE = areaNorm === "BPE" || areaNorm.includes("BPE");
+    const esSuperAdmin = rolNorm === "SUPERADMIN";
+
+    return esBPE || esSuperAdmin;
+  }, [areaDelUsuarioLogueado, rolDelUsuarioLogueado]);
+
   useEffect(() => {
     if (!currentUser) {
       navigate('/');
@@ -156,6 +236,24 @@ export default function RegistroCuadroQ() {
 
       if (registroEditId) {
         const reg = await obtenerCuadroQPorId(registroEditId);
+        const fechaPlan = reg.fecha_planificada ? String(reg.fecha_planificada).slice(0, 10) : "";
+        const fechaCierreLocal = isoADatetimeLocal(reg.fecha_cierre);
+
+        const evalInicial =
+          reg.evaluacion || (reg.estado === "CANCELADO" ? "CANCELADO" : "");
+
+        const estadoCalculado = calcularEstadoAutomatico({
+          evaluacion: evalInicial,
+          fecha_planificada: fechaPlan,
+          fecha_cierre: fechaCierreLocal
+        });
+
+        const estabaConcluido =
+          estadoCalculado === "CONCLUIDO" || reg.estado === "CONCLUIDO";
+
+        setYaEstabaConcluidoEnBD(estabaConcluido);
+        setCierreConfirmadoUI(estabaConcluido);
+
         setFormData({
           id_cuadro_q: reg.id_cuadro_q || "-",
           fecha_registro: reg.fecha_registro || "",
@@ -168,19 +266,19 @@ export default function RegistroCuadroQ() {
           proceso: reg.proceso || "",
           error: reg.error || "",
           descripcion_error: reg.descripcion_error || "",
-          estado: reg.estado || "PENDIENTE",
+          estado: estabaConcluido ? "CONCLUIDO" : estadoCalculado,
 
           responsabilidad: reg.responsabilidad || "",
           impacto: reg.impacto || "",
           pdca: reg.pdca || "",
-          evaluacion: reg.evaluacion || "",
+          evaluacion: evalInicial,
           motivo_cancelacion: reg.motivo_cancelacion || "",
           responsable_id: reg.responsable_id || "",
           responsable: reg.responsable || "",
-          fecha_planificada: reg.fecha_planificada || "",
+          fecha_planificada: fechaPlan,
           medida: reg.medida || "",
           causa_raiz: reg.causa_raiz || "",
-          fecha_cierre: reg.fecha_cierre || "",
+          fecha_cierre: fechaCierreLocal,
           fecha_hora_actualiza: reg.fecha_hora_actualiza || "",
           usuario_actualiza: reg.usuario_actualiza || ""
         });
@@ -195,14 +293,34 @@ export default function RegistroCuadroQ() {
   // Lista de errores dinámica según el AREA_ERROR seleccionada
   const listaErroresDisponibles = useMemo(() => {
     const errores = obtenerErroresPorNombreArea(formData.area_error);
-    // Si en modo edición tenía un error personalizado que no está en la lista, lo mantenemos visible
     if (formData.error && !errores.includes(formData.error)) {
       return [formData.error, ...errores];
     }
     return errores;
   }, [formData.area_error, formData.error]);
 
+  // Flags de bloqueo según las reglas de negocio
+  const esCancelado =
+    formData.evaluacion === "CANCELADO" || formData.estado === "CANCELADO";
+  const esAprobado = formData.evaluacion === "APROBADO";
+  const tieneFechaCierre = Boolean(formData.fecha_cierre && formData.fecha_cierre.trim());
+  const esConcluido = formData.estado === "CONCLUIDO" || tieneFechaCierre;
+
+  // Bloqueo de Sección 1 y 2 en modo análisis para todos menos BPE y SUPERADMIN
+  const bloquearDatosBase = esModoAnalisis && !esBpeOSuperAdmin;
+
+  // Bloqueo del Análisis cuando se coloca Fecha y Hora de Cierre (CONCLUIDO) para todos menos BPE y SUPERADMIN
+  const bloquearAnalisisPorConcluido = esModoAnalisis && esConcluido && !esBpeOSuperAdmin;
+
+  // Bloqueo del input de Fecha de Cierre una vez confirmado o cargado como CONCLUIDO para no-BPE/SUPERADMIN
+  const bloquearInputFechaCierre =
+    esCancelado || (esModoAnalisis && (yaEstabaConcluidoEnBD || cierreConfirmadoUI) && !esBpeOSuperAdmin);
+
+  // Bloqueo del resto de campos PDCA cuando es CANCELADO o cuando está bloqueado por CONCLUIDO
+  const bloquearRestoCamposPDCA = esCancelado || bloquearAnalisisPorConcluido;
+
   const handleAreaErrorChange = (e) => {
+    if (bloquearDatosBase) return;
     const nombreSeleccionado = e.target.value;
     const areaObj = areasError.find((a) => a.nombre === nombreSeleccionado);
 
@@ -210,56 +328,92 @@ export default function RegistroCuadroQ() {
       ...prev,
       area_error: nombreSeleccionado,
       area_error_id: areaObj ? String(areaObj.id) : "",
-      error: "" // Reiniciamos el error al cambiar de área
+      error: ""
     }));
   };
 
   const handleEvaluacionChange = (e) => {
+    if (bloquearAnalisisPorConcluido) return;
     const nuevaEval = e.target.value;
+
     setFormData((prev) => {
-      let nuevoEstado = prev.estado;
+      const nuevaFechaCierre = nuevaEval === "CANCELADO" ? "" : prev.fecha_cierre;
       if (nuevaEval === "CANCELADO") {
-        nuevoEstado = "CANCELADO";
-      } else if (nuevaEval === "APROBADO" && prev.estado === "CANCELADO") {
-        nuevoEstado = "PENDIENTE";
+        setCierreConfirmadoUI(false);
       }
+
+      const nuevoEstado = calcularEstadoAutomatico({
+        evaluacion: nuevaEval,
+        fecha_planificada: prev.fecha_planificada,
+        fecha_cierre: nuevaFechaCierre
+      });
 
       return {
         ...prev,
         evaluacion: nuevaEval,
+        fecha_cierre: nuevaFechaCierre,
         estado: nuevoEstado,
         motivo_cancelacion: nuevaEval === "CANCELADO" ? prev.motivo_cancelacion : ""
       };
     });
   };
 
-  const handleEstadoChange = (e) => {
-    const nuevoEstado = e.target.value;
-    setFormData((prev) => {
-      let nuevaEval = prev.evaluacion;
-      let nuevaFechaCierre = prev.fecha_cierre;
+  const handleFechaPlanificadaChange = (e) => {
+    if (bloquearRestoCamposPDCA) return;
+    const nuevaFechaPlan = e.target.value;
 
-      if (nuevoEstado === "CANCELADO") {
-        nuevaEval = "CANCELADO";
-        if (!nuevaFechaCierre) nuevaFechaCierre = new Date().toISOString();
-      } else if (nuevoEstado === "CONCLUIDO") {
-        if (!nuevaEval || nuevaEval === "CANCELADO") nuevaEval = "APROBADO";
-        if (!nuevaFechaCierre) nuevaFechaCierre = new Date().toISOString();
-      } else if (nuevoEstado === "PENDIENTE") {
-        nuevaFechaCierre = "";
-        if (nuevaEval === "CANCELADO") nuevaEval = "APROBADO";
-      }
+    setFormData((prev) => {
+      const nuevoEstado = calcularEstadoAutomatico({
+        evaluacion: prev.evaluacion,
+        fecha_planificada: nuevaFechaPlan,
+        fecha_cierre: prev.fecha_cierre
+      });
 
       return {
         ...prev,
-        estado: nuevoEstado,
-        evaluacion: nuevaEval,
-        fecha_cierre: nuevaFechaCierre
+        fecha_planificada: nuevaFechaPlan,
+        estado: nuevoEstado
       };
     });
   };
 
+  const handleFechaCierreChange = (e) => {
+    if (bloquearInputFechaCierre) return;
+    const nuevaFechaCierre = e.target.value;
+
+    setFormData((prev) => {
+      const evalEfectiva =
+        nuevaFechaCierre && (!prev.evaluacion || prev.evaluacion === "CANCELADO")
+          ? "APROBADO"
+          : prev.evaluacion;
+
+      const nuevoEstado = calcularEstadoAutomatico({
+        evaluacion: evalEfectiva,
+        fecha_planificada: prev.fecha_planificada,
+        fecha_cierre: nuevaFechaCierre
+      });
+
+      if (!nuevaFechaCierre) {
+        setCierreConfirmadoUI(false);
+      }
+
+      return {
+        ...prev,
+        evaluacion: evalEfectiva,
+        fecha_cierre: nuevaFechaCierre,
+        estado: nuevoEstado
+      };
+    });
+  };
+
+  const handleFechaCierreBlur = () => {
+    if (formData.fecha_cierre && formData.fecha_cierre.trim() !== "") {
+      setCierreConfirmadoUI(true);
+    }
+  };
+
   const handleResponsableChange = (e) => {
+    if (bloquearRestoCamposPDCA) return;
     const empId = e.target.value;
     const empObj = personalWhite.find((p) => String(p.id) === String(empId));
     setFormData((prev) => ({
@@ -269,13 +423,18 @@ export default function RegistroCuadroQ() {
     }));
   };
 
-  const esCancelado =
-    formData.evaluacion === "CANCELADO" || formData.estado === "CANCELADO";
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validaciones Fase 1 (Registro)
+    if (esModoAnalisis && yaEstabaConcluidoEnBD && !esBpeOSuperAdmin) {
+      return mostrarAviso(
+        'warning',
+        'Registro Concluido (Solo Lectura)',
+        'Este análisis ya fue concluido. Únicamente el personal del área de BPE y el rol SUPERADMIN pueden modificarlo.'
+      );
+    }
+
+    // Validaciones Fase 1 (Registro y Análisis)
     if (!formData.area_error.trim()) {
       return mostrarAviso('warning', 'Área requerida', 'Por favor seleccione el Área del Error.');
     }
@@ -291,27 +450,40 @@ export default function RegistroCuadroQ() {
 
     // Validaciones Fase 2 (Modo Análisis)
     if (esModoAnalisis) {
-      if (esCancelado && !formData.motivo_cancelacion.trim()) {
+      if (!formData.evaluacion) {
         return mostrarAviso(
-          'danger',
-          'Motivo de Cancelación Obligatorio',
-          'Cuando la Evaluación o el Estado se marca como CANCELADO, es obligatorio indicar el motivo de cancelación.'
+          'warning',
+          'Evaluación Requerida',
+          'Por favor seleccione la Evaluación del Cuadro Q (APROBADO o CANCELADO).'
         );
       }
 
-      if (formData.estado === "CONCLUIDO") {
-        if (!formData.responsabilidad || !formData.impacto || !formData.pdca || !formData.responsable) {
+      if (esCancelado) {
+        if (!formData.motivo_cancelacion.trim()) {
           return mostrarAviso(
-            'warning',
-            'Datos de Análisis Incompletos',
-            'Para pasar el registro a CONCLUIDO debe completar Responsabilidad, Impacto, PDCA y Responsable.'
+            'danger',
+            'Motivo de Cancelación Obligatorio',
+            'Cuando la Evaluación es CANCELADO, es obligatorio especificar el motivo de cancelación.'
           );
         }
-        if (!formData.causa_raiz.trim() || !formData.medida.trim()) {
+      }
+
+      if (formData.evaluacion === "APROBADO") {
+        const faltantes = [];
+        if (!formData.responsabilidad) faltantes.push("Responsabilidad");
+        if (!formData.impacto) faltantes.push("Impacto");
+        if (!formData.pdca) faltantes.push("PDCA");
+        if (!formData.responsable_id && !formData.responsable) faltantes.push("Responsable (Personal WHITE)");
+        if (!formData.fecha_planificada) faltantes.push("Fecha Planificada");
+        if (!formData.causa_raiz.trim()) faltantes.push("Causa Raíz");
+        if (!formData.medida.trim()) faltantes.push("Medida / Plan de Acción");
+
+        if (faltantes.length > 0) {
           return mostrarAviso(
             'warning',
-            'Causa Raíz y Medida Requeridas',
-            'Para concluir el registro debe detallar la Causa Raíz y la Medida adoptada.'
+            'Campos Obligatorios en Aprobado',
+            'Al seleccionar APROBADO debe completar todos los campos obligatorios del análisis.',
+            `Campos pendientes: ${faltantes.join(', ')}`
           );
         }
       }
@@ -337,33 +509,40 @@ export default function RegistroCuadroQ() {
           'La incidencia se ha registrado correctamente con estado PENDIENTE.',
           `Código asignado: ${creado.id_cuadro_q || 'Generado'}`,
           () => navigate('/cuadro_q/trackingCuadroQ')
-
         );
       } else {
-        const fechaCierreFinal =
-          formData.estado === "CONCLUIDO" || formData.estado === "CANCELADO"
-            ? formData.fecha_cierre || new Date().toISOString()
+        const estadoFinal = calcularEstadoAutomatico({
+          evaluacion: formData.evaluacion,
+          fecha_planificada: formData.fecha_planificada,
+          fecha_cierre: esCancelado ? "" : formData.fecha_cierre
+        });
+
+        const fechaCierreISO =
+          !esCancelado && formData.fecha_cierre
+            ? new Date(formData.fecha_cierre).toISOString()
             : null;
 
         const actualizado = await actualizarRegistroCuadroQ(registroEditId, {
+          nombre_registrador: formData.nombre_registrador.trim(),
+          area_registrador: formData.area_registrador.trim(),
           area_error_id: formData.area_error_id ? Number(formData.area_error_id) : null,
           area_error: formData.area_error.trim(),
           proceso: formData.proceso.trim(),
           error: formData.error.trim(),
           descripcion_error: formData.descripcion_error.trim(),
-          estado: formData.estado,
+          estado: estadoFinal,
 
-          responsabilidad: formData.responsabilidad || null,
-          impacto: formData.impacto || null,
-          pdca: formData.pdca || null,
+          responsabilidad: esCancelado ? null : (formData.responsabilidad || null),
+          impacto: esCancelado ? null : (formData.impacto || null),
+          pdca: esCancelado ? null : (formData.pdca || null),
           evaluacion: formData.evaluacion || null,
           motivo_cancelacion: esCancelado ? formData.motivo_cancelacion.trim() : null,
-          responsable_id: formData.responsable_id || null,
-          responsable: formData.responsable || null,
-          fecha_planificada: formData.fecha_planificada || null,
-          medida: formData.medida.trim() || null,
-          causa_raiz: formData.causa_raiz.trim() || null,
-          fecha_cierre: fechaCierreFinal,
+          responsable_id: esCancelado ? null : (formData.responsable_id || null),
+          responsable: esCancelado ? null : (formData.responsable || null),
+          fecha_planificada: esCancelado ? null : (formData.fecha_planificada || null),
+          medida: esCancelado ? null : (formData.medida.trim() || null),
+          causa_raiz: esCancelado ? null : (formData.causa_raiz.trim() || null),
+          fecha_cierre: fechaCierreISO,
           usuario_actualiza: currentUser?.nombre || "Usuario"
         });
 
@@ -371,7 +550,7 @@ export default function RegistroCuadroQ() {
           'success',
           'Análisis Guardado',
           'Los datos de seguimiento y análisis del Cuadro Q se actualizaron correctamente.',
-          `Código: ${actualizado.id_cuadro_q} | Estado: ${actualizado.estado}`,
+          `Código: ${actualizado.id_cuadro_q || formData.id_cuadro_q} | Estado: ${actualizado.estado || estadoFinal}`,
           () => navigate('/cuadro_q/trackingCuadroQ')
         );
       }
@@ -389,6 +568,8 @@ export default function RegistroCuadroQ() {
       timeStyle: 'short'
     });
   }
+
+  const claseEstadoBadge = formData.estado ? formData.estado.replace(/\s+/g, '_') : 'PENDIENTE';
 
   return (
     <div className="registro-page">
@@ -452,11 +633,17 @@ export default function RegistroCuadroQ() {
           <div className="card-head-left">
             <h2>{esModoAnalisis ? `Análisis Cuadro Q (${formData.id_cuadro_q})` : 'Registro de Cuadro Q'}</h2>
             <p>
-              Usuario activo: <strong>{currentUser?.nombre}</strong>
+              Usuario activo: <strong>{currentUser?.nombre}</strong> ({areaDelUsuarioLogueado})
             </p>
           </div>
 
           <div className="card-head-right">
+            <div className="status-pill-wrapper">
+              <span className="status-pill-label">Estado actual:</span>
+              <span className={`cq-badge-estado ${claseEstadoBadge}`}>
+                {formData.estado}
+              </span>
+            </div>
             <div className="legend-item">
               <span className="legend-dot auto"></span>
               <span>Automático</span>
@@ -468,80 +655,100 @@ export default function RegistroCuadroQ() {
           </div>
         </div>
 
+        {bloquearAnalisisPorConcluido && (
+          <div className="lock-banner-alert">
+            🔒 <strong>Registro Concluido:</strong> El análisis se encuentra bloqueado en modo de solo visualización. Únicamente el personal del área de <strong>BPE</strong> o el rol <strong>SUPERADMIN</strong> pueden realizar modificaciones.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           {/* =========================================================
-              1. DATOS DEL REGISTRADOR (AUTOMÁTICOS)
+              1. DATOS DEL REGISTRADOR (SOLO VISIBLE EN MODO ANÁLISIS)
              ========================================================= */}
-          <div className="section-title-row" style={{ marginTop: 0 }}>
-            <div className="section-title" style={{ marginBottom: 0 }}>
-              1. Datos del Registrador
-            </div>
-            <div className="status-pill-wrapper">
-              <span className="status-pill-label">Estado actual:</span>
-              <span className={`cq-badge-estado ${formData.estado}`}>
-                {formData.estado}
-              </span>
-            </div>
-          </div>
+          {esModoAnalisis && (
+            <>
+              <div className="section-title-row" style={{ marginTop: 0 }}>
+                <div className="section-title" style={{ marginBottom: 0 }}>
+                  1. Datos del Registrador
+                </div>
+                {bloquearDatosBase && (
+                  <span className="lock-tag-info">
+                    Bloqueado (Editable solo por BPE / SUPERADMIN)
+                  </span>
+                )}
+              </div>
 
-          <div className="form-grid cols-4" style={{ marginTop: '12px', marginBottom: '22px' }}>
-            <div className="field">
-              <label>
-                ID Cuadro Q <span className="field-badge auto">AUTOMÁTICO</span>
-              </label>
-              <input
-                type="text"
-                value={formData.id_cuadro_q}
-                readOnly
-                className="input-readonly"
-              />
-            </div>
+              <div className="form-grid cols-4" style={{ marginTop: '12px', marginBottom: '22px' }}>
+                <div className="field">
+                  <label>
+                    ID Cuadro Q <span className="field-badge auto">AUTOMÁTICO</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.id_cuadro_q}
+                    readOnly
+                    disabled
+                    className="input-readonly"
+                  />
+                </div>
 
-            <div className="field">
-              <label>
-                Fecha y Hora Registro <span className="field-badge auto">AUTOMÁTICO</span>
-              </label>
-              <input
-                type="text"
-                value={
-                  esModoAnalisis
-                    ? formatearFechaHora(formData.fecha_registro)
-                    : new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
-                }
-                readOnly
-                className="input-readonly"
-              />
-            </div>
+                <div className="field">
+                  <label>
+                    Fecha y Hora Registro <span className="field-badge auto">AUTOMÁTICO</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formatearFechaHora(formData.fecha_registro)}
+                    readOnly
+                    disabled
+                    className="input-readonly"
+                  />
+                </div>
 
-            <div className="field">
-              <label>
-                Nombre Registrador <span className="field-badge auto">AUTOMÁTICO</span>
-              </label>
-              <input
-                type="text"
-                value={formData.nombre_registrador}
-                readOnly
-                className="input-readonly"
-              />
-            </div>
+                <div className="field">
+                  <label>
+                    Nombre Registrador <span className="field-badge auto">{esBpeOSuperAdmin ? 'BPE / ADMIN' : 'BLOQUEADO'}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.nombre_registrador}
+                    onChange={(e) => setFormData({ ...formData, nombre_registrador: e.target.value })}
+                    readOnly={bloquearDatosBase}
+                    disabled={bloquearDatosBase}
+                    className={bloquearDatosBase ? "input-readonly" : ""}
+                  />
+                </div>
 
-            <div className="field">
-              <label>
-                Área Registrador <span className="field-badge auto">AUTOMÁTICO</span>
-              </label>
-              <input
-                type="text"
-                value={formData.area_registrador}
-                readOnly
-                className="input-readonly"
-              />
-            </div>
-          </div>
+                <div className="field">
+                  <label>
+                    Área Registrador <span className="field-badge auto">{esBpeOSuperAdmin ? 'BPE / ADMIN' : 'BLOQUEADO'}</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.area_registrador}
+                    onChange={(e) => setFormData({ ...formData, area_registrador: e.target.value })}
+                    readOnly={bloquearDatosBase}
+                    disabled={bloquearDatosBase}
+                    className={bloquearDatosBase ? "input-readonly" : ""}
+                  />
+                </div>
+              </div>
+            </>
+          )}
 
           {/* =========================================================
-              2. DETALLE DE LA INCIDENCIA / ERROR (REGISTRO)
+              2. DETALLE DE LA INCIDENCIA / ERROR
              ========================================================= */}
-          <div className="section-title">2. Detalle del Error Reportado</div>
+          <div className="section-title-row" style={{ marginTop: esModoAnalisis ? '16px' : 0, marginBottom: '12px' }}>
+            <div className="section-title" style={{ marginBottom: 0 }}>
+              {esModoAnalisis ? '2. Detalle del Error Reportado' : '1. Detalle del Error Reportado'}
+            </div>
+            {bloquearDatosBase && (
+              <span className="lock-tag-info">
+                Bloqueado (Editable solo por BPE / SUPERADMIN)
+              </span>
+            )}
+          </div>
 
           <div className="form-grid cols-3" style={{ marginBottom: '16px' }}>
             <div className="field">
@@ -551,6 +758,8 @@ export default function RegistroCuadroQ() {
               <select
                 value={formData.area_error}
                 onChange={handleAreaErrorChange}
+                disabled={bloquearDatosBase}
+                className={bloquearDatosBase ? "input-readonly" : ""}
                 required
               >
                 <option value="">Seleccione un área...</option>
@@ -571,6 +780,9 @@ export default function RegistroCuadroQ() {
                 placeholder="Escriba el proceso (Ej: Picking, Recepción, Almacenamiento...)"
                 value={formData.proceso}
                 onChange={(e) => setFormData({ ...formData, proceso: e.target.value })}
+                readOnly={bloquearDatosBase}
+                disabled={bloquearDatosBase}
+                className={bloquearDatosBase ? "input-readonly" : ""}
                 required
               />
             </div>
@@ -582,7 +794,8 @@ export default function RegistroCuadroQ() {
               <select
                 value={formData.error}
                 onChange={(e) => setFormData({ ...formData, error: e.target.value })}
-                disabled={!formData.area_error}
+                disabled={!formData.area_error || bloquearDatosBase}
+                className={bloquearDatosBase ? "input-readonly" : ""}
                 required
               >
                 <option value="">
@@ -609,12 +822,15 @@ export default function RegistroCuadroQ() {
               placeholder="Detalles del error: SKU, picker, QTY, número de pedido, entre otros"
               value={formData.descripcion_error}
               onChange={(e) => setFormData({ ...formData, descripcion_error: e.target.value })}
+              readOnly={bloquearDatosBase}
+              disabled={bloquearDatosBase}
+              className={bloquearDatosBase ? "input-readonly" : ""}
               required
             />
           </div>
 
           {/* =========================================================
-              3. FASE DE ANÁLISIS Y SEGUIMIENTO (SOLO EN MODO ANÁLISIS/EDICIÓN)
+              3. FASE DE ANÁLISIS Y SEGUIMIENTO (SOLO EN MODO ANÁLISIS)
              ========================================================= */}
           {esModoAnalisis && (
             <div className="analisis-section-wrapper">
@@ -631,10 +847,15 @@ export default function RegistroCuadroQ() {
 
               <div className="form-grid cols-3" style={{ marginBottom: '16px' }}>
                 <div className="field">
-                  <label>Evaluación</label>
+                  <label>
+                    Evaluación <span className="field-badge manual">OBLIGATORIO</span>
+                  </label>
                   <select
                     value={formData.evaluacion}
                     onChange={handleEvaluacionChange}
+                    disabled={bloquearAnalisisPorConcluido}
+                    className={bloquearAnalisisPorConcluido ? "input-readonly" : ""}
+                    required
                   >
                     <option value="">Seleccione evaluación...</option>
                     <option value="APROBADO">APROBADO</option>
@@ -643,22 +864,28 @@ export default function RegistroCuadroQ() {
                 </div>
 
                 <div className="field">
-                  <label>Estado del Cuadro Q</label>
-                  <select
+                  <label>
+                    Estado del Cuadro Q <span className="field-badge auto">AUTOMÁTICO</span>
+                  </label>
+                  <input
+                    type="text"
                     value={formData.estado}
-                    onChange={handleEstadoChange}
-                  >
-                    <option value="PENDIENTE">PENDIENTE</option>
-                    <option value="CONCLUIDO">CONCLUIDO</option>
-                    <option value="CANCELADO">CANCELADO</option>
-                  </select>
+                    readOnly
+                    disabled
+                    className={`input-readonly input-estado-pill ${claseEstadoBadge}`}
+                  />
                 </div>
 
                 <div className="field">
-                  <label>Responsabilidad</label>
+                  <label>
+                    Responsabilidad {esAprobado && <span className="field-badge manual">OBLIGATORIO</span>}
+                  </label>
                   <select
                     value={formData.responsabilidad}
                     onChange={(e) => setFormData({ ...formData, responsabilidad: e.target.value })}
+                    disabled={bloquearRestoCamposPDCA}
+                    className={bloquearRestoCamposPDCA ? "input-readonly" : ""}
+                    required={esAprobado}
                   >
                     <option value="">Seleccione...</option>
                     <option value="CEVA">CEVA</option>
@@ -667,10 +894,15 @@ export default function RegistroCuadroQ() {
                 </div>
 
                 <div className="field">
-                  <label>Impacto</label>
+                  <label>
+                    Impacto {esAprobado && <span className="field-badge manual">OBLIGATORIO</span>}
+                  </label>
                   <select
                     value={formData.impacto}
                     onChange={(e) => setFormData({ ...formData, impacto: e.target.value })}
+                    disabled={bloquearRestoCamposPDCA}
+                    className={bloquearRestoCamposPDCA ? "input-readonly" : ""}
+                    required={esAprobado}
                   >
                     <option value="">Seleccione impacto...</option>
                     <option value="ALTO">ALTO</option>
@@ -680,10 +912,15 @@ export default function RegistroCuadroQ() {
                 </div>
 
                 <div className="field">
-                  <label>PDCA</label>
+                  <label>
+                    PDCA {esAprobado && <span className="field-badge manual">OBLIGATORIO</span>}
+                  </label>
                   <select
                     value={formData.pdca}
                     onChange={(e) => setFormData({ ...formData, pdca: e.target.value })}
+                    disabled={bloquearRestoCamposPDCA}
+                    className={bloquearRestoCamposPDCA ? "input-readonly" : ""}
+                    required={esAprobado}
                   >
                     <option value="">Seleccione...</option>
                     <option value="APLICA">APLICA</option>
@@ -692,10 +929,15 @@ export default function RegistroCuadroQ() {
                 </div>
 
                 <div className="field">
-                  <label>Responsable (Personal WHITE)</label>
+                  <label>
+                    Responsable (Personal WHITE) {esAprobado && <span className="field-badge manual">OBLIGATORIO</span>}
+                  </label>
                   <select
                     value={formData.responsable_id}
                     onChange={handleResponsableChange}
+                    disabled={bloquearRestoCamposPDCA}
+                    className={bloquearRestoCamposPDCA ? "input-readonly" : ""}
+                    required={esAprobado}
                   >
                     <option value="">Seleccione responsable...</option>
                     {personalWhite.map((emp) => (
@@ -707,32 +949,35 @@ export default function RegistroCuadroQ() {
                 </div>
 
                 <div className="field">
-                  <label>Fecha Planificada</label>
+                  <label>
+                    Fecha Planificada {esAprobado && <span className="field-badge manual">OBLIGATORIO</span>}
+                  </label>
                   <input
                     type="date"
                     value={formData.fecha_planificada}
-                    onChange={(e) => setFormData({ ...formData, fecha_planificada: e.target.value })}
+                    onChange={handleFechaPlanificadaChange}
+                    disabled={bloquearRestoCamposPDCA}
+                    className={bloquearRestoCamposPDCA ? "input-readonly" : ""}
+                    required={esAprobado}
                   />
                 </div>
 
                 <div className="field">
                   <label>
-                    Fecha y Hora de Cierre <span className="field-badge auto">AUTO AL CONCLUIR</span>
+                    Fecha y Hora de Cierre <span className="field-badge auto">CIERRA A CONCLUIDO</span>
                   </label>
                   <input
-                    type="text"
-                    value={
-                      formData.fecha_cierre
-                        ? formatearFechaHora(formData.fecha_cierre)
-                        : "Pendiente de cierre"
-                    }
-                    readOnly
-                    className="input-readonly"
+                    type="datetime-local"
+                    value={formData.fecha_cierre}
+                    onChange={handleFechaCierreChange}
+                    onBlur={handleFechaCierreBlur}
+                    disabled={bloquearInputFechaCierre}
+                    className={bloquearInputFechaCierre ? "input-readonly" : ""}
                   />
                 </div>
               </div>
 
-              {/* CAMPO OBLIGATORIO SI SE APRIETA CANCELADO */}
+              {/* CAMPO OBLIGATORIO SI SE SELECCIONA CANCELADO */}
               {esCancelado && (
                 <div className="field motivo-cancelacion-box" style={{ marginBottom: '16px' }}>
                   <label>
@@ -743,7 +988,8 @@ export default function RegistroCuadroQ() {
                     placeholder="Explique obligatoriamente por qué se cancela o desestima este registro..."
                     value={formData.motivo_cancelacion}
                     onChange={(e) => setFormData({ ...formData, motivo_cancelacion: e.target.value })}
-                    className={!formData.motivo_cancelacion.trim() ? 'input-error-border' : ''}
+                    disabled={bloquearAnalisisPorConcluido}
+                    className={`${!formData.motivo_cancelacion.trim() ? 'input-error-border' : ''} ${bloquearAnalisisPorConcluido ? 'input-readonly' : ''}`}
                     required
                   />
                   {!formData.motivo_cancelacion.trim() && (
@@ -756,22 +1002,32 @@ export default function RegistroCuadroQ() {
 
               <div className="form-grid cols-2">
                 <div className="field">
-                  <label>Causa Raíz</label>
+                  <label>
+                    Causa Raíz {esAprobado && <span className="field-badge manual">OBLIGATORIO</span>}
+                  </label>
                   <textarea
                     rows="3"
                     placeholder="Describa la causa raíz identificada..."
                     value={formData.causa_raiz}
                     onChange={(e) => setFormData({ ...formData, causa_raiz: e.target.value })}
+                    disabled={bloquearRestoCamposPDCA}
+                    className={bloquearRestoCamposPDCA ? "input-readonly" : ""}
+                    required={esAprobado}
                   />
                 </div>
 
                 <div className="field">
-                  <label>Medida / Plan de Acción</label>
+                  <label>
+                    Medida / Plan de Acción {esAprobado && <span className="field-badge manual">OBLIGATORIO</span>}
+                  </label>
                   <textarea
                     rows="3"
                     placeholder="Describa la medida correctiva o preventiva..."
                     value={formData.medida}
                     onChange={(e) => setFormData({ ...formData, medida: e.target.value })}
+                    disabled={bloquearRestoCamposPDCA}
+                    className={bloquearRestoCamposPDCA ? "input-readonly" : ""}
+                    required={esAprobado}
                   />
                 </div>
               </div>
@@ -784,15 +1040,18 @@ export default function RegistroCuadroQ() {
               className="secondary-btn"
               onClick={() => navigate('/cuadro_q/trackingCuadroQ')}
             >
-              Cancelar
+              {esModoAnalisis && yaEstabaConcluidoEnBD && !esBpeOSuperAdmin ? 'Volver' : 'Cancelar'}
             </button>
-            <button
-              type="submit"
-              className="primary-btn"
-              disabled={loading}
-            >
-              {esModoAnalisis ? 'Guardar Análisis y Cambios' : 'Registrar Cuadro Q'}
-            </button>
+
+            {!(esModoAnalisis && yaEstabaConcluidoEnBD && !esBpeOSuperAdmin) && (
+              <button
+                type="submit"
+                className="primary-btn"
+                disabled={loading}
+              >
+                {esModoAnalisis ? 'Guardar Análisis y Cambios' : 'Registrar Cuadro Q'}
+              </button>
+            )}
           </div>
         </form>
       </section>

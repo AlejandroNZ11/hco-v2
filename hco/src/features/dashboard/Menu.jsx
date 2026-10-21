@@ -412,7 +412,7 @@ export default function Menu() {
             estado: "Inactivo",
           },
           {
-            title: "Auditoría de Despachos Laboratorio",
+            title: "Reporte de Discrepancia Laboratorio",
             description: "Registrar auditorías de despachos.",
             Icon: FaBoxOpen,
             accent: "accent-violet",

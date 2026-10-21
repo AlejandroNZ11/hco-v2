@@ -154,16 +154,18 @@ export const obtenerErroresPorNombreArea = (nombreArea) => {
  * 2. Áreas con cuadro_q = 'Activo' (para el desplegable AREA_ERROR)
  * 3. Empleados con tipo = 'WHITE' y estado = 'Activo' (para el desplegable RESPONSABLE)
  */
+
+/**
+ * Obtiene catálogos para el formulario
+ */
 export const obtenerCatalogosCuadroQ = async () => {
   try {
+    // ✨ LA SOLUCIÓN TAMBIÉN AQUÍ
+    await supabase.auth.getSession();
+
     const [resAreas, resWhite] = await Promise.all([
       supabase.from('areas').select('id, nombre, cuadro_q').order('nombre'),
-      supabase
-        .from('empleados')
-        .select('id, dni, nombre, tipo, estado, area_id')
-        .ilike('tipo', 'WHITE')
-        .ilike('estado', 'Activo')
-        .order('nombre')
+      supabase.from('empleados').select('id, dni, nombre, tipo, estado, area_id').ilike('tipo', 'WHITE').ilike('estado', 'Activo').order('nombre')
     ]);
 
     const todasAreas = resAreas.data || [];
@@ -171,16 +173,10 @@ export const obtenerCatalogosCuadroQ = async () => {
       await localDb.areas.bulkPut(todasAreas);
     }
 
-    const areasErrorActivas = todasAreas.filter(
-      (a) => String(a.cuadro_q || '').trim().toUpperCase() === 'ACTIVO'
-    );
+    const areasErrorActivas = todasAreas.filter(a => String(a.cuadro_q || '').trim().toUpperCase() === 'ACTIVO');
 
-    return {
-      todasAreas,
-      areasError: areasErrorActivas,
-      personalWhite: resWhite.data || []
-    };
-  } catch (err) {
+    return { todasAreas, areasError: areasErrorActivas, personalWhite: resWhite.data || [] };
+  } catch (err){
     console.warn("Error cargando catálogos de Cuadro Q desde Supabase, usando respaldo local:", err);
     const todasAreas = localDb?.areas ? await localDb.areas.toArray() : [];
     const todosUsuarios = localDb?.usuarios ? await localDb.usuarios.toArray() : [];
@@ -197,18 +193,34 @@ export const obtenerCatalogosCuadroQ = async () => {
     return { todasAreas, areasError, personalWhite };
   }
 };
-
 /**
- * Obtiene todos los registros de la tabla cuadro_q ordenados del más reciente al más antiguo
+ * Obtiene todos los registros de la tabla cuadro_q 
  */
 export const obtenerRegistrosCuadroQ = async () => {
-  const { data, error } = await supabase
-    .from('cuadro_q')
-    .select('*')
-    .order('fecha_registro', { ascending: false });
+  try {
+    // ✨ LA SOLUCIÓN: Esperar a que Supabase recupere la sesión tras recargar la página
+    await supabase.auth.getSession();
 
-  if (error) throw new Error(`Error al obtener registros de Cuadro Q: ${error.message}`);
-  return data || [];
+    const { data, error } = await supabase
+      .from('cuadro_q')
+      .select('*')
+      .order('fecha_registro', { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    if (data && data.length > 0 && localDb.cuadro_q) {
+      await localDb.cuadro_q.bulkPut(data);
+    }
+
+    return data || [];
+  } catch (err) {
+    console.warn(`Modo Offline o error de red: ${err.message}. Leyendo caché...`);
+    if (localDb.cuadro_q) {
+      const registrosLocales = await localDb.cuadro_q.toArray();
+      return registrosLocales.sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro));
+    }
+    return [];
+  }
 };
 
 /**

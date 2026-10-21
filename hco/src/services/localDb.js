@@ -9,6 +9,11 @@ localDb.version(3).stores({
   jefes: 'id, nombre',
   roles: 'id, nombre', 
   sync_queue: '++id, tabla, operacion, payload',
+
+  // Tablas locales para Cuadro Q
+  cuadro_q: 'id, id_cuadro_q, estado, area_error, fecha_registro',
+
+
   // Tablas locales para MHE (PIV)
   inspecciones: 'id, equipo_id, usuario_id, fecha_hora, estado_proceso, _sincronizado',
   respuestas_inspeccion: '++local_id, inspeccion_id, item_id, _sincronizado',

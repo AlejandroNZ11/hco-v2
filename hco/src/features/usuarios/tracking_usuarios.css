@@ -1,4 +1,3 @@
-/* Reemplaza :root por .registro-page al inicio de tracking_usuarios.css */
 .registro-page {
   --card: #ffffff;
   --muted: #64748b;
@@ -16,259 +15,236 @@
   width: 100%;
   padding: 20px 24px;
   color: var(--text);
-}
-
-/* Agrega este bloque debajo de .toast-message.error */
-.toast-message.warning {
-  background: #fef9c3;
-  color: #854d0e;
-  border: 1px solid #fde047;
-}
-
-.registro-page {
-position: relative;
-width: 100%;
-padding: 20px 24px;
-color: var(--text);
+  box-sizing: border-box;
 }
 
 /* =========================================
-
-HERO (TÍTULO PRINCIPAL) - Más elegante y delgado
-========================================= */
+   1. HERO (TÍTULO PRINCIPAL)
+   ========================================= */
 .page-hero {
-background: var(--card);
-border-radius: 16px;
-border: 1px solid var(--border);
-padding: 16px 24px;
-margin-bottom: 20px;
-box-shadow: var(--shadow);
+  background: var(--card);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
 }
 
 .page-chip {
-display: inline-flex;
-padding: 4px 10px;
-border-radius: 6px;
-background: #f1f5f9;
-color: var(--primary);
-font-size: 11px;
-font-weight: 700;
-text-transform: uppercase;
-margin-bottom: 8px;
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
 
 .page-hero h1 {
-margin: 0 0 4px;
-font-size: 22px;
-font-weight: 800;
-color: var(--title);
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--title);
 }
 
 .page-hero p {
-margin: 0;
-color: var(--muted);
-font-size: 14px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 /* =========================================
-2. CONTENEDOR DE LA TABLA Y TOOLBAR
-========================================= */
-.tracking-card {
+   2. CONTENEDOR DE LA TABLA Y TOOLBAR
+   ========================================= */
+.tracking-card,
+.card {
   background: var(--card);
   border-radius: 16px;
   border: 1px solid var(--border);
   padding: 20px 24px;
   box-shadow: var(--shadow);
-  width: 100%; /* Asegura que tome todo el ancho disponible */
-}
-
-.card {
-background: var(--card);
-border-radius: 16px;
-border: 1px solid var(--border);
-padding: 20px 24px;
-box-shadow: var(--shadow);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .toolbar {
-display: flex;
-justify-content: space-between;
-align-items: center;
-flex-wrap: wrap;
-gap: 16px;
-margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .toolbar-info h2 {
-margin: 0;
-font-size: 18px;
-font-weight: 800;
-color: var(--title);
-line-height: 1.2;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--title);
+  line-height: 1.2;
 }
 
 .toolbar-info p {
-margin: 4px 0 0;
-color: var(--muted);
-font-size: 13px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .toolbar-actions {
-display: flex;
-gap: 10px;
-align-items: center;
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 /* =========================================
-   BOTONES PRINCIPALES (No se parten en 2 líneas)
+   BOTONES PRINCIPALES
    ========================================= */
-.export-btn { 
-  border: none; 
-  cursor: pointer; 
-  font-weight: 700; 
+.primary-btn {
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
   font-size: 13px;
-  height: 40px; 
-  border-radius: 10px; 
+  height: 40px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 18px;
-  white-space: nowrap; /* ESTO EVITA QUE "+ Nuevo Usuario" SE ROMPA EN DOS LÍNEAS */
-  transition: all 0.2s ease;
-}
-
-.primary-btn { 
-  background: var(--primary); 
-  color: #fff; 
-  box-shadow: 0 4px 12px rgba(15, 76, 129, 0.15); 
-}
-
-.primary-btn { 
-  border: none; 
-  cursor: pointer; 
-  font-weight: 700; 
-  font-size: 13px;
-  height: 40px; 
-  border-radius: 10px; 
-  
-  /* ESTAS 3 LÍNEAS CENTRAN TODO PERFECTAMENTE */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px; /* Separación entre el + y el texto */
-  
+  gap: 8px;
   padding: 0 18px;
   white-space: nowrap;
-  background: var(--primary); 
-  color: #fff; 
+  background: var(--primary);
+  color: #fff;
   box-shadow: none !important;
   transition: all 0.2s ease;
 }
 
 .export-btn {
-  background: #217346; 
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  white-space: nowrap;
+  background: #217346;
   color: white;
-  box-shadow: 0 4px 12px rgba(33, 115, 70, 0.15); 
+  box-shadow: none !important;
+  transition: all 0.2s ease;
 }
 
 .excel-icon {
   background: rgba(255, 255, 255, 0.25);
-  border-radius: 6px; 
-  padding: 3px 8px; 
+  border-radius: 6px;
+  padding: 3px 8px;
   font-size: 13px;
   font-weight: 900;
-  margin-right: 8px; 
+  margin-right: 8px;
 }
 
 /* =========================================
-   3. FILTROS Y BOTONES (USANDO GRID PARA UNA SOLA FILA ESTRICTA)
+   3. FILTROS Y BOTONES
    ========================================= */
-.filters { 
-  display: grid; 
-  /* 1 input grande, 3 selects medianos, 2 botones al final */
-  grid-template-columns: 2fr 1fr 1fr 1fr auto auto; 
-  align-items: center; /* Centrado vertical estricto */
-  gap: 12px; 
-  margin-bottom: 20px; 
+.filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
   background: #f8fafc;
   padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
 }
 
-/* REGLA MAESTRA: Forzar que TODOS los hijos del filtro midan exactamente 40px y no tengan márgenes ocultos */
-.filters > input, 
-.filters > select, 
-.filters > button { 
-  height: 40px !important; 
-  margin: 0 !important; 
-  box-sizing: border-box !important; 
+.filters > input,
+.filters > select,
+.filters > button {
+  height: 40px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
 }
 
-.filters input, 
-.filters select { 
-  border-radius: 8px; 
-  border: 1px solid #cbd5e1; 
-  padding: 0 12px; 
-  outline: none; 
-  background: #ffffff; 
+.filters input,
+.filters select {
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  padding: 0 12px;
+  outline: none;
+  background: #ffffff;
   font-size: 13px;
   color: var(--text);
   width: 100%;
 }
 
-.filters input:focus, .filters select:focus { 
-  border-color: var(--primary); 
-  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1); 
+.filters input:focus,
+.filters select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
 }
 
-/* Botón Actualizar */
-.secondary-btn { 
+.secondary-btn {
   border: none;
   cursor: pointer;
-  border-radius: 8px; 
-  background: #eef3f8; 
-  color: var(--primary); 
+  border-radius: 8px;
+  background: #eef3f8;
+  color: var(--primary);
   font-weight: 700;
   font-size: 13px;
   padding: 0 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  white-space: nowrap; 
+  white-space: nowrap;
+  box-shadow: none !important;
   transition: all 0.2s ease;
 }
 
-/* Nuevo Botón Limpiar Filtros - Color Gris/Pizarra */
 .clear-btn {
   border: none;
   cursor: pointer;
-  border-radius: 8px; 
-  background: #e2e8f0; /* Color gris elegante en lugar de rosa */
-  color: #475569; /* Ícono gris oscuro */
-  width: 40px; /* Cuadrado perfecto */
+  border-radius: 8px;
+  background: #e2e8f0;
+  color: #475569;
+  width: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-shadow: none !important;
   transition: all 0.2s ease;
 }
 
-/* Hovers */
 .primary-btn:hover { background: var(--primary-2); transform: translateY(-1px); }
 .export-btn:hover { background: #1a5c38; transform: translateY(-1px); }
 .secondary-btn:hover { background: #e2e8f0; }
-.clear-btn:hover { background: #cbd5e1; color: #0f172a; } /* Oscurece al pasar el mouse */
+.clear-btn:hover { background: #cbd5e1; color: #0f172a; }
 
 /* =========================================
-   4. TABLA RESPONSIVA
+   4. TABLA RESPONSIVA Y ARRASTRE (MANITO)
    ========================================= */
 .table-wrap {
   width: 100%;
   overflow-x: auto;
   border-radius: 10px;
   border: 1px solid var(--border);
-  /* Escondemos el borde superior para que la cabecera azul fluya limpia */
-  border-top: none; 
+  border-top: none;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+  scrollbar-width: none;
+}
+
+.table-wrap:active {
+  cursor: grabbing;
+}
+
+.table-wrap::-webkit-scrollbar {
+  display: none;
+  height: 0px;
 }
 
 .usuarios-table {
@@ -285,8 +261,9 @@ align-items: center;
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
-  padding: 10px 8px;
+  padding: 10px 12px;
   border-bottom: 2px solid var(--primary-2);
+  white-space: nowrap !important;
 }
 
 .usuarios-table tbody td {
@@ -297,8 +274,8 @@ align-items: center;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.usuarios-table tbody tr:hover td { 
-  background: #f8fafc; 
+.usuarios-table tbody tr:hover td {
+  background: #f8fafc;
 }
 
 .usuarios-table tbody td:nth-child(5),
@@ -309,7 +286,7 @@ align-items: center;
 }
 
 /* =========================================
-   5. COMPONENTES PEQUEÑOS (Píldoras y Botones de acción)
+   5. COMPONENTES PEQUEÑOS Y ALERTAS
    ========================================= */
 .estado-pill {
   display: inline-flex;
@@ -342,17 +319,16 @@ align-items: center;
 .foto-status.has { background: var(--success); }
 .foto-status.no { background: var(--danger); }
 
-/* CONTENEDOR DE ACCIONES: Alineación estricta al centro */
-.actions-inline { 
-  display: flex; /* Cambiamos a flexbox estricto */
-  gap: 6px; 
-  align-items: center; /* ESTO CENTRA LOS BOTONES VERTICALMENTE */
-  justify-content: center; /* Centrado horizontal */
-  height: 100%; /* Toma todo el alto de la celda */
+.actions-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 
 .icon-btn {
-  width: 32px; /* Un poco más anchos para mayor área de clic */
+  width: 32px;
   height: 32px;
   border: none;
   border-radius: 8px;
@@ -361,24 +337,14 @@ align-items: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 0; /* Eliminamos márgenes que pudieran desalinearlos */
+  margin: 0;
   padding: 0;
+  box-shadow: none !important;
 }
 
 .icon-btn.edit { background: #e0f2fe; color: #0284c7; }
 .icon-btn.status { background: #ffedd5; color: #c2410c; }
 .icon-btn:hover { filter: brightness(0.95); transform: scale(1.05); }
-
-/* =========================================
-   QUITAR SOMBRAS DE TODOS LOS BOTONES
-   ========================================= */
-.primary-btn,
-.export-btn,
-.secondary-btn,
-.clear-btn,
-.icon-btn {
-  box-shadow: none !important;
-}
 
 .toast-message {
   position: fixed;
@@ -407,6 +373,12 @@ align-items: center;
   border: 1px solid #f5a5a5;
 }
 
+.toast-message.warning {
+  background: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde047;
+}
+
 @keyframes toastSlideIn {
   from {
     opacity: 0;
@@ -419,65 +391,23 @@ align-items: center;
 }
 
 /* =========================================
-   1. EVITAR QUE EL TEXTO DE LA CABECERA SE PARTA
-   ========================================= */
-.usuarios-table thead th {
-  white-space: nowrap !important; /* Fuerza a que el texto quede en una sola línea */
-  padding: 10px 12px;
-}
-
-/* =========================================
-   2. OCULTAR SCROLL HORIZONTAL Y PERMITIR ARRASTRE (MANITO)
-   ========================================= */
-.table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  border-top: none;
-  
-  /* Habilita el desplazamiento táctil fluido en celulares y tablets */
-  -webkit-overflow-scrolling: touch;
-  
-  /* Cambia el cursor por una manito indicando que se puede arrastrar */
-  cursor: grab;
-}
-
-/* Cursor de "agarrando" al hacer clic y arrastrar */
-.table-wrap:active {
-  cursor: grabbing;
-}
-
-/* Ocultar la barra de desplazamiento horizontal en navegadores Webkit (Chrome, Safari, Edge) */
-.table-wrap::-webkit-scrollbar {
-  display: none; /* Oculta la barra visualmente */
-  height: 0px;
-}
-
-/* Ocultar la barra de desplazamiento en Firefox */
-.table-wrap {
-  scrollbar-width: none; 
-}
-
-
-/* =========================================
-   6. RESPONSIVE  A CELULAR 
+   6. RESPONSIVE A TABLET Y CELULAR
    ========================================= */
 @media (max-width: 1150px) {
-  .filters { grid-template-columns: 1fr 1fr auto auto; } /* Mueve los filtros a 2 filas en pantallas medianas */
-  .search-input { grid-column: span 2; }
+  .filters { grid-template-columns: 1fr 1fr auto; }
+  .search-input { grid-column: span 3; }
 }
 
 @media (max-width: 768px) {
-  /* 1. Pegar los contenedores a los bordes de la pantalla */
+  /* 1. Pegar la página a los bordes laterales en móvil */
   .registro-page {
     padding: 10px 10px;
   }
 
-  /* 2. Achicar y compactar la tarjeta superior (Tracking de usuarios) */
+  /* 2. Compactar la tarjeta superior */
   .page-hero {
-    padding: 12px 14px;
-    margin-bottom: 12px;
+    padding: 12px 12px;
+    margin-bottom: 10px;
     border-radius: 12px;
   }
 
@@ -487,10 +417,9 @@ align-items: center;
     margin-bottom: 4px;
   }
 
-  /* Achicar y adelgazar el título principal */
   .page-hero h1 {
     font-size: 18px;
-    font-weight: 600; /* Más delgado (antes 800) */
+    font-weight: 700;
     margin: 0 0 2px;
   }
 
@@ -499,28 +428,48 @@ align-items: center;
     line-height: 1.35;
   }
 
-  /* 3. Ajustar la tarjeta de la tabla para que alinee con la superior */
+  /* 3. Reducir el relleno lateral de .tracking-card para que la tabla se pegue al borde */
+  .tracking-card,
   .card {
-    padding: 16px 14px;
+    padding: 10px 10px;
     border-radius: 12px;
   }
 
   .toolbar {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 0 4px;
   }
 
   .toolbar-actions {
     width: 100%;
     justify-content: space-between;
+    gap: 8px;
   }
 
-  .primary-btn, .export-btn { flex: 1; }
+  /* Ajustar botones para que no se salgan por la derecha en pantallas pequeñas */
+  .primary-btn,
+  .export-btn {
+    flex: 1;
+    padding: 0 10px;
+    font-size: 12px;
+  }
 
-  /* Ajuste correcto de Grid para celulares */
-  .filters { grid-template-columns: 1fr; }
-  .search-input { grid-column: span 1; }
-  
-  /* Permite que los botones ocupen todo el ancho en celular */
-  .filters > button { width: 100% !important; }
+  /* 4. Filtros compactos y alineados con la tabla */
+  .filters {
+    grid-template-columns: 1fr;
+    padding: 10px;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .search-input {
+    grid-column: span 1;
+  }
+
+  .filters > button {
+    width: 100% !important;
+  }
 }

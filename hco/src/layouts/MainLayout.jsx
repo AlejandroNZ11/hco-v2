@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { localDb } from "../services/localDb";
 import {
   FaHome, FaSyncAlt, FaCog, FaKey, FaSignOutAlt, FaExchangeAlt, FaArrowLeft, FaBroom, FaBell
 } from "react-icons/fa";
@@ -99,22 +100,35 @@ const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opcion
   // ==========================================
   useEffect(() => {
     async function comprobarVersion() {
+      if (!navigator.onLine) return;
+
       try {
-        const response = await fetch(`/version.json?t=${new Date().getTime()}`);
+        // cache: 'no-store' obliga al navegador a leer el version.json real del servidor
+        const response = await fetch(`/version.json?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+
+        if (!response.ok) return;
         const data = await response.json();
-        
+        if (!data?.version) return;
+
         const versionLocal = localStorage.getItem('hco_app_version');
 
+        // Primera vez que entra el usuario: registramos la versión actual
         if (!versionLocal) {
           localStorage.setItem('hco_app_version', data.version);
           return;
         }
 
+        // Si subiste un cambio grande (ej. de 1.0.0 a 1.0.1)
         if (versionLocal !== data.version) {
-          console.warn("¡Nueva versión detectada!");
-          // Guardamos temporalmente la nueva versión para aplicarla al cerrar el modal
+          console.warn(`¡Nueva versión detectada! Local: ${versionLocal} -> Nueva: ${data.version}`);
           localStorage.setItem('hco_nueva_version', data.version);
-          setShowUpdateModal(true); // Muestra nuestro modal bonito
+          setShowUpdateModal(true);
         }
       } catch (error) {
         console.log("Modo offline, no se pudo comprobar la versión.");
@@ -122,9 +136,88 @@ const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opcion
     }
 
     comprobarVersion();
-    const intervalo = setInterval(comprobarVersion, 15 * 60 * 1000); 
-    return () => clearInterval(intervalo);
+    const intervalo = setInterval(comprobarVersion, 15 * 60 * 1000);
+    window.addEventListener('online', comprobarVersion);
+
+    return () => {
+      clearInterval(intervalo);
+      window.removeEventListener('online', comprobarVersion);
+    };
   }, []);
+
+  // Función auxiliar que destruye cachés de PWA y reinicia IndexedDB (Dexie)
+  async function destruirCacheYBaseLocal() {
+    // 1. Cerrar y eliminar Dexie correctamente esperando la promesa
+    try {
+      localDb.close();
+      await localDb.delete();
+    } catch (e) {
+      console.warn("Aviso cerrando Dexie:", e);
+    }
+
+    // 2. Asegurar borrado de HCO_OfflineDB en el navegador
+    if (window.indexedDB) {
+      await new Promise((resolve) => {
+        const req = indexedDB.deleteDatabase('HCO_OfflineDB');
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+      });
+    }
+
+    // 3. Borrar Cache Storage (archivos JS, CSS e imágenes de la PWA)
+    if ('caches' in window) {
+      const nombresCaches = await caches.keys();
+      await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+    }
+
+    // 4. Desregistrar el Service Worker viejo
+    if ('serviceWorker' in navigator) {
+      const registros = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registros.map(registro => registro.unregister()));
+    }
+
+    localStorage.removeItem('popup_almuerzo_cache_v2');
+  }
+
+  // BOTÓN MANUAL: "Limpiar Caché y Actualizar" (Escoba 🧹)
+  async function ejecutarLimpiezaCache() {
+    try {
+      await destruirCacheYBaseLocal();
+      window.location.replace(window.location.pathname + '?v=' + Date.now());
+    } catch (error) {
+      console.error("Error al limpiar la caché:", error);
+      alert("Hubo un problema al limpiar la caché. Intenta reiniciar tu navegador.");
+    }
+  }
+
+  // MODAL AUTOMÁTICO DE CAMBIOS GRANDES (Cohete 🚀 por version.json)
+  async function aplicarActualizacionYSalir() {
+    try {
+      const nuevaVersion = localStorage.getItem('hco_nueva_version') || '1.0.1';
+
+      // 1. Si el usuario tenía cambios hechos en modo Offline, los subimos primero para que no pierda nada
+      if (pendingCount > 0 && navigator.onLine) {
+        await sincronizarPendientes(true);
+      }
+
+      // 2. Destruimos toda la caché vieja y la base local antigua
+      await destruirCacheYBaseLocal();
+
+      // 3. Cerramos la sesión primero
+      ejecutarCierreSesion();
+
+      // 4. Guardamos la nueva versión DESPUÉS de cerrar sesión para que no se borre
+      localStorage.setItem('hco_app_version', nuevaVersion);
+      localStorage.removeItem('hco_nueva_version');
+
+      // 5. Recargamos desde cero apuntando al login con timestamp limpio
+      window.location.replace('/?v=' + Date.now());
+    } catch (error) {
+      console.error("Error al actualizar versión:", error);
+      window.location.replace('/?v=' + Date.now());
+    }
+  }
 
   function limpiarCacheYActualizar() {
     setDropdownOpen(false);
@@ -161,52 +254,39 @@ const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opcion
     }
   }
 
-    async function ejecutarLimpiezaCache() {
+  async function limpiarAlmacenamientoNavegador() {
+    // 1. Cerrar conexión activa de Dexie y borrar IndexedDB esperando a que termine
     try {
-      if ('caches' in window) {
-        const nombresCaches = await caches.keys();
-        await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
-      }
-      if ('serviceWorker' in navigator) {
-        const registros = await navigator.serviceWorker.getRegistrations();
-        for (let registro of registros) {
-          await registro.unregister();
-        }
-      }
-      if (window.indexedDB) {
-        indexedDB.deleteDatabase('HCO_OfflineDB');
-      }
-      localStorage.removeItem('popup_almuerzo_cache_v2');
-      window.location.reload(true);
-    } catch (error) {
-      console.error("Error al limpiar la caché:", error);
-      alert("Hubo un problema al limpiar la caché. Intenta reiniciar tu navegador.");
+      localDb.close();
+      await localDb.delete();
+    } catch (e) {
+      console.warn("Aviso al borrar localDb con Dexie:", e);
     }
-  }
 
-  async function aplicarActualizacionYSalir() {
-    try {
-      if ('caches' in window) {
-        const nombresCaches = await caches.keys();
-        await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
-      }
-      if ('serviceWorker' in navigator) {
-        const registros = await navigator.serviceWorker.getRegistrations();
-        for (let registro of registros) {
-          await registro.unregister();
-        }
-      }
-
-      const nuevaVersion = localStorage.getItem('hco_nueva_version') || '1.0.0';
-      localStorage.setItem('hco_app_version', nuevaVersion);
-      localStorage.removeItem('hco_nueva_version');
-
-      ejecutarCierreSesion();
-      window.location.reload(true);
-    } catch (error) {
-      console.error("Error al actualizar versión:", error);
-      window.location.reload(true);
+    // 2. Respaldo nativo con Promesa por si existen otras bases de datos
+    if (window.indexedDB) {
+      await new Promise((resolve) => {
+        const req = indexedDB.deleteDatabase('HCO_OfflineDB');
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+      });
     }
+
+    // 3. Borrar todas las Cache Storage de la PWA (archivos JS, CSS, imágenes viejas)
+    if ('caches' in window) {
+      const nombresCaches = await caches.keys();
+      await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+    }
+
+    // 4. Desregistrar todos los Service Workers activos
+    if ('serviceWorker' in navigator) {
+      const registros = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registros.map(registro => registro.unregister()));
+    }
+
+    // 5. Limpiar cachés residuales en localStorage (conservando versión o sesión según corresponda)
+    localStorage.removeItem('popup_almuerzo_cache_v2');
   }
 
   if (!authUser) return null;

@@ -13,16 +13,22 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      // En vite.config.js dentro de VitePWA -> workbox:
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt,woff,woff2}'],
+        globIgnores: ['**/version.json'], // <-- Evita que la PWA congele la versión vieja
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        // Hace que el Service Worker tome control inmediato sin requerir F5
         clientsClaim: true,
         skipWaiting: true,
         cleanupOutdatedCaches: true,
-        // Permite que todas las rutas de React Router carguen offline
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api/],
+        navigateFallbackDenylist: [/^\/api/, /\/version\.json$/],
+        runtimeCaching: [
+          {
+            urlPattern: /\/version\.json/,
+            handler: 'NetworkOnly', // <-- Obliga a consultar siempre al servidor
+          }
+        ]
       },
       manifest: {
         name: 'HCO - Herramientas de Control',

@@ -104,40 +104,54 @@ export default function TrackingUsuarios() {
   // =========================================================================
   // SINCRONIZACIÓN INICIAL CON SUPABASE (Con candado para no repetir)
   // =========================================================================
+  // SINCRONIZACIÓN INTELIGENTE CON SUPABASE
   const syncIniciado = React.useRef(false);
 
-
   useEffect(() => {
-    const sincronizarDatosIniciales = async () => {
-      if (isOnline && usuariosDb.length === 0 && !syncIniciado.current) {
-        syncIniciado.current = true;
-        setLoading(true);
-        try {
-          const datosEmpleados = await obtenerTodosLosEmpleados();
-          const datosAreas = await obtenerAreas();
+    const sincronizarDatos = async () => {
+      if (!isOnline || syncIniciado.current) return;
+      syncIniciado.current = true;
 
-          if (datosEmpleados && datosEmpleados.length > 0) {
-            const empleadosFormateados = datosEmpleados.map(emp => ({
-              ...emp,
-              cargo: emp.cargo ? emp.cargo.nombre : '-',
-              area: emp.area ? emp.area.nombre : '-',
-              jefe_directo: emp.jefe ? emp.jefe.nombre : '-'
-            }));
-            await localDb.usuarios.bulkPut(empleadosFormateados);
-          }
-          if (datosAreas && datosAreas.length > 0) {
-            await localDb.areas.bulkPut(datosAreas);
-          }
-        } catch (error) {
-          console.error("Error sincronizando base local:", error);
-        } finally {
-          setLoading(false);
+      // Solo mostramos el spinner de pantalla completa si la base local está vacía
+      const mostrarLoader = usuariosDb.length === 0;
+      if (mostrarLoader) setLoading(true);
+
+      try {
+        // Verificar si hay cambios offline pendientes antes de sobrescribir
+        const pendientes = await localDb.sync_queue
+          .where('tabla')
+          .equals('usuarios')
+          .count()
+          .catch(() => 0);
+
+        const [datosEmpleados, datosAreas] = await Promise.all([
+          obtenerTodosLosEmpleados(),
+          obtenerAreas()
+        ]);
+
+        if (datosEmpleados && datosEmpleados.length > 0 && pendientes === 0) {
+          const empleadosFormateados = datosEmpleados.map(emp => ({
+            ...emp,
+            cargo: emp.cargo ? emp.cargo.nombre : '-',
+            area: emp.area ? emp.area.nombre : '-',
+            jefe_directo: emp.jefe ? emp.jefe.nombre : '-'
+          }));
+          // Actualiza y limpia registros que ya no existan
+          await localDb.usuarios.bulkPut(empleadosFormateados);
         }
+
+        if (datosAreas && datosAreas.length > 0) {
+          await localDb.areas.bulkPut(datosAreas);
+        }
+      } catch (error) {
+        console.error("Error sincronizando base local:", error);
+      } finally {
+        if (mostrarLoader) setLoading(false);
       }
     };
 
-    sincronizarDatosIniciales();
-  }, [isOnline, usuariosDb.length]);
+    sincronizarDatos();
+  }, [isOnline]); // Se ejecuta al montar si hay red o cuando vuelve el internet
 
   // 2. PROCESAMIENTO LOCAL (Formateo de relaciones y ORDENAMIENTO A-Z)
   const allItems = React.useMemo(() => {

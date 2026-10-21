@@ -6,7 +6,8 @@ import {
   FaSearch,
   FaUndo,
   FaChevronLeft,
-  FaChevronRight
+  FaChevronRight,
+  FaChartBar, FaBullseye
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './trackingCuadroQ.css';
@@ -440,52 +441,54 @@ const registrosFiltrados = useMemo(() => {
         </div>
 
         <div className="filters-actions-row">
-          <button
+        <button
             type="button"
             className="btn-action-primary"
             onClick={() => navigate('/cuadro_q/Registro-cuadroQ')}
-
-          >
+        >
             <FaPlus />
             <span>Registrar</span>
-          </button>
+        </button>
 
-          <button
+        <button
             type="button"
             className="btn-action-primary"
             onClick={handleAplicarFiltros}
-          >
+        >
             <FaSearch />
             <span>Buscar</span>
-          </button>
+        </button>
 
-          <button
+        <button
             type="button"
             className="btn-action-secondary"
             onClick={handleLimpiarFiltros}
-          >
+        >
             <FaUndo />
             <span>Limpiar</span>
-          </button>
+        </button>
+
         <button
             type="button"
-            className="btn-action-primary"
-            style={{ background: '#0284c7' }}
+            className="btn-action-primary btn-graficos"
             onClick={() => navigate('/cuadro_q/pizarraCuadroQ')}
         >
-            <span>📊 Ver Gráficos</span>
+            <FaChartBar />
+            <span>Ver Gráficos</span>
         </button>
 
         <button
             type="button"
-            className="btn-action-primary"
-            style={{ background: '#7c3aed' }}
+            className="btn-action-primary btn-radar"
             onClick={() => navigate('/cuadro_q/radarCuadroQ')}
-          >
-            <span>🎯 Radar</span>
+        >
+            <FaBullseye />
+            <span>Radar</span>
         </button>
-
         </div>
+
+
+
       </section>
 
       {/* 3. SECCIÓN INFERIOR: TABLA Y PAGINACIÓN */}

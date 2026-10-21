@@ -216,14 +216,6 @@ export default function PizarraCuadroQ() {
           </p>
         </div>
 
-        <button
-          type="button"
-          id="btnVolver"
-          className="secondary-btn"
-          onClick={() => navigate('/cuadro_q/trackingCuadroQ')}
-        >
-          Volver
-        </button>
       </section>
 
       {/* FILTROS PARA GRÁFICOS POR ÁREA */}

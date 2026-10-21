@@ -258,6 +258,7 @@
 }
 
 /* Tablero con forma de Q: cuadraditos unidos sin separación como Imagen 4 */
+/* Tablero con forma de Q */
 .q-board {
   --q-cell-w: clamp(23px, 1.95vw, 33px);
   --q-cell-h: clamp(16px, 1.3vw, 21px);
@@ -267,15 +268,19 @@
   display: grid;
   grid-template-columns: repeat(13, var(--q-cell-w));
   grid-template-rows: repeat(16, var(--q-cell-h));
-  gap: 0;
+  gap: 0 !important;
+  padding: 1px 0 0 1px; /* Da espacio para que el borde exterior no se corte */
 }
 
+/* Celdas de los días */
 .q-day {
-  width: var(--q-cell-w);
-  height: var(--q-cell-h);
-  border: 1.5px solid var(--border);
-  border-radius: 0;
-  margin: -1px 0 0 -1px;
+  /* ESTA ES LA MAGIA: 100% del tamaño + 1px extra para que superponga exactamente */
+  width: calc(100% + 1px) !important;
+  height: calc(100% + 1px) !important;
+  margin: -1px 0 0 -1px !important;
+  
+  border: 1px solid #111 !important;
+  border-radius: 0 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -286,7 +291,17 @@
   line-height: 1;
   padding: 0 !important;
   box-sizing: border-box !important;
+  z-index: 1;
 }
+
+/* Cuadro vacío de relleno */
+.q-day.empty-box {
+  background: #ffffff;
+  color: transparent;
+  pointer-events: none; /* Hace que no sea clickeable ni interactivo */
+}
+
+
 
 /* Estados de los días */
 .q-day.quality {
@@ -311,32 +326,28 @@
   color: #000;
 }
 
-.q-day.empty-box {
-  background: #ffffff;
-  border: 1.5px solid var(--border);
-  color: transparent;
-}
 
-/* Leyenda inferior de cada mes con cajas unidas */
+/* Leyenda inferior de cada mes (con espacio entre ítems) */
 .month-legend {
   position: absolute;
   left: 16px;
   bottom: 14px;
   display: grid;
-  grid-template-columns: 30px auto;
+  grid-template-columns: 24px auto; /* Ancho ajustado para la cajita */
   align-items: center;
-  row-gap: 0;
+  row-gap: 1px; /* ESPACIO de separación entre cada fila */
   font-size: 12px;
   font-weight: 600;
 }
 
 .legend-box {
-  width: 30px;
-  height: 18px;
-  border: 1.5px solid #111;
-  border-radius: 0;
-  margin-top: -1px;
+  width: 24px;
+  height: 16px;
+  border: 1px solid #111; /* Borde fino de 1px */
+  border-radius: 3px; /* Curva ligera para que luzca mejor */
+  margin-top: 0; /* Quitamos el margen negativo para que no se peguen */
 }
+
 
 .legend-box.quality { background: var(--green); }
 .legend-box.internal { background: var(--yellow); }
@@ -391,12 +402,83 @@
     gap: 8px;
   }
 
+  .summary-panel {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  /* 1. Ajustar el relleno y centrar todo en la tarjeta */
+  .summary-card {
+    padding: 10px 6px;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* 2. Centrar la zona de la etiqueta */
+  .summary-card-top {
+    justify-content: left;
+    width: 100%;
+    margin-bottom: 4px;
+  }
+
+  /* 3. Estilizar la etiqueta para que no se deforme si baja a 2 líneas */
+  .summary-tag {
+    font-size: 9px; /* Reducimos la letra ligeramente */
+    padding: 4px 8px;
+    line-height: 1.15;
+    text-align: center;
+    letter-spacing: 0;
+    white-space: normal; /* Permite 2 líneas ordenadas si es necesario */
+  }
+
+  /* 4. Ocultar el punto lateral para ganar espacio vital en celulares */
+  .summary-dot {
+    display: none !important;
+  }
+
+  /* 5. Centrar y ajustar el tamaño del número */
+  .summary-card strong {
+    font-size: 20px;
+    text-align: center;
+    width: 100%;
+  }
+  
   .radar-grid {
     grid-template-columns: 1fr;
   }
 
+  /* AJUSTE DEL CONTENEDOR DEL MES */
   .month-body {
-    padding-left: 6px;
-    padding-right: 6px;
+    padding-top: 20px;
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 95px; /* Espacio exacto reservado para la leyenda abajo */
+    min-height: auto; /* Permite que el contenedor se ajuste al tamaño real de la Q */
+  }
+
+  /* CENTRAR Y RESTAURAR EL TAMAÑO DE LA Q */
+  .q-board {
+    margin: 0 auto; 
+    transform: scale(1); /* Restaura el tamaño al 100% para llenar mejor la pantalla */
+    transform-origin: center top;
+  }
+
+  /* AJUSTE FINO DE LA LEYENDA PARA MÓVIL */
+  .month-legend {
+    left: 16px;
+    bottom: 14px;
+    grid-template-columns: 24px auto; 
+    row-gap: 5px; 
+    font-size: 11px; 
+  }
+
+  .legend-box {
+    width: 24px; 
+    height: 14px; 
+    border-radius: 2px;
+  }
+
+  .legend-label {
+    padding-left: 6px; 
   }
 }

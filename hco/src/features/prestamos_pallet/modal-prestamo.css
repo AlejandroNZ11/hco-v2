@@ -1,0 +1,336 @@
+/* =========================================
+   ESTILOS - REGISTRO DE PRÉSTAMOS (DISEÑO IMAGEN 3)
+   ========================================= */
+
+.registro-page-p {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 20px 24px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #102033;
+  background: #f4f7fa;
+}
+
+.card-p {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  border: 1px solid #e7edf3;
+  padding: 30px;
+}
+
+.card-head-modern-p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.card-head-left-p h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+}
+
+.section-title-p {
+  font-size: 13px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #e8eef4;
+  padding-bottom: 8px;
+}
+
+/* GRID SYSTEM */
+.form-grid-p {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-grid-p.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.form-grid-p.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.form-grid-p.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.form-grid-p.cols-1 { grid-template-columns: 1fr; }
+
+/* NUEVO: Grid para Retorna (1/4) y Observación (3/4) */
+.grid-retorna-obs {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* INPUT FIELDS */
+.field-p {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.field-p label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.field-p input,
+.field-p select {
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  padding: 0 12px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+/* Textarea específico */
+.field-p textarea {
+  width: 100%;
+  border-radius: 12px;
+  font-size: 13.5px;
+  padding: 10px 12px;
+  outline: none;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  border: 1.5px solid #c8d8e8;
+  color: #0f172a;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.field-p textarea:focus {
+  border-color: #0f4c81;
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+}
+
+.field-auto-p input {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.field-manual-p input,
+.field-manual-p select {
+  background: #ffffff;
+  border: 1.5px solid #c8d8e8;
+  color: #0f172a;
+}
+
+.field-manual-p input:focus,
+.field-manual-p select:focus {
+  border-color: #0f4c81;
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+}
+
+.label-with-link-p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.link-action-p {
+  color: #1565a7;
+  font-size: 11px;
+  font-weight: 800;
+  font-style: italic; /* ESTO LO VUELVE CURSIVA */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+.link-action-p:hover { 
+  text-decoration: underline; 
+}
+
+
+/* FIRMA Y FOTO */
+.firma-input-group-p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-firma-p {
+  background: #ffffff;
+  border: 1.5px solid #0f4c81;
+  color: #0f4c81;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.btn-firma-p:hover { background: #f0f7fc; }
+
+.badge-firma-p {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.badge-firma-p.activa { background: #475569; color: #ffffff; }
+.badge-firma-p.inactiva { background: #e2e8f0; color: #64748b; }
+
+.btn-quitar-foto-p {
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.counter-p {
+  text-align: right;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* FOOTER */
+.footer-form-p {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e8eef4;
+}
+
+.footer-text-p {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.footer-actions-p {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-limpiar-p {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  height: 42px;
+  padding: 0 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-limpiar-p:hover { background: #f1f5f9; }
+
+.btn-guardar-p {
+  background: #0f4c81;
+  border: none;
+  color: #ffffff;
+  height: 42px;
+  padding: 0 32px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(15, 76, 129, 0.2);
+  transition: all 0.2s;
+}
+.btn-guardar-p:hover:not(:disabled) { background: #0c3d68; }
+.btn-guardar-p:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* =========================================
+   MODALES FLOTANTES (CORRECCIÓN IMAGEN 1)
+   ========================================= */
+.tw-modal-backdrop {
+  position: fixed;     /* <-- ESTO SOLUCIONA EL PROBLEMA */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+
+.tw-modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.firma-box-p {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 600px;
+  text-align: center;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+.firma-box-p h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+#firmaCanvas {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  width: 100%;
+  touch-action: none;
+  cursor: crosshair;
+  margin-bottom: 16px;
+}
+
+.firma-actions-p {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 992px) {
+  .form-grid-p.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .form-grid-p.cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-retorna-obs { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .registro-page-p { padding: 12px; }
+  .card-p { padding: 20px 16px; border-radius: 12px; }
+  .form-grid-p.cols-4, .form-grid-p.cols-3, .form-grid-p.cols-2 { grid-template-columns: 1fr; }
+  .grid-retorna-obs { grid-template-columns: 1fr; }
+  .footer-form-p { flex-direction: column; align-items: stretch; gap: 16px; }
+  .footer-text-p { text-align: center; }
+  .footer-actions-p { flex-direction: column; }
+  .footer-actions-p button { width: 100%; justify-content: center; }
+  .firma-actions-p { flex-direction: column; }
+}

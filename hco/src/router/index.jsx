@@ -7,7 +7,8 @@ import Menu from "../features/dashboard/Menu";
 import { almuerzosRoutes } from "./almuerzosRoutes";
 import { usuariosRoutes } from "./usuariosRoutes";
 import { mheRoutes } from "./mheRoutes";
-import { cuadroQRoutes } from "./cuadroQRoutes"; // <-- 1. Importar
+import { cuadroQRoutes } from "./cuadroQRoutes"; 
+import { prestamosRoutes } from './prestamosRoutes';
 
 export const router = createBrowserRouter([
   {
@@ -21,7 +22,8 @@ export const router = createBrowserRouter([
       ...almuerzosRoutes,
       ...usuariosRoutes,
       ...mheRoutes,
-      ...cuadroQRoutes, // <-- 2. Agregar aquí
+      ...cuadroQRoutes, 
+      ...prestamosRoutes,
     ],
   },
   {

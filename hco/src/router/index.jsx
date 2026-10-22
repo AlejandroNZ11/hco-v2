@@ -9,6 +9,7 @@ import { usuariosRoutes } from "./usuariosRoutes";
 import { mheRoutes } from "./mheRoutes";
 import { cuadroQRoutes } from "./cuadroQRoutes"; 
 import { prestamosRoutes } from './prestamosRoutes';
+import { sugerenciasRoutes } from "./sugerenciasRoutes";
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
       ...mheRoutes,
       ...cuadroQRoutes, 
       ...prestamosRoutes,
+      ...sugerenciasRoutes,
     ],
   },
   {

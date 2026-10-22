@@ -15,8 +15,10 @@ import {
   FaRoute,
   FaMobileAlt,
   FaBusAlt,
+  FaLightbulb,
   FaBus,
   FaUsers,
+  FaTools,
   FaLock, // <-- Agregado para el bloqueo
 } from "react-icons/fa";
 
@@ -234,6 +236,7 @@ export default function Menu() {
   );
 
   const rol = String(authUser?.rol || "USUARIO").trim().toUpperCase();
+  const esSuperAdmin = rol === "SUPERADMIN";
   const esAdmin = rol === "SUPERADMIN" || rol === "SUPERVISOR";
 
   const menuTabs = useMemo(() => {
@@ -264,14 +267,14 @@ export default function Menu() {
             estado: "Activo",
           },
           {
-            title: "Tarjetas de Sugerencia",
-            description: "Recolectar y gestionar ideas o propuestas de mejora.",
-            Icon: FaBoxes,
-            accent: "accent-slate",
+            title: "Tarjetas de Sugerencias",
+            description: "Recolectar y gestionar ideas o propuestas de mejora continua.",
+            Icon: FaLightbulb, // Cambiado de FaBoxes a FaLightbulb (foco de ideas)
+            accent: "accent-blue", // o "accent-amber" si usas tonos amarillos para ideas
             buttonText: "Entrar",
             image: "/img/SUGERENCIA.jpg",
-            url: "/tarjetas-sugerencias/sugerencias",
-            estado: "Inactivo",
+            url: "/sugerencias/tracking", // Debe coincidir exactamente con la ruta de tu router
+            estado: "En Proceso",
           },
           {
             title: "Cuadro Q",
@@ -345,7 +348,7 @@ export default function Menu() {
             buttonText: "Entrar",
             image: "/img/palet.jpg",
             url: "/prestamos/tracking",
-            estado: "Activo",
+            estado: "En Proceso",
           },
         ],
       },
@@ -652,8 +655,12 @@ export default function Menu() {
   }
 
   function abrirApp(app) {
-    const esInactivo = String(app.estado || "Activo").trim().toLowerCase() === "inactivo";
-    if (esInactivo) return; // Bloquea cualquier acción si está inactivo
+    const estadoNorm = String(app.estado || "Activo").trim().toLowerCase();
+    const esInactivo = estadoNorm === "inactivo";
+    const esEnProceso = estadoNorm === "en proceso" || estadoNorm === "en preceso";
+
+    // Bloquea si está inactivo, o si está en proceso y el usuario NO es SUPERADMIN
+    if (esInactivo || (esEnProceso && !esSuperAdmin)) return;
 
     if (app.action === "logout") {
       cerrarSesion();
@@ -771,16 +778,27 @@ export default function Menu() {
             {visibleApps.map((app) => {
               const Icon = app.Icon;
               const imgSrc = app.image || buildFallbackSvg(app.title, app.accent);
-              const esInactivo =
-                String(app.estado || "Activo").trim().toLowerCase() === "inactivo";
+              
+              const estadoNorm = String(app.estado || "Activo").trim().toLowerCase();
+              const esInactivo = estadoNorm === "inactivo";
+              const esEnProceso = estadoNorm === "en proceso" || estadoNorm === "en preceso";
+              
+              // Se bloquea si es Inactivo, o si es En Proceso pero NO es SUPERADMIN
+              const bloqueado = esInactivo || (esEnProceso && !esSuperAdmin);
 
               return (
                 <button
                   key={app.title}
                   type="button"
-                  disabled={esInactivo}
+                  disabled={bloqueado}
                   className={`app-card ${app.accent || ""} ${
                     esInactivo ? "app-card-inactivo" : ""
+                  } ${
+                    esEnProceso
+                      ? esSuperAdmin
+                        ? "app-card-proceso-admin"
+                        : "app-card-proceso"
+                      : ""
                   }`}
                   aria-label={app.title}
                   onClick={() => abrirApp(app)}
@@ -799,7 +817,7 @@ export default function Menu() {
 
                     <div className="app-media-overlay"></div>
 
-                    {/* Etiqueta flotante sobre la imagen cuando está inactivo */}
+                    {/* Etiqueta flotante: PRÓXIMAMENTE (Inactivo) */}
                     {esInactivo && (
                       <div className="app-badge-proximamente">
                         <FaLock className="badge-lock-icon" />
@@ -807,29 +825,56 @@ export default function Menu() {
                       </div>
                     )}
 
+                    {/* Etiqueta flotante: EN DESARROLLO (En Proceso) */}
+                    {esEnProceso && (
+                      <div className="app-badge-desarrollo">
+                        <FaTools className="badge-tools-icon" />
+                        <span>En Desarrollo</span>
+                      </div>
+                    )}
+
                     <div className="app-media-icon">
-                      {esInactivo ? <FaLock /> : <Icon />}
+                      {esInactivo ? (
+                        <FaLock />
+                      ) : esEnProceso ? (
+                        <FaTools />
+                      ) : (
+                        <Icon />
+                      )}
                     </div>
                   </div>
 
                   <div className="app-card-body">
                     <span className="app-pill">
-                      {esInactivo ? "En desarrollo" : app.buttonText}
+                      {esInactivo
+                        ? "Próximamente"
+                        : esEnProceso
+                        ? esSuperAdmin
+                          ? "En proceso • Acceso Total"
+                          : "En desarrollo"
+                        : app.buttonText}
                     </span>
                     <h3>{app.title}</h3>
                     <p>{app.description}</p>
 
                     <div className="app-card-bottom">
                       <span className="app-link-text">
-                        {esInactivo ? "No disponible" : app.buttonText}
+                        {esInactivo
+                          ? "No disponible"
+                          : esEnProceso
+                          ? esSuperAdmin
+                            ? "Entrar (Superadmin)"
+                            : "En construcción"
+                          : app.buttonText}
                       </span>
-                      {esInactivo ? <FaLock /> : <FaArrowRight />}
+                      {bloqueado ? <FaLock /> : <FaArrowRight />}
                     </div>
                   </div>
                 </button>
               );
             })}
           </div>
+
         </section>
       </main>
 

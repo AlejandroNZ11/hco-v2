@@ -101,7 +101,7 @@ export const ERRORES_POR_AREA = {
     "Rótulos desactualizados",
     "Resultados 5S desactualizados"
   ],
-  "RRHH": [
+  "RR.HH.": [
     "Firma de contrato tardia",
     "Programación de citas de taxi tardia",
     "No se apertura el consolidado de almuerzos de día anterior",

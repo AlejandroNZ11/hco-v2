@@ -573,7 +573,7 @@ export default function RegistroCuadroQ() {
   const claseEstadoBadge = formData.estado ? formData.estado.replace(/\s+/g, '_') : 'PENDIENTE';
 
   return (
-    <div className="registro-page">
+    <div className="registro-cuadroq-page">
       {loading && <Loading />}
 
       {/* MODAL DE AVISO FLOTANTE */}

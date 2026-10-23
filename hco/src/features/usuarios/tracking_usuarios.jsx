@@ -306,7 +306,7 @@ export default function TrackingUsuarios() {
   };
 
   return (
-    <div className="registro-page">
+    <div className="tracking-usuarios-page">
       <section className="page-hero">
         <span className="page-chip">Administración</span>
         <h1>Tracking de usuarios {isOnline ? '🟢' : '🔴 (Sin Conexión)'}</h1>

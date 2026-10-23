@@ -2,14 +2,14 @@
    ESTILOS - TRACKING MHE (PIV)
    ========================================= */
 
-.tracking-page {
+.tracking-mhe-page {
   width: 100%;
   padding: 12px 10px; /* Reducido para acercar al borde en celulares */
   color: #102033;
   background-color: #f4f7fb;
   min-height: calc(100vh - 110px);
-}
 
+  
 /* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS AZULES */
 .top-summary-grid {
   display: grid;
@@ -572,4 +572,8 @@
   .mobile-hidden-filter {
     display: none !important;
   }
+}
+
+
+
 }

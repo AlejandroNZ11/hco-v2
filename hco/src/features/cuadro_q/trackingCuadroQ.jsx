@@ -339,7 +339,7 @@ const registrosFiltrados = useMemo(() => {
   };
 
   return (
-    <div className="tracking-page">
+    <div className="tracking-cuadroq-page">
       {loading && <Loading />}
 
       {/* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS KPI */}

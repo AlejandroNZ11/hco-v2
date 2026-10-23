@@ -2,14 +2,14 @@
    ESTILOS - REGISTRO Y ANÁLISIS CUADRO Q
    ========================================= */
 
-.registro-page {
+.registro-cuadroq-page {
   width: 100%;
   padding: 20px 24px;
   color: #102033;
   background-color: #f4f7fb;
   min-height: calc(100vh - 110px);
-}
 
+  
 /* Busca esta sección en Registro-cuadroQ.css */
 .card {
   background: #ffffff;
@@ -523,4 +523,9 @@
   .submit-row button {
     width: 100%;
   }
+}
+
+
+
+
 }

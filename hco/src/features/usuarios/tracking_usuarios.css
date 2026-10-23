@@ -1,4 +1,4 @@
-.registro-page {
+.tracking-usuarios-page {
   --card: #ffffff;
   --muted: #64748b;
   --text: #334155;
@@ -16,8 +16,8 @@
   padding: 20px 24px;
   color: var(--text);
   box-sizing: border-box;
-}
 
+  
 /* =========================================
    1. HERO (TÍTULO PRINCIPAL)
    ========================================= */
@@ -472,4 +472,7 @@
   .filters > button {
     width: 100% !important;
   }
+}
+
+
 }

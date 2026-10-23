@@ -498,7 +498,7 @@ export default function RegistrarUsuario() {
   };
 
   return (
-    <div className="registro-page" style={{ position: 'relative' }}>
+    <div className="registro-usuario-page" style={{ position: 'relative' }}>
       {loading && <Loading />}
       <section className="page-hero">
         <span className="page-chip">Administración</span>

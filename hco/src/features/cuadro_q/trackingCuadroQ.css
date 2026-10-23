@@ -1,146 +1,579 @@
 /* =========================================
-   ESTILOS - TRACKING CUADRO Q (Basado en MHE)
+   ESTILOS AISLADOS - TRACKING CUADRO Q
    ========================================= */
 
-@import '../mhe_piv/tracking_mhe.css';
+.tracking-cuadroq-page {
+  width: 100%;
+  padding: 12px 10px;
+  color: #102033;
+  background-color: #f4f7fb;
+  min-height: calc(100vh - 110px);
 
-/* Truncar textos largos en celdas con tooltip al pasar el mouse */
-.td-truncate {
-  max-width: 210px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* =========================================
-   COLORES DE ESTADO PERSONALIZADOS (CUADRO Q)
-   ========================================= */
-
-.badge-estado.cq-estado-cancelado {
-  background: #0f172a !important; /* Negro / Gris oscuro corporativo */
-  color: #ffffff !important;
-}
-
-.badge-estado.cq-estado-pendiente {
-  background: #0284c7 !important; /* Azul con letra blanca */
-  color: #ffffff !important;
-}
-
-.badge-estado.cq-estado-concluido {
-  background: #16a34a !important; /* Verde para concluido */
-  color: #ffffff !important;
-}
-
-/* =========================================
-   INDICADOR DE PÁGINA (Página X de Y)
-   ========================================= */
-
-.pagination-text-indicator {
-  font-size: 13px;
-  font-weight: 700;
-  color: #334155;
-  padding: 0 8px;
-  white-space: nowrap;
-}
-
-/* Ajuste visual de los botones de paginación para que se parezcan a tu imagen */
-.page-nav-btn {
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  color: #0f4c81;
-  font-size: 12.5px;
-  font-weight: 700;
-  padding: 6px 14px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.page-nav-btn:hover:not(:disabled) {
-  background: #e2e8f0;
-}
-
-.page-nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* =========================================
-   COLORES DE ESTADO PERSONALIZADOS (CUADRO Q)
-   ========================================= */
-
-/* ... (los que ya tenías de pendiente, concluido, cancelado) ... */
-
-/* Nuevo: EN PROCESO (Amarillo/Ámbar con letra blanca) */
-.badge-estado.cq-estado-proceso {
-  background: #f36f03 !important; 
-  color: #ffffff !important;
-}
-
-/* Nuevo: ATRAZADO o ATRASADO (Rojo con letra blanca) */
-.badge-estado.cq-estado-atrasado {
-  background: #dc2626 !important; 
-  color: #ffffff !important;
-}
-
-
-/* =========================================
-   ADAPTACIÓN RESPONSIVA PARA MÓVILES (360px)
-   ========================================= */
-
-@media (max-width: 768px) {
-  /* Apila el título superior y el contenedor general */
+  /* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS AZULES */
   .top-summary-grid {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 16px !important;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    margin-bottom: 12px;
+    align-items: stretch;
   }
 
-  /* FORZAR UNA SOLA FILA Y DEVOLVER EL MARGEN BLANCO (PADDING) */
+  .hero-card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 16px 18px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .module-pill {
+    background: #eef2f8;
+    color: #1e3a6d;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+    display: inline-block;
+  }
+
+  .hero-card h1 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 800;
+    color: #0b2239;
+  }
+
+  .hero-card p {
+    margin: 0;
+    color: #64748b;
+    font-size: 12.5px;
+  }
+
   .kpi-container-card {
-    display: flex !important;
-    flex-direction: row !important; 
-    flex-wrap: nowrap !important; 
-    gap: 8px !important; /* Espacio ideal entre las cajitas azules */
-    width: 100% !important;
-    padding: 16px !important; /* Esto crea el borde blanco alrededor como en la imagen 2 */
-    box-sizing: border-box !important;
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
   }
 
-  /* Ajustar cada caja azul para que ocupe 1/3 del espacio */
   .kpi-blue-box {
-    flex: 1 1 0 !important; 
-    min-width: 0 !important; 
-    padding: 9px 4px !important; /* Le da buena altura a la caja azul */
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
-    text-align: center !important;
-    border-radius: 10px !important;
+    background: linear-gradient(180deg, #0d5cab 0%, #094787 100%);
+    color: #ffffff;
+    border-radius: 10px;
+    min-width: 110px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(9, 71, 135, 0.18);
   }
 
-  /* Ajustar el título para que baje a dos líneas naturalmente (Ej: "MIS" arriba, "REGISTROS" abajo) */
   .kpi-box-title {
-    font-size: 10px !important; 
-    line-height: 1.2 !important;
-    white-space: normal !important; 
-    word-break: break-word !important;
-    margin-bottom: 6px !important;
+    font-size: 9.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    opacity: 0.95;
+    margin-bottom: 4px;
   }
 
-  /* Tamaño grande y destacado para el número */
   .kpi-box-value {
-    font-size: 24px !important; 
-    line-height: 1 !important;
-    margin: 0 !important;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
   }
 
-    /* Ocultar filtros innecesarios en celular (Impacto, Fechas, etc.) */
-  .mobile-hidden-filter {
-    display: none !important;
+  /* 2. SECCIÓN DE FILTROS Y BOTONES */
+  .filters-card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+  }
+
+  .filters-grid {
+    display: grid;
+    grid-template-columns: 2.4fr 0.95fr 0.95fr 0.85fr 0.85fr 0.85fr;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: end;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .filter-group label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #334155;
+    white-space: nowrap;
+  }
+
+  .filter-group select,
+  .filter-group input {
+    height: 34px;
+    padding: 0 8px;
+    border-radius: 8px;
+    border: 1px solid #dbe2ea;
+    background-color: #f8fafc;
+    color: #1e293b;
+    font-size: 11.5px;
+    outline: none;
+    transition: border-color 0.2s, background-color 0.2s;
+    width: 100%;
+  }
+
+  .filter-group.filter-buscar input {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+
+  .filter-group select:focus,
+  .filter-group input:focus {
+    border-color: #0f4c81;
+    background-color: #ffffff;
+  }
+
+  .filters-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .btn-action-primary {
+    background: #0f4c81;
+    color: #ffffff;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: none;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-action-primary:hover {
+    background: #145d9b;
+  }
+
+  .btn-action-secondary {
+    background: #eef2f7;
+    color: #1e3a6d;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid #d8e2ee;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .btn-action-secondary:hover {
+    background: #e2e8f0;
+  }
+
+  /* 3. SECCIÓN DE TABLA, PAGINACIÓN Y EXPORTAR */
+  .table-section-card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 12px 14px 16px;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+  }
+
+  .table-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .pagination-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .records-counter {
+    font-size: 11.5px;
+    color: #334155;
+  }
+
+  .pagination-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pagination-text-indicator {
+    font-size: 13px;
+    font-weight: 700;
+    color: #334155;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+
+  /* Botón de paginación propio de Cuadro Q (con borde y fondo) */
+  .page-nav-btn {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #0f4c81;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .page-nav-btn:hover:not(:disabled) {
+    background: #e2e8f0;
+  }
+
+  .page-nav-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .nav-chevron {
+    font-size: 11px;
+  }
+
+  .btn-exportar-excel {
+    background: #1f7a3f;
+    color: #ffffff;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .btn-exportar-excel:hover:not(:disabled) {
+    background: #186332;
+  }
+
+  .btn-exportar-excel:disabled {
+    background: #cbd5e1;
+    color: #64748b;
+    cursor: not-allowed;
+    opacity: 0.75;
+  }
+
+  .excel-icon-box {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  /* 4. TABLA COMPACTA SIN SCROLLBAR Y CON ARRASTRE */
+  .table-container {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 8px;
+    cursor: grab;
+    user-select: none;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .table-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .table-container.dragging {
+    cursor: grabbing;
+  }
+
+  .table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    white-space: nowrap;
+    font-size: 10.5px !important;
+  }
+
+  .table-container th {
+    background: #234375;
+    color: #ffffff;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 10.5px !important;
+    padding: 9px 10px !important;
+    text-align: center;
+    border-bottom: none;
+    letter-spacing: 0.2px;
+  }
+
+  .table-container th:first-child {
+    border-top-left-radius: 8px;
+  }
+
+  .table-container th:last-child {
+    border-top-right-radius: 8px;
+  }
+
+  .table-container td {
+    font-size: 10.5px !important;
+    padding: 8px 10px !important;
+    border-bottom: 1px solid #eef2f6;
+    vertical-align: middle;
+    text-align: center;
+    color: #1e293b;
+  }
+
+  .table-container tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  .td-truncate {
+    max-width: 210px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 5. COLORES DE ESTADO PERSONALIZADOS (CUADRO Q) */
+  .badge-estado {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+  }
+
+  .badge-estado.cq-estado-cancelado {
+    background: #0f172a !important;
+    color: #ffffff !important;
+  }
+
+  .badge-estado.cq-estado-pendiente {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+  }
+
+  .badge-estado.cq-estado-concluido {
+    background: #16a34a !important;
+    color: #ffffff !important;
+  }
+
+  .badge-estado.cq-estado-proceso {
+    background: #f36f03 !important;
+    color: #ffffff !important;
+  }
+
+  .badge-estado.cq-estado-atrasado {
+    background: #dc2626 !important;
+    color: #ffffff !important;
+  }
+
+  .badge-estado.pendiente-envio {
+    background: #f97316;
+    color: #ffffff;
+  }
+
+  /* 6. BOTONES DE ACCIÓN EN FILA */
+  .acciones-cell {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-tabla-editar,
+  .btn-tabla-aprobar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border-radius: 5px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-tabla-editar {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #1e3a6d;
+  }
+
+  .btn-tabla-editar:hover {
+    background: #f1f5f9;
+  }
+
+  .btn-tabla-aprobar {
+    border: none;
+    background: #0f4c81;
+    color: #ffffff;
+  }
+
+  .btn-tabla-aprobar:hover:not(:disabled) {
+    background: #145d9b;
+  }
+
+  .btn-tabla-aprobar.is-approved {
+    background: #16a34a;
+    color: #ffffff;
+    cursor: default;
+  }
+
+  .btn-tabla-editar.disabled-by-role,
+  .btn-tabla-aprobar.disabled-by-role {
+    background: #e2e8f0 !important;
+    color: #94a3b8 !important;
+    border-color: #cbd5e1 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+  }
+
+  /* 7. RESPONSIVE PARA PANTALLAS MEDIANAS Y MÓVILES */
+  @media (max-width: 1150px) {
+    .top-summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .kpi-container-card {
+      justify-content: stretch;
+    }
+
+    .kpi-blue-box {
+      flex: 1;
+    }
+
+    .filters-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .filter-group.filter-buscar {
+      grid-column: span 2;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .top-summary-grid {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 16px !important;
+    }
+
+    .kpi-container-card {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: nowrap !important;
+      gap: 8px !important;
+      width: 100% !important;
+      padding: 16px !important;
+      box-sizing: border-box !important;
+    }
+
+    .kpi-blue-box {
+      flex: 1 1 0 !important;
+      min-width: 0 !important;
+      padding: 9px 4px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+      border-radius: 10px !important;
+    }
+
+    .kpi-box-title {
+      font-size: 10px !important;
+      line-height: 1.2 !important;
+      white-space: normal !important;
+      word-break: break-word !important;
+      margin-bottom: 6px !important;
+    }
+
+    .kpi-box-value {
+      font-size: 24px !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+    }
+
+    .mobile-hidden-filter {
+      display: none !important;
+    }
+  }
+
+  @media (max-width: 600px) {
+    padding: 10px 10px;
+
+    .hero-card,
+    .filters-card,
+    .table-section-card {
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+
+    .filters-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .filter-group.filter-buscar {
+      grid-column: span 1;
+    }
+
+    .filters-actions-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .filters-actions-row button {
+      width: 100%;
+      justify-content: center;
+      padding: 0 4px;
+      font-size: 11.5px;
+    }
   }
 }

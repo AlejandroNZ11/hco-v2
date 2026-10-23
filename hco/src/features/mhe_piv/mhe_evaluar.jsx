@@ -722,7 +722,7 @@ export default function MheEvaluar() {
   };
 
   return (
-    <div className="registro-page">
+    <div className="mhe-evaluar-page">
       {loading && <Loading />}
 
       {/* AVISO FLOTANTE MODERNO (ESTILO TAILWIND CSS / BOOTSTRAP 5) */}

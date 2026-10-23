@@ -8,8 +8,8 @@
   color: #102033;
   background-color: #f4f7fb;
   min-height: calc(100vh - 110px);
-}
 
+  
 .sugerencia-card {
   background: #ffffff;
   border-radius: 16px;
@@ -589,4 +589,11 @@
   .tw-modal-btn {
     width: 100%;
   }
+}
+
+
+
+
+
+
 }

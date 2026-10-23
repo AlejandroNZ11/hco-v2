@@ -434,7 +434,7 @@ export default function TrackingMHE() {
   };
 
   return (
-    <div className="tracking-page">
+    <div className="tracking-mhe-page">
       {loading && <Loading />}
 
       {/* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS KPI */}

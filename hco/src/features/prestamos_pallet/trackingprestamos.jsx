@@ -300,7 +300,7 @@ export default function TrackingPrestamos() {
   };
 
   return (
-    <div className="tracking-page">
+    <div className="tracking-prestamos-page">
       {loading && <Loading />}
 
       {/* AVISO FLOTANTE MODERNO */}

@@ -2,12 +2,12 @@
    ESTILOS - REGISTRO DE USUARIO
    ========================================= */
 
-.registro-page {
+.registro-usuario-page {
   width: 100%;
   padding: 20px 24px;
   color: var(--text, #102033);
-}
 
+  
 .page-hero,
 .card {
   background: var(--card, #ffffff);
@@ -666,4 +666,8 @@
     align-items: center !important;
     justify-content: center !important;
   }
+}
+
+
+
 }

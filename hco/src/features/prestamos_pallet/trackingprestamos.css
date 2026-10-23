@@ -2,14 +2,16 @@
    ESTILOS - TRACKING PRÉSTAMOS DE PALLET
    ========================================= */
 
-.tracking-page {
+.tracking-prestamos-page {
   width: 100%;
   padding: 12px 10px;
   color: #102033;
   background-color: #f4f7fb;
   min-height: calc(100vh - 110px);
   font-family: "Segoe UI", Arial, sans-serif;
-}
+
+
+  
 /* =========================================
    1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS KPI PASTEL
    ========================================= */
@@ -623,4 +625,8 @@
   .firma-actions button {
     width: 100%;
   }
+}
+
+
+
 }

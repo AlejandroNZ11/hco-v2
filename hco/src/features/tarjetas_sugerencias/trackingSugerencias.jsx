@@ -474,7 +474,7 @@ export default function TrackingSugerencias() {
             onClick={() => navigate('/sugerencias/registrar')}
           >
             <FaPlus />
-            <span>Nueva sugerencia</span>
+            <span>Registrar</span>
           </button>
 
           <button

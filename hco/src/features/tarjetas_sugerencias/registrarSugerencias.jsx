@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 
-// Cambia los "../" por "../../"
 import Loading from '../../layouts/Loading';
 import {
   obtenerCatalogosSugerencias,
@@ -13,8 +12,7 @@ import {
 } from '../../services/sugerenciasService';
 import './registrarSugerencias.css';
 
-
-// Opciones fijas exactas solicitadas para marcar
+// Opciones fijas exactas
 const CATEGORIAS_OPCIONES = [
   'EHS',
   'Productividad',
@@ -120,7 +118,7 @@ export default function RegistrarSugerencias() {
     usuario_actualiza: ''
   });
 
-  // Modal de Aviso Flotante (estilo MHE_PIV)
+  // Modal de Aviso Flotante
   const [avisoFlotante, setAvisoFlotante] = useState({
     visible: false,
     tipo: 'warning',
@@ -157,7 +155,7 @@ export default function RegistrarSugerencias() {
     rolUsuario === 'admin';
 
   // En modo creación cualquiera puede llenar los datos de la sugerencia;
-  // en modo edición, el creador o los supervisores/admins pueden editar.
+  // en modo edición, el creador (si sigue Por Validar) o los supervisores/admins pueden editar.
   const puedeEditarDetalleInicial = !esModoEdicion || puedeAnalizar || (
     currentUser?.id && formData.usuario_registro_id === currentUser.id && formData.estado === 'Por Validar'
   );
@@ -227,7 +225,6 @@ export default function RegistrarSugerencias() {
           return;
         }
 
-        // Buscar cargo y jefe del creador del registro para mostrarlos en las casillas AUTO
         const creadorFicha = (empList || []).find(e => String(e.id) === String(reg.usuario_registro_id));
         const cargoCreador = (cargoList || []).find(c => String(c.id) === String(creadorFicha?.cargo_id))?.nombre || '';
         const jefeCreador = (empList || []).find(j => String(j.id) === String(creadorFicha?.jefe_directo_id))?.nombre || '';
@@ -245,7 +242,7 @@ export default function RegistrarSugerencias() {
           cargo_registro: cargoCreador || 'Operador / Analista',
           jefe_registro: jefeCreador || '-',
           categorias: Array.isArray(reg.categorias) ? reg.categorias : [],
-          fuentes: Array.isArray(reg.fuentes) ? reg.fuentes : [],
+          fuentes: Array.isArray(reg.fuentes) ? reg.fuentes : (reg.fuentes ? [reg.fuentes] : []),
           equipo_ids: Array.isArray(reg.equipo_ids) ? reg.equipo_ids : [],
           equipo_nombres: Array.isArray(reg.equipo_nombres) ? reg.equipo_nombres : [],
           descripcion_sugerencia: reg.descripcion_sugerencia || '',
@@ -257,8 +254,8 @@ export default function RegistrarSugerencias() {
           nombre_responsable: reg.nombre_responsable || '',
           responsable_apoyo_id: reg.responsable_apoyo_id || '',
           responsable_apoyo: reg.responsable_apoyo || '',
-          reconocido: Array.isArray(reg.reconocido) ? reg.reconocido : [],
-          impacto: Array.isArray(reg.impacto) ? reg.impacto : [],
+          reconocido: Array.isArray(reg.reconocido) ? reg.reconocido : (reg.reconocido ? [reg.reconocido] : []),
+          impacto: Array.isArray(reg.impacto) ? reg.impacto : (reg.impacto ? [reg.impacto] : []),
           plan_accion: reg.plan_accion || '',
           fecha_cierre: reg.fecha_cierre ? String(reg.fecha_cierre).slice(0, 10) : '',
           comentario_adicional: reg.comentario_adicional || '',
@@ -304,7 +301,7 @@ export default function RegistrarSugerencias() {
       .slice(0, 8);
   }, [busquedaEquipo, empleadosActivos, formData.equipo_ids]);
 
-  // Alternar casillas de arrays (categorías, fuentes, reconocido, impacto)
+  // Alternar casillas de arrays múltiples (Categorías)
   const toggleItemArray = (campo, valor) => {
     setFormData(prev => {
       const actual = Array.isArray(prev[campo]) ? prev[campo] : [];
@@ -312,6 +309,14 @@ export default function RegistrarSugerencias() {
       const nuevo = existe ? actual.filter(item => item !== valor) : [...actual, valor];
       return { ...prev, [campo]: nuevo };
     });
+  };
+
+  // Selección única guardada como array de 1 elemento (Fuentes, Impacto, Reconocido)
+  const handleSelectUnicoEnArray = (campo, valor) => {
+    setFormData(prev => ({
+      ...prev,
+      [campo]: valor ? [valor] : []
+    }));
   };
 
   // Agregar y quitar empleado en "Equipo"
@@ -391,13 +396,13 @@ export default function RegistrarSugerencias() {
       return mostrarAviso('warning', 'Proceso requerido', 'Por favor escriba el proceso al que pertenece la sugerencia.');
     }
     if (formData.fuentes.length === 0) {
-      return mostrarAviso('warning', 'Fuente requerida', 'Seleccione al menos una Fuente (Cotidiano, Auditoría 5S, Wecare, Gemba, Gemba EHS).');
-    }
-    if (formData.categorias.length === 0) {
-      return mostrarAviso('warning', 'Categoría requerida', 'Seleccione al menos una Categoría para la sugerencia.');
+      return mostrarAviso('warning', 'Fuente requerida', 'Seleccione una Fuente de la lista desplegable.');
     }
     if (formData.descripcion_sugerencia.trim().length < 10) {
       return mostrarAviso('warning', 'Descripción muy corta', 'La descripción de la sugerencia debe tener al menos 10 caracteres.');
+    }
+    if (formData.categorias.length === 0) {
+      return mostrarAviso('warning', 'Categoría requerida', 'Seleccione al menos una Categoría para la sugerencia.');
     }
 
     // 2. Validaciones de Análisis (si está en Modo Edición y tiene permisos)
@@ -439,7 +444,7 @@ export default function RegistrarSugerencias() {
             return mostrarAviso('warning', 'Fecha planificada requerida', 'Seleccione la Fecha planificada para la implementación.');
           }
           if (formData.impacto.length === 0) {
-            return mostrarAviso('warning', 'Impacto requerido', 'Marque al menos un tipo de Impacto.');
+            return mostrarAviso('warning', 'Impacto requerido', 'Seleccione el tipo de Impacto.');
           }
         }
       }
@@ -558,10 +563,12 @@ export default function RegistrarSugerencias() {
           </div>
 
           <div className="card-head-right">
-            <div className="legend-item">
-              <span className="legend-dot auto"></span>
-              <span>Automático / Lectura</span>
-            </div>
+            {esModoEdicion && (
+              <div className="legend-item">
+                <span className="legend-dot auto"></span>
+                <span>Automático / Lectura</span>
+              </div>
+            )}
             <div className="legend-item">
               <span className="legend-dot manual"></span>
               <span>Debe completar</span>
@@ -572,54 +579,64 @@ export default function RegistrarSugerencias() {
         <form onSubmit={handleSubmit} noValidate>
           {/* =========================================================
               1. DATOS AUTOMÁTICOS DEL REGISTRO
+              (Oculto en Registro nuevo, visible únicamente en Análisis / Edición)
              ========================================================= */}
-          <div className="section-title-row" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
-            <div className="section-title">1. Datos del Solicitante y Registro</div>
-          </div>
+          {esModoEdicion && (
+            <>
+              <div className="section-title-row" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
+                <div className="section-title">1. Datos del Solicitante y Registro</div>
+              </div>
 
-          <div className="grid-4-cols">
-            <div className="field field-auto">
-              <label>
-                Estado Actual <span className="field-badge auto">AUTO</span>
-              </label>
-              <input type="text" value={calcularEstadoAutomatico(formData)} readOnly />
-            </div>
+              <div className="grid-4-cols">
+                <div className="field field-auto">
+                  <label>
+                    Estado Actual <span className="field-badge auto">AUTO</span>
+                  </label>
+                  <input type="text" value={calcularEstadoAutomatico(formData)} readOnly />
+                </div>
 
-            <div className="field field-auto">
-              <label>
-                Fecha y Hora (Lima) <span className="field-badge auto">AUTO</span>
-              </label>
-              <input
-                type="text"
-                value={esModoEdicion ? String(formData.fecha_registro).replace('T', ' ').slice(0, 19) : relojLima}
-                readOnly
-              />
-            </div>
+                <div className="field field-auto">
+                  <label>
+                    Fecha y Hora (Lima) <span className="field-badge auto">AUTO</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={esModoEdicion ? String(formData.fecha_registro).replace('T', ' ').slice(0, 19) : relojLima}
+                    readOnly
+                  />
+                </div>
 
-            <div className="field field-auto">
-              <label>
-                Registrado por <span className="field-badge auto">AUTO</span>
-              </label>
-              <input type="text" value={formData.usuario_registro} readOnly />
-            </div>
+                <div className="field field-auto">
+                  <label>
+                    Registrado por <span className="field-badge auto">AUTO</span>
+                  </label>
+                  <input type="text" value={formData.usuario_registro} readOnly />
+                </div>
 
-            <div className="field field-auto">
-              <label>
-                Área de Registro <span className="field-badge auto">AUTO</span>
-              </label>
-              <input type="text" value={formData.area_registro || 'Sin área asignada'} readOnly />
-            </div>
-          </div>
+                <div className="field field-auto">
+                  <label>
+                    Área de Registro <span className="field-badge auto">AUTO</span>
+                  </label>
+                  <input type="text" value={formData.area_registro || 'Sin área asignada'} readOnly />
+                </div>
+              </div>
+            </>
+          )}
 
           {/* =========================================================
-              2. DETALLE DE LA SUGERENCIA
+              2. CLASIFICACIÓN Y DETALLE DE LA SUGERENCIA
              ========================================================= */}
-          <div className="section-title-row">
-            <div className="section-title">2. Clasificación y Detalle de la Sugerencia</div>
+          <div
+            className="section-title-row"
+            style={!esModoEdicion ? { marginTop: 0, borderTop: 'none', paddingTop: 0 } : undefined}
+          >
+            <div className="section-title">
+              {esModoEdicion ? '2. Clasificación y Detalle de la Sugerencia' : 'Clasificación y Detalle de la Sugerencia'}
+            </div>
           </div>
 
+          {/* PRIMERA FILA: PROCESO | FUENTE (Desplegable de 1 opción) */}
           <div className="grid-2-cols">
-            {/* PROCESO */}
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
               <label>
                 Proceso <span className="field-badge manual">OBLIGATORIO</span>
@@ -634,7 +651,26 @@ export default function RegistrarSugerencias() {
               />
             </div>
 
-            {/* EQUIPO INVOLUCRADO (MULTI-SELECT DE TABLA EMPLEADOS) */}
+            <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
+              <label>
+                Fuente <span className="field-badge manual">OBLIGATORIO</span>
+              </label>
+              <select
+                value={formData.fuentes[0] || ''}
+                onChange={(e) => handleSelectUnicoEnArray('fuentes', e.target.value)}
+                disabled={!puedeEditarDetalleInicial}
+                required
+              >
+                <option value="">Seleccione una fuente...</option>
+                {FUENTES_OPCIONES.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* SEGUNDA FILA: SOLO EQUIPO INVOLUCRADO */}
+          <div style={{ marginTop: '12px' }}>
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'} equipo-autocomplete-wrapper`}>
               <label>
                 Equipo Involucrado (Personal) <span className="field-badge optional">OPCIONAL</span>
@@ -694,56 +730,7 @@ export default function RegistrarSugerencias() {
             </div>
           </div>
 
-          {/* FUENTES Y CATEGORÍAS (CASILLAS PARA MARCAR) */}
-          <div className="grid-2-cols" style={{ marginTop: '12px' }}>
-            <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
-              <label>
-                Fuentes (Marque una o más) <span className="field-badge manual">OBLIGATORIO</span>
-              </label>
-              <div className="chips-selector-grid">
-                {FUENTES_OPCIONES.map((item) => {
-                  const marcado = formData.fuentes.includes(item);
-                  return (
-                    <button
-                      type="button"
-                      key={item}
-                      disabled={!puedeEditarDetalleInicial}
-                      className={`chip-check-btn ${marcado ? 'selected' : ''}`}
-                      onClick={() => toggleItemArray('fuentes', item)}
-                    >
-                      <span className="chip-check-box">✓</span>
-                      <span>{item}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
-              <label>
-                Categorías (Marque una o más) <span className="field-badge manual">OBLIGATORIO</span>
-              </label>
-              <div className="chips-selector-grid">
-                {CATEGORIAS_OPCIONES.map((item) => {
-                  const marcado = formData.categorias.includes(item);
-                  return (
-                    <button
-                      type="button"
-                      key={item}
-                      disabled={!puedeEditarDetalleInicial}
-                      className={`chip-check-btn ${marcado ? 'selected' : ''}`}
-                      onClick={() => toggleItemArray('categorias', item)}
-                    >
-                      <span className="chip-check-box">✓</span>
-                      <span>{item}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* DESCRIPCIÓN Y BENEFICIOS */}
+          {/* TERCERA FILA: DESCRIPCIÓN Y BENEFICIOS DE LA SUGERENCIA */}
           <div className="grid-2-cols" style={{ marginTop: '12px' }}>
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
               <label>
@@ -775,11 +762,37 @@ export default function RegistrarSugerencias() {
             </div>
           </div>
 
+          {/* CUARTA FILA: CATEGORÍAS (Selección múltiple) */}
+          <div style={{ marginTop: '12px' }}>
+            <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
+              <label>
+                Categorías (Marque una o más) <span className="field-badge manual">OBLIGATORIO</span>
+              </label>
+              <div className="chips-selector-grid">
+                {CATEGORIAS_OPCIONES.map((item) => {
+                  const marcado = formData.categorias.includes(item);
+                  return (
+                    <button
+                      type="button"
+                      key={item}
+                      disabled={!puedeEditarDetalleInicial}
+                      className={`chip-check-btn ${marcado ? 'selected' : ''}`}
+                      onClick={() => toggleItemArray('categorias', item)}
+                    >
+                      <span className="chip-check-box">✓</span>
+                      <span>{item}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           {/* =========================================================
               3. ANÁLISIS, RESPONSABLES Y SEGUIMIENTO
-              (Visible al editar/ver detalle o si el usuario es Supervisor/Admin)
+              (Visible únicamente al entrar a Analizar / Editar desde la tabla)
              ========================================================= */}
-          {(esModoEdicion || puedeAnalizar) && (
+          {esModoEdicion && (
             <>
               <div className="section-title-row">
                 <div className="section-title">3. Análisis, Asignación y Seguimiento</div>
@@ -788,6 +801,7 @@ export default function RegistrarSugerencias() {
                 </span>
               </div>
 
+              {/* PRIMERA FILA: Área responsable - Nombre del responsable - Responsable de apoyo - Fecha planificada */}
               <div className="grid-4-cols">
                 <div className="field field-manual">
                   <label>
@@ -850,89 +864,7 @@ export default function RegistrarSugerencias() {
                 </div>
               </div>
 
-              {/* IMPACTO Y RECONOCIDO (CASILLAS PARA MARCAR) */}
-              <div className="grid-2-cols" style={{ marginTop: '12px' }}>
-                <div className="field field-manual">
-                  <label>
-                    Impacto (Marque uno o más) <span className="field-badge manual">EDITAR</span>
-                  </label>
-                  <div className="chips-selector-grid">
-                    {IMPACTO_OPCIONES.map((item) => {
-                      const marcado = formData.impacto.includes(item);
-                      return (
-                        <button
-                          type="button"
-                          key={item}
-                          disabled={!puedeAnalizar}
-                          className={`chip-check-btn ${marcado ? 'selected' : ''}`}
-                          onClick={() => toggleItemArray('impacto', item)}
-                        >
-                          <span className="chip-check-box">✓</span>
-                          <span>{item}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="field field-manual">
-                  <label>
-                    Reconocido como <span className="field-badge optional">OPCIONAL</span>
-                  </label>
-                  <div className="chips-selector-grid">
-                    {RECONOCIDO_OPCIONES.map((item) => {
-                      const marcado = formData.reconocido.includes(item);
-                      return (
-                        <button
-                          type="button"
-                          key={item}
-                          disabled={!puedeAnalizar}
-                          className={`chip-check-btn ${marcado ? 'selected' : ''}`}
-                          onClick={() => toggleItemArray('reconocido', item)}
-                        >
-                          <span className="chip-check-box">✓</span>
-                          <span>{item}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* PLAN DE ACCIÓN Y ESTADO MANUAL (POR SI ES FUTURO) */}
-              <div className="grid-4-cols" style={{ marginTop: '12px' }}>
-                <div className="field field-manual" style={{ gridColumn: 'span 3' }}>
-                  <label>
-                    Plan de Acción <span className="field-badge manual">EDITAR</span>
-                  </label>
-                  <textarea
-                    rows="2"
-                    placeholder="Describa las actividades del plan de acción..."
-                    value={formData.plan_accion}
-                    onChange={(e) => setFormData({ ...formData, plan_accion: e.target.value })}
-                    disabled={!puedeAnalizar}
-                  />
-                </div>
-
-                <div className="field field-manual">
-                  <label>
-                    Estado Manual <span className="field-badge optional">ESTADO</span>
-                  </label>
-                  <select
-                    value={formData.estado}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    disabled={!puedeAnalizar}
-                  >
-                    <option value="Por Validar">Por Validar</option>
-                    <option value="Priorizado">Priorizado</option>
-                    <option value="Futuro">Futuro</option>
-                    <option value="Concluido">Concluido</option>
-                    <option value="Cancelado">Cancelado</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* CIERRE Y CANCELACIÓN */}
+              {/* SEGUNDA FILA: Fecha de Cierre - Fecha de Cancelación - Reconocido como - Impacto */}
               <div className="grid-4-cols" style={{ marginTop: '12px' }}>
                 <div className="field field-manual">
                   <label>
@@ -948,6 +880,53 @@ export default function RegistrarSugerencias() {
 
                 <div className="field field-manual">
                   <label>
+                    Fecha de Cancelación <span className="field-badge optional">CANCELAR</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.fecha_cancelacion}
+                    onChange={(e) => setFormData({ ...formData, fecha_cancelacion: e.target.value })}
+                    disabled={!puedeAnalizar}
+                  />
+                </div>
+
+                <div className="field field-manual">
+                  <label>
+                    Reconocido como <span className="field-badge optional">OPCIONAL</span>
+                  </label>
+                  <select
+                    value={formData.reconocido[0] || ''}
+                    onChange={(e) => handleSelectUnicoEnArray('reconocido', e.target.value)}
+                    disabled={!puedeAnalizar}
+                  >
+                    <option value="">Seleccione opción...</option>
+                    {RECONOCIDO_OPCIONES.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field field-manual">
+                  <label>
+                    Impacto <span className="field-badge manual">EDITAR</span>
+                  </label>
+                  <select
+                    value={formData.impacto[0] || ''}
+                    onChange={(e) => handleSelectUnicoEnArray('impacto', e.target.value)}
+                    disabled={!puedeAnalizar}
+                  >
+                    <option value="">Seleccione impacto...</option>
+                    {IMPACTO_OPCIONES.map((item) => (
+                      <option key={item} value={item}>{item}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* TERCERA FILA: Comentario Adicional - Motivo de Cancelación */}
+              <div className="grid-2-cols" style={{ marginTop: '12px' }}>
+                <div className="field field-manual">
+                  <label>
                     Comentario Adicional <span className="field-badge optional">CIERRE</span>
                   </label>
                   <input
@@ -956,18 +935,6 @@ export default function RegistrarSugerencias() {
                     placeholder="Comentario de seguimiento o cierre..."
                     value={formData.comentario_adicional}
                     onChange={(e) => setFormData({ ...formData, comentario_adicional: e.target.value })}
-                    disabled={!puedeAnalizar}
-                  />
-                </div>
-
-                <div className="field field-manual">
-                  <label>
-                    Fecha de Cancelación <span className="field-badge optional">CANCELAR</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.fecha_cancelacion}
-                    onChange={(e) => setFormData({ ...formData, fecha_cancelacion: e.target.value })}
                     disabled={!puedeAnalizar}
                   />
                 </div>
@@ -987,32 +954,63 @@ export default function RegistrarSugerencias() {
                 </div>
               </div>
 
-              {/* AUDITORÍA DE ÚLTIMA ACTUALIZACIÓN */}
-              {esModoEdicion && (
-                <div className="grid-2-cols" style={{ marginTop: '12px' }}>
-                  <div className="field field-auto">
-                    <label>
-                      Última Actualización <span className="field-badge auto">AUTO</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={
-                        formData.fechahora_actualiza
-                          ? String(formData.fechahora_actualiza).replace('T', ' ').slice(0, 19)
-                          : '-'
-                      }
-                      readOnly
-                    />
-                  </div>
-
-                  <div className="field field-auto">
-                    <label>
-                      Actualizado por <span className="field-badge auto">AUTO</span>
-                    </label>
-                    <input type="text" value={formData.usuario_actualiza || '-'} readOnly />
-                  </div>
+              {/* CUARTA FILA: Plan de Acción */}
+              <div style={{ marginTop: '12px' }}>
+                <div className="field field-manual">
+                  <label>
+                    Plan de Acción <span className="field-badge manual">EDITAR</span>
+                  </label>
+                  <textarea
+                    rows="2"
+                    placeholder="Describa las actividades del plan de acción..."
+                    value={formData.plan_accion}
+                    onChange={(e) => setFormData({ ...formData, plan_accion: e.target.value })}
+                    disabled={!puedeAnalizar}
+                  />
                 </div>
-              )}
+              </div>
+
+              {/* FILA DE CONTROL Y AUDITORÍA: Estado Manual - Fecha/Hora Actualiza - Usuario Actualiza */}
+              <div className="grid-3-cols" style={{ marginTop: '12px' }}>
+                <div className="field field-manual">
+                  <label>
+                    Estado Manual <span className="field-badge optional">ESTADO</span>
+                  </label>
+                  <select
+                    value={formData.estado}
+                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                    disabled={!puedeAnalizar}
+                  >
+                    <option value="Por Validar">Por Validar</option>
+                    <option value="Priorizado">Priorizado</option>
+                    <option value="Futuro">Futuro</option>
+                    <option value="Concluido">Concluido</option>
+                    <option value="Cancelado">Cancelado</option>
+                  </select>
+                </div>
+
+                <div className="field field-auto">
+                  <label>
+                    Última Actualización <span className="field-badge auto">AUTO</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      formData.fechahora_actualiza
+                        ? String(formData.fechahora_actualiza).replace('T', ' ').slice(0, 19)
+                        : '-'
+                    }
+                    readOnly
+                  />
+                </div>
+
+                <div className="field field-auto">
+                  <label>
+                    Actualizado por <span className="field-badge auto">AUTO</span>
+                  </label>
+                  <input type="text" value={formData.usuario_actualiza || '-'} readOnly />
+                </div>
+              </div>
             </>
           )}
 

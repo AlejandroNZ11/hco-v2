@@ -1,3 +1,7 @@
+/* =========================================
+   ESTILOS AISLADOS - TRACKING USUARIOS
+   ========================================= */
+
 .tracking-usuarios-page {
   --card: #ffffff;
   --muted: #64748b;
@@ -17,335 +21,415 @@
   color: var(--text);
   box-sizing: border-box;
 
-  
+  /* =========================================
+     1. HERO (TÍTULO PRINCIPAL)
+     ========================================= */
+  .page-hero {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 16px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+
+  .page-chip {
+    display: inline-flex;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .page-hero h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--title);
+  }
+
+  .page-hero p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* =========================================
+     2. CONTENEDOR DE LA TABLA Y TOOLBAR
+     ========================================= */
+  .tracking-card,
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .toolbar-info h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--title);
+    line-height: 1.2;
+  }
+
+  .toolbar-info p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .toolbar-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  /* =========================================
+     BOTONES PRINCIPALES
+     ========================================= */
+  .primary-btn {
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13px;
+    height: 40px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 18px;
+    white-space: nowrap;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: none !important;
+    transition: all 0.2s ease;
+  }
+
+  .export-btn {
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13px;
+    height: 40px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 18px;
+    white-space: nowrap;
+    background: #217346;
+    color: white;
+    box-shadow: none !important;
+    transition: all 0.2s ease;
+  }
+
+  .excel-icon {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 13px;
+    font-weight: 900;
+    margin-right: 8px;
+  }
+
+  /* =========================================
+     3. FILTROS Y BOTONES
+     ========================================= */
+  .filters {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    background: #f8fafc;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .filters > input,
+  .filters > select,
+  .filters > button {
+    height: 40px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .filters input,
+  .filters select {
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    padding: 0 12px;
+    outline: none;
+    background: #ffffff;
+    font-size: 13px;
+    color: var(--text);
+    width: 100%;
+  }
+
+  .filters input:focus,
+  .filters select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+  }
+
+  .secondary-btn {
+    border: none;
+    cursor: pointer;
+    border-radius: 8px;
+    background: #eef3f8;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 13px;
+    padding: 0 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    box-shadow: none !important;
+    transition: all 0.2s ease;
+  }
+
+  .clear-btn {
+    border: none;
+    cursor: pointer;
+    border-radius: 8px;
+    background: #e2e8f0;
+    color: #475569;
+    width: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none !important;
+    transition: all 0.2s ease;
+  }
+
+  .primary-btn:hover { background: var(--primary-2); transform: translateY(-1px); }
+  .export-btn:hover { background: #1a5c38; transform: translateY(-1px); }
+  .secondary-btn:hover { background: #e2e8f0; }
+  .clear-btn:hover { background: #cbd5e1; color: #0f172a; }
+
+  /* =========================================
+     4. TABLA RESPONSIVA Y ARRASTRE (MANITO)
+     ========================================= */
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    border-top: none;
+    -webkit-overflow-scrolling: touch;
+    cursor: grab;
+    scrollbar-width: none;
+  }
+
+  .table-wrap:active {
+    cursor: grabbing;
+  }
+
+  .table-wrap::-webkit-scrollbar {
+    display: none;
+    height: 0px;
+  }
+
+  .usuarios-table {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+    background: #fff;
+  }
+
+  .usuarios-table thead th {
+    background: var(--primary);
+    color: #ffffff;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--primary-2);
+    white-space: nowrap !important;
+  }
+
+  .usuarios-table tbody td {
+    padding: 7px 8px;
+    font-size: 11px;
+    text-align: center;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .usuarios-table tbody tr:hover td {
+    background: #f8fafc;
+  }
+
+  .usuarios-table tbody td:nth-child(5),
+  .usuarios-table tbody td:nth-child(7),
+  .usuarios-table tbody td:nth-child(8),
+  .usuarios-table tbody td:nth-child(9) {
+    text-align: left;
+  }
+
+  /* =========================================
+     5. COMPONENTES PEQUEÑOS Y ESTADOS
+     ========================================= */
+  .estado-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 70px;
+    height: 24px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .estado-pill.activo { background: #dcfce7; color: #166534; }
+  .estado-pill.inactivo { background: #fee2e2; color: #991b1b; }
+
+  .foto-status {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 900;
+    margin: 0 auto;
+  }
+
+  .foto-status.has { background: var(--success); }
+  .foto-status.no { background: var(--danger); }
+
+  .actions-inline {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    box-shadow: none !important;
+  }
+
+  .icon-btn.edit { background: #e0f2fe; color: #0284c7; }
+  .icon-btn.status { background: #ffedd5; color: #c2410c; }
+  .icon-btn:hover { filter: brightness(0.95); transform: scale(1.05); }
+
+  /* =========================================
+     6. RESPONSIVE A TABLET Y CELULAR
+     ========================================= */
+  @media (max-width: 1150px) {
+    .filters { grid-template-columns: 1fr 1fr auto; }
+    .search-input { grid-column: span 3; }
+  }
+
+  @media (max-width: 768px) {
+    padding: 10px 10px;
+
+    .page-hero {
+      padding: 12px 12px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+    }
+
+    .page-chip {
+      font-size: 10px;
+      padding: 2px 8px;
+      margin-bottom: 4px;
+    }
+
+    .page-hero h1 {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 2px;
+    }
+
+    .page-hero p {
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .tracking-card,
+    .card {
+      padding: 10px 10px;
+      border-radius: 12px;
+    }
+
+    .toolbar {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+      padding: 0 4px;
+    }
+
+    .toolbar-actions {
+      width: 100%;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .primary-btn,
+    .export-btn {
+      flex: 1;
+      padding: 0 10px;
+      font-size: 12px;
+    }
+
+    .filters {
+      grid-template-columns: 1fr;
+      padding: 10px;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .search-input {
+      grid-column: span 1;
+    }
+
+    .filters > button {
+      width: 100% !important;
+    }
+  }
+} /* 👈 Cierre correcto de .tracking-usuarios-page */
+
 /* =========================================
-   1. HERO (TÍTULO PRINCIPAL)
+   7. TOAST NOTIFICATIONS (GLOBALES FUERA DE SCOPE)
    ========================================= */
-.page-hero {
-  background: var(--card);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  padding: 16px 24px;
-  margin-bottom: 20px;
-  box-shadow: var(--shadow);
-}
-
-.page-chip {
-  display: inline-flex;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: var(--primary);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-
-.page-hero h1 {
-  margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--title);
-}
-
-.page-hero p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-/* =========================================
-   2. CONTENEDOR DE LA TABLA Y TOOLBAR
-   ========================================= */
-.tracking-card,
-.card {
-  background: var(--card);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  padding: 20px 24px;
-  box-shadow: var(--shadow);
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.toolbar-info h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--title);
-  line-height: 1.2;
-}
-
-.toolbar-info p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.toolbar-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-/* =========================================
-   BOTONES PRINCIPALES
-   ========================================= */
-.primary-btn {
-  border: none;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 13px;
-  height: 40px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 18px;
-  white-space: nowrap;
-  background: var(--primary);
-  color: #fff;
-  box-shadow: none !important;
-  transition: all 0.2s ease;
-}
-
-.export-btn {
-  border: none;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 13px;
-  height: 40px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 18px;
-  white-space: nowrap;
-  background: #217346;
-  color: white;
-  box-shadow: none !important;
-  transition: all 0.2s ease;
-}
-
-.excel-icon {
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: 6px;
-  padding: 3px 8px;
-  font-size: 13px;
-  font-weight: 900;
-  margin-right: 8px;
-}
-
-/* =========================================
-   3. FILTROS Y BOTONES
-   ========================================= */
-.filters {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr auto;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  background: #f8fafc;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-}
-
-.filters > input,
-.filters > select,
-.filters > button {
-  height: 40px !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-}
-
-.filters input,
-.filters select {
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  padding: 0 12px;
-  outline: none;
-  background: #ffffff;
-  font-size: 13px;
-  color: var(--text);
-  width: 100%;
-}
-
-.filters input:focus,
-.filters select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
-}
-
-.secondary-btn {
-  border: none;
-  cursor: pointer;
-  border-radius: 8px;
-  background: #eef3f8;
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 13px;
-  padding: 0 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  box-shadow: none !important;
-  transition: all 0.2s ease;
-}
-
-.clear-btn {
-  border: none;
-  cursor: pointer;
-  border-radius: 8px;
-  background: #e2e8f0;
-  color: #475569;
-  width: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: none !important;
-  transition: all 0.2s ease;
-}
-
-.primary-btn:hover { background: var(--primary-2); transform: translateY(-1px); }
-.export-btn:hover { background: #1a5c38; transform: translateY(-1px); }
-.secondary-btn:hover { background: #e2e8f0; }
-.clear-btn:hover { background: #cbd5e1; color: #0f172a; }
-
-/* =========================================
-   4. TABLA RESPONSIVA Y ARRASTRE (MANITO)
-   ========================================= */
-.table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  border-top: none;
-  -webkit-overflow-scrolling: touch;
-  cursor: grab;
-  scrollbar-width: none;
-}
-
-.table-wrap:active {
-  cursor: grabbing;
-}
-
-.table-wrap::-webkit-scrollbar {
-  display: none;
-  height: 0px;
-}
-
-.usuarios-table {
-  width: 100%;
-  min-width: 1100px;
-  border-collapse: collapse;
-  background: #fff;
-}
-
-.usuarios-table thead th {
-  background: var(--primary);
-  color: #ffffff;
-  text-align: center;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  padding: 10px 12px;
-  border-bottom: 2px solid var(--primary-2);
-  white-space: nowrap !important;
-}
-
-.usuarios-table tbody td {
-  padding: 7px 8px;
-  font-size: 11px;
-  text-align: center;
-  vertical-align: middle;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.usuarios-table tbody tr:hover td {
-  background: #f8fafc;
-}
-
-.usuarios-table tbody td:nth-child(5),
-.usuarios-table tbody td:nth-child(7),
-.usuarios-table tbody td:nth-child(8),
-.usuarios-table tbody td:nth-child(9) {
-  text-align: left;
-}
-
-/* =========================================
-   5. COMPONENTES PEQUEÑOS Y ALERTAS
-   ========================================= */
-.estado-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 70px;
-  height: 24px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.estado-pill.activo { background: #dcfce7; color: #166534; }
-.estado-pill.inactivo { background: #fee2e2; color: #991b1b; }
-
-.foto-status {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
-  margin: 0 auto;
-}
-
-.foto-status.has { background: var(--success); }
-.foto-status.no { background: var(--danger); }
-
-.actions-inline {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
-.icon-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: 0;
-  box-shadow: none !important;
-}
-
-.icon-btn.edit { background: #e0f2fe; color: #0284c7; }
-.icon-btn.status { background: #ffedd5; color: #c2410c; }
-.icon-btn:hover { filter: brightness(0.95); transform: scale(1.05); }
-
 .toast-message {
   position: fixed;
   top: 20px;
@@ -388,91 +472,4 @@
     opacity: 1;
     transform: translateY(0) translateX(0);
   }
-}
-
-/* =========================================
-   6. RESPONSIVE A TABLET Y CELULAR
-   ========================================= */
-@media (max-width: 1150px) {
-  .filters { grid-template-columns: 1fr 1fr auto; }
-  .search-input { grid-column: span 3; }
-}
-
-@media (max-width: 768px) {
-  /* 1. Pegar la página a los bordes laterales en móvil */
-  .registro-page {
-    padding: 10px 10px;
-  }
-
-  /* 2. Compactar la tarjeta superior */
-  .page-hero {
-    padding: 12px 12px;
-    margin-bottom: 10px;
-    border-radius: 12px;
-  }
-
-  .page-chip {
-    font-size: 10px;
-    padding: 2px 8px;
-    margin-bottom: 4px;
-  }
-
-  .page-hero h1 {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0 0 2px;
-  }
-
-  .page-hero p {
-    font-size: 12px;
-    line-height: 1.35;
-  }
-
-  /* 3. Reducir el relleno lateral de .tracking-card para que la tabla se pegue al borde */
-  .tracking-card,
-  .card {
-    padding: 10px 10px;
-    border-radius: 12px;
-  }
-
-  .toolbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 14px;
-    padding: 0 4px;
-  }
-
-  .toolbar-actions {
-    width: 100%;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  /* Ajustar botones para que no se salgan por la derecha en pantallas pequeñas */
-  .primary-btn,
-  .export-btn {
-    flex: 1;
-    padding: 0 10px;
-    font-size: 12px;
-  }
-
-  /* 4. Filtros compactos y alineados con la tabla */
-  .filters {
-    grid-template-columns: 1fr;
-    padding: 10px;
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  .search-input {
-    grid-column: span 1;
-  }
-
-  .filters > button {
-    width: 100% !important;
-  }
-}
-
-
 }

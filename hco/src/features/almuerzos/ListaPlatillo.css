@@ -6,8 +6,8 @@
     max-width: 1800px;
     margin: 32px auto;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
 
-    
 .menu-editor-card {
     background: #ffffff;
     border-radius: 12px;
@@ -268,8 +268,4 @@
     .editor-title h2 {
         font-size: 1.4rem;
     }
-}
-
-
-
 }

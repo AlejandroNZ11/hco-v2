@@ -3,7 +3,7 @@
   min-height: calc(100vh - var(--header-total-height));
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   padding: 16px 0 40px;
-
+}
 
 .admin-main {
   width: min(1710px, calc(100% - 90px));
@@ -492,30 +492,51 @@
   }
 }
 
-
-
 /* ===================================== */
 /* TABLA ADMIN MOBILE - COMO IMAGEN 3 */
 /* ===================================== */
 @media (max-width: 768px) {
-    .admin-main {
-        width: calc(100% - 12px);
-        margin-top: 4px;
-        padding: 10px;
-    }
+  .admin-main {
+    width: calc(100% - 12px);
+    margin-top: 4px;
+    padding: 10px;
+  }
 
-    .admin-actions-bar .btn {
-        width: 100%;
-    }
+  .admin-actions-bar .btn {
+    width: 100%;
+  }
 
-    .admin-table { width: 100%; border-collapse: collapse; min-width: 300px; }
-    .admin-table th { background-color: #0b192c; color: white; padding: 12px; text-align: center; font-size: 10px; }
-    .admin-table td { padding: 5px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle; font-size: 9px; font-weight: 200; color: black;}
-    .admin-table tbody tr:hover { background-color: #f8f9fa; }
-    .admin-table img { width: 43px; height: 43px; border-radius: 4px; object-fit: cover; }
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 300px;
+  }
+  .admin-table th {
+    background-color: #0b192c;
+    color: white;
+    padding: 12px;
+    text-align: center;
+    font-size: 10px;
+  }
+  .admin-table td {
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 9px;
+    font-weight: 200;
+    color: black;
+  }
+  .admin-table tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+  .admin-table img {
+    width: 43px;
+    height: 43px;
+    border-radius: 4px;
+    object-fit: cover;
+  }
 }
-
-
 
 /* Modal Adicionar Almuerzo - igual al HTML */
 .admin-modal-adicional {
@@ -626,7 +647,4 @@
   .admin-modal-adicional .form-control {
     font-size: 18px;
   }
-}
-
-
 }

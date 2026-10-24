@@ -3,8 +3,8 @@
   padding: 1px 0 70px;
   background: #f8f9fa;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
 
-  
 .pedidos-container {
   width: calc(100% - 80px);
   max-width: none;
@@ -340,8 +340,4 @@
   background: #cff4fc;
   border: 1px solid #b6effb;
   color: #055160;
-}
-
-
-  
 }

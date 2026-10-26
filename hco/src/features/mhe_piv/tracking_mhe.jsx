@@ -125,7 +125,7 @@ export default function TrackingMHE() {
     return est;
   };
 
-  // Verifica si una inspección INOPERATIVA ya tuvo su equipo rehabilitado posteriormente
+// Verifica si una inspección INOPERATIVA ya tuvo su equipo rehabilitado posteriormente
   const verificarEquipoYaHabilitado = (insp) => {
     const estMhe = String(insp.estado_mhe || '').toUpperCase().trim();
     if (estMhe !== 'INOPERATIVO') return false;
@@ -140,8 +140,32 @@ export default function TrackingMHE() {
       return new Date(eq.fecha_habilitacion).getTime() > new Date(insp.fecha_hora).getTime();
     }
 
-    return false;
+    // Si el equipo en la base de datos ya figura como OPERATIVO, ya fue habilitado
+    return estadoOpActual === 'OPERATIVO';
   };
+
+  // NUEVO: Identifica cuál es el ID de la última inspección registrada por cada equipo/serie
+  const ultimaInspeccionPorSerie = useMemo(() => {
+    const mapa = {};
+    inspecciones.forEach((insp) => {
+      const claveSerie = String(
+        insp.equipo_id || insp.equipos?.id || insp.equipos?.serie || ''
+      ).trim().toUpperCase();
+
+      if (!claveSerie) return;
+
+      const fechaInsp = insp.fecha_hora ? new Date(insp.fecha_hora).getTime() : 0;
+      const actual = mapa[claveSerie];
+
+      if (!actual || fechaInsp > actual.fecha) {
+        mapa[claveSerie] = {
+          id: insp.id,
+          fecha: fechaInsp
+        };
+      }
+    });
+    return mapa;
+  }, [inspecciones]);
 
   // Referencia y estados para mover la tabla con la "manito"
   const tableContainerRef = useRef(null);
@@ -402,6 +426,7 @@ export default function TrackingMHE() {
       "Área": insp.areas?.nombre || insp.area?.nombre || '-',
       "Estado Proceso": insp.estado_proceso || 'PENDIENTE DE REVISIÓN',
       "Categoría Equipo": insp.equipos?.categorias_equipos?.nombre || 'N/A',
+      "Versión": insp.equipos?.categorias_equipos?.version || '-',
       "Equipo (Serie)": insp.equipos?.serie || 'N/A',
       "Estado MHE": insp.estado_mhe || '-',
       "Estado Personal": obtenerEstadoPersonal(insp.estado_personal),
@@ -419,6 +444,7 @@ export default function TrackingMHE() {
       { wch: 22 },
       { wch: 22 },
       { wch: 18 },
+      { wch: 12 },
       { wch: 15 },
       { wch: 16 },
       { wch: 28 },
@@ -577,9 +603,14 @@ export default function TrackingMHE() {
                 disabled={paginaActual <= 1}
                 onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
               >
-                <span>Anterior</span>
                 <FaChevronLeft className="nav-chevron" />
+                <span>Anterior</span>
               </button>
+
+              {/* NUEVO: Indicador de página central */}
+              <span className="page-indicator">
+                Página {paginaActual} de {totalPaginas}
+              </span>
 
               <button
                 type="button"
@@ -587,10 +618,11 @@ export default function TrackingMHE() {
                 disabled={paginaActual >= totalPaginas}
                 onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
               >
-                <FaChevronRight className="nav-chevron" />
                 <span>Siguiente</span>
+                <FaChevronRight className="nav-chevron" />
               </button>
             </div>
+
           </div>
 
           <button
@@ -626,6 +658,7 @@ export default function TrackingMHE() {
                 <th>Estado Proceso</th>
                 <th>Categoría Equipo</th>
                 <th>Equipo (Serie)</th>
+                <th>Versión</th>
                 <th>Estado MHE</th>
                 <th>Estado Personal</th>
                 <th>Registrado Por</th>
@@ -646,6 +679,18 @@ export default function TrackingMHE() {
                   const yaAprobado = insp.estado_proceso === 'APROBADO';
                   const esFilaInoperativa = String(insp.estado_mhe || '').toUpperCase().trim() === 'INOPERATIVO';
                   const equipoYaFueHabilitado = verificarEquipoYaHabilitado(insp);
+                  
+                  // Verificamos si esta fila es la inspección más reciente de esa serie
+                  const claveSerie = String(
+                    insp.equipo_id || insp.equipos?.id || insp.equipos?.serie || ''
+                  ).trim().toUpperCase();
+                  const esUltimaDeSerie =
+                    Boolean(claveSerie) && ultimaInspeccionPorSerie[claveSerie]?.id === insp.id;
+
+                  // Solo requiere habilitación (color naranja) si es la última de su serie, salió INOPERATIVO y no ha sido habilitado
+                  const requiereHabilitacion =
+                    esUltimaDeSerie && esFilaInoperativa && !equipoYaFueHabilitado;
+
                   const numeroFila = indiceInicio + index + 1;
 
                   return (
@@ -668,6 +713,13 @@ export default function TrackingMHE() {
 
                       <td style={{ fontWeight: '800', color: '#0f172a' }}>
                         {insp.equipos?.serie || 'N/A'}
+                      </td>
+
+                      {/* <--  VERSIÓN --> */}
+                      <td style={{ textAlign: 'center', fontWeight: '600', color: '#475569' }}>
+                        {insp.equipos?.categorias_equipos?.version 
+                          ? `v. ${insp.equipos.categorias_equipos.version}` 
+                          : '-'}
                       </td>
 
                       <td>
@@ -744,26 +796,37 @@ export default function TrackingMHE() {
                             <FaCheck />
                           </button>
 
-                          {/* SE MUESTRA ÚNICAMENTE SI EL EQUIPO SIGUE INOPERATIVO Y NO HA SIDO HABILITADO */}
-                          {esFilaInoperativa && !equipoYaFueHabilitado && (
-                            <button
-                              type="button"
-                              className={`btn-tabla-habilitar ${!puedeHabilitarEquipo ? 'disabled-by-role' : ''}`}
-                              onClick={() => {
-                                if (!puedeHabilitarEquipo) {
-                                  return alert("No tienes permisos para pasar el equipo a Operativo. Acción exclusiva para el área QHSE y rol Superadmin.");
-                                }
-                                handleHabilitarEquipo(insp);
-                              }}
-                              title={
-                                puedeHabilitarEquipo
-                                  ? "Habilitar equipo (Pasar a Operativo)"
-                                  : "No autorizado: Exclusivo para área QHSE y Superadmin"
+                          {/* Botón Habilitar Equipo (Siempre visible, solo naranja cuando se requiere en la última serie) */}
+                          <button
+                            type="button"
+                            className={`btn-tabla-habilitar ${
+                              requiereHabilitacion
+                                ? puedeHabilitarEquipo
+                                  ? 'requiere-habilitacion'
+                                  : 'requiere-habilitacion disabled-by-role'
+                                : 'no-requerido'
+                            }`}
+                            disabled={!requiereHabilitacion}
+                            onClick={() => {
+                              if (!requiereHabilitacion) return;
+                              if (!puedeHabilitarEquipo) {
+                                return alert(
+                                  "No tienes permisos para pasar el equipo a Operativo. Acción exclusiva para el área QHSE y rol Superadmin."
+                                );
                               }
-                            >
-                              <FaWrench />
-                            </button>
-                          )}
+                              handleHabilitarEquipo(insp);
+                            }}
+                            title={
+                              !requiereHabilitacion
+                                ? "No requiere habilitación"
+                                : puedeHabilitarEquipo
+                                ? "Habilitar equipo (Pasar a Operativo)"
+                                : "No autorizado: Exclusivo para área QHSE y Superadmin"
+                            }
+                          >
+                            <FaWrench />
+                          </button>
+  
                         </div>
                       </td>
 

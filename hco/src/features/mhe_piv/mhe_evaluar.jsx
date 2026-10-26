@@ -70,6 +70,7 @@ export default function MheEvaluar() {
   const [checklistAnterior, setChecklistAnterior] = useState(null);
   const [horometroAnterior, setHorometroAnterior] = useState(null);
   const [equipoInoperativoBloqueado, setEquipoInoperativoBloqueado] = useState(false);
+  const [fotoAmpliada, setFotoAmpliada] = useState(false);
 
   // Estado para el Aviso Flotante moderno (estilo Tailwind / Bootstrap 5)
   const [avisoFlotante, setAvisoFlotante] = useState({
@@ -780,6 +781,38 @@ export default function MheEvaluar() {
         </div>
       )}
 
+      {/* MODAL PANTALLA COMPLETA PARA VER LA FOTO DEL EQUIPO */}
+      {fotoAmpliada && equipoSeleccionado?.foto_url && (
+        <div
+          className="foto-lightbox-backdrop"
+          onClick={() => setFotoAmpliada(false)}
+        >
+          <div className="foto-lightbox-topbar" onClick={(e) => e.stopPropagation()}>
+            <span className="foto-lightbox-title">
+              {equipoSeleccionado?.serie || 'Vista previa del equipo'}
+            </span>
+            <button
+              type="button"
+              className="foto-lightbox-close"
+              onClick={() => setFotoAmpliada(false)}
+              title="Cerrar vista ampliada"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+
+          <div className="foto-lightbox-body" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={convertirDriveUrl(equipoSeleccionado.foto_url)}
+              alt={equipoSeleccionado?.serie || "Equipo ampliado"}
+            />
+          </div>
+        </div>
+      )}
+
       <section className="card mb-4">
         <div className="card-head-modern">
           <div className="card-head-left">
@@ -851,13 +884,49 @@ export default function MheEvaluar() {
 
             <div className="split-panel panel-foto">
               {equipoSeleccionado?.foto_url ? (
-                <img src={convertirDriveUrl(equipoSeleccionado.foto_url)} alt="Equipo" />
+                <div
+                  className="foto-preview-clickable"
+                  onClick={() => setFotoAmpliada(true)}
+                  title="Tocar para ver en pantalla completa"
+                >
+                  <img
+                    src={convertirDriveUrl(equipoSeleccionado.foto_url)}
+                    alt="Equipo"
+                  />
+                  <button
+                    type="button"
+                    className="btn-lupa-overlay"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFotoAmpliada(true);
+                    }}
+                    title="Ampliar imagen"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      <line x1="11" y1="8" x2="11" y2="14"></line>
+                      <line x1="8" y1="11" x2="14" y2="11"></line>
+                    </svg>
+                    <span>Ampliar</span>
+                  </button>
+                </div>
+              ) : formData.equipo_id ? (
+                <div className="foto-preview-placeholder">
+                  <img
+                    src="/public/img/piv_no_foto.png" // Ajusta la ruta según si está en public o assets (ej: import noFoto from './assets/nofoto.png')
+                    alt="Sin foto"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.7 }}
+                  />
+                 
+                </div>
               ) : (
-                <span style={{fontSize: '13px', color: '#64748b', fontWeight: '600', textAlign: 'center'}}>
-                  {formData.equipo_id ? "Sin foto registrada" : "Seleccione un equipo"}
+                <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '600', textAlign: 'center' }}>
+                  Seleccione un equipo
                 </span>
               )}
             </div>
+
           </div>
 
           {/* BANNER DE BLOQUEO ARRIBA (JUSTO DEBAJO DE DATOS DEL EQUIPO) */}

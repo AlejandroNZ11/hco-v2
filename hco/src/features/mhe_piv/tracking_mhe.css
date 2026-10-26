@@ -231,26 +231,40 @@
 }
 
 .pagination-controls {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+}
+
+.page-indicator {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 .page-nav-btn {
-  background: transparent;
-  border: none;
-  color: #0f172a;
-  font-size: 13.5px;
-  font-weight: 800;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 6px 12px;
+  transition: all 0.2s ease;
+}
+
+.page-nav-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
 }
 
 .page-nav-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -487,11 +501,33 @@
   padding: 0;
   border-radius: 5px;
   font-size: 11px;
+  border: 1px solid #cbd5e1;
+  background: #e2e8f0; /* Gris por defecto cuando no requiere acción */
+  color: #94a3b8;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+/* Solo se pinta de anaranjado en la última inspección de la serie si está INOPERATIVO */
+.btn-tabla-habilitar.requiere-habilitacion {
   border: none;
-  background: #d97706; /* Ámbar / Naranja alerta cuando requiere habilitación */
+  background: #d97706; /* Ámbar / Naranja alerta */
   color: #ffffff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  opacity: 1;
+}
+
+.btn-tabla-habilitar.requiere-habilitacion:hover:not(:disabled) {
+  background: #b45309;
+}
+
+/* Estado cuando no requiere habilitación */
+.btn-tabla-habilitar.no-requerido {
+  background: #e2e8f0;
+  color: #94a3b8;
+  border-color: #cbd5e1;
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .btn-tabla-habilitar:hover:not(:disabled) {
@@ -504,10 +540,11 @@
   cursor: default;
 }
 
+/* Si requiere habilitación pero el usuario no es QHSE ni Superadmin */
 .btn-tabla-habilitar.disabled-by-role {
   background: #e2e8f0 !important;
   color: #94a3b8 !important;
-  border-color: #cbd5e1 !important;
+  border: 1px solid #cbd5e1 !important;
   cursor: not-allowed !important;
   opacity: 0.6;
 }
@@ -572,6 +609,39 @@
   .mobile-hidden-filter {
     display: none !important;
   }
+
+  /* Desintegra el flexbox padre en móvil para reorganizar sus hijos */
+  .pagination-bar {
+    display: contents;
+  }
+
+  /* Aplica un Grid de 2 filas y 2 columnas */
+  .table-topbar {
+    display: grid !important;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "counter export"
+      "pagination pagination";
+    gap: 14px 10px;
+    align-items: center;
+  }
+
+  .records-counter {
+    grid-area: counter;
+  }
+
+  .btn-exportar-excel {
+    grid-area: export;
+    margin: 0;
+  }
+
+  .pagination-controls {
+    grid-area: pagination;
+    justify-content: space-between; /* Distribuye: [Anterior]   Página X de Y   [Siguiente] */
+    width: 100%;
+  }
+
+
 }
 
 

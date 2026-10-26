@@ -876,6 +876,124 @@
   .tw-modal-btn.success { background-color: #16a34a; }
   .tw-modal-btn.success:hover { background-color: #15803d; }
 
+  /* Contenedor clickeable con botón de lupa */
+  .foto-preview-clickable {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-in;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .btn-lupa-overlay {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    background: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(4px);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 5px 11px;
+    font-size: 11.5px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+
+  .foto-preview-clickable:hover .btn-lupa-overlay {
+    background: #0f4c81;
+    transform: scale(1.04);
+  }
+
+  /* =========================================
+     VISOR DE IMAGEN PANTALLA COMPLETA (LIGHTBOX)
+     ========================================= */
+  .foto-lightbox-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background-color: rgba(10, 15, 28, 0.92);
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: twFadeIn 0.2s ease-out;
+  }
+
+  .foto-lightbox-topbar {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10001;
+    pointer-events: auto;
+  }
+
+  .foto-lightbox-title {
+    background: rgba(30, 41, 59, 0.85);
+    color: #f8fafc;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    letter-spacing: 0.4px;
+  }
+
+  .foto-lightbox-close {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #dc2626;
+    color: #ffffff;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+
+  .foto-lightbox-close:hover {
+    background: #b91c1c;
+    transform: scale(1.08);
+  }
+
+  .foto-lightbox-body {
+    max-width: 96vw;
+    max-height: 85vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: twScaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .foto-lightbox-body img {
+    max-width: 100%;
+    max-height: 85vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #ffffff;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+
   /* =========================================
      8. DISEÑO RESPONSIVO (TABLETS Y CELULARES)
      ========================================= */

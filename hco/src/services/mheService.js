@@ -139,7 +139,7 @@ export const obtenerUltimasInspecciones = async () => {
         supabase.from('areas').select('id, nombre'),
         // Traemos '*' de equipos para incluir estado_operativo, fecha_habilitacion, habilitado_por_id y foto_url
         supabase.from('equipos').select('*'),
-        supabase.from('categorias_equipos').select('id, nombre')
+        supabase.from('categorias_equipos').select('id, nombre, version')
       ]);
 
       if (!resInsp.error) {

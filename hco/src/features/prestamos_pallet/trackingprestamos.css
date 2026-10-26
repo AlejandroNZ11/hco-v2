@@ -578,7 +578,7 @@
 }
 
 @media (max-width: 600px) {
-  .tracking-page {
+  & {
     padding: 10px 10px; 
   }
   .summary-grid {

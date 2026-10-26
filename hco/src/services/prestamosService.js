@@ -128,11 +128,11 @@ export const subirImagenADrive = async (dataUrlBase64, nombreArchivo) => {
 export const obtenerDatosMaestrosPrestamos = async () => {
   try {
     const [resEmp, resCond, resPlac, resCli, resTip] = await Promise.all([
-      supabase.from('empresas_transporte').select('*'),
-      supabase.from('conductores').select('*'),
-      supabase.from('placas').select('*'),
-      supabase.from('clientes').select('*'),
-      supabase.from('tipos_paleta').select('*')
+      supabase.from('empresas_transporte').select('id, nombre_empresa'),
+      supabase.from('conductores').select('dni_conductor, nombre_conductor, empresa_id'),
+      supabase.from('placas').select('nro_placa, empresa_id, volumen_m3'),
+      supabase.from('clientes').select('id, nombre_cliente'),
+      supabase.from('tipos_paleta').select('id, nombre_tipo')
     ]);
 
     if (resEmp.error) console.error('Error empresas_transporte:', resEmp.error.message);
@@ -141,7 +141,11 @@ export const obtenerDatosMaestrosPrestamos = async () => {
     if (resCli.error) console.error('Error clientes:', resCli.error.message);
     if (resTip.error) console.error('Error tipos_paleta:', resTip.error.message);
 
-    // Ordenamos alfabéticamente Empresas
+    // Si todas fallaron por falta de internet, forzamos ir al catch (caché offline)
+    if (resEmp.error && resCond.error && resPlac.error) {
+      throw new Error(resEmp.error.message);
+    }
+
     const empresas = (resEmp.data || []).sort((a, b) =>
       String(a.nombre_empresa || '').localeCompare(String(b.nombre_empresa || ''), 'es', { sensitivity: 'base' })
     );
@@ -150,10 +154,8 @@ export const obtenerDatosMaestrosPrestamos = async () => {
       empresas.map(e => [String(e.id), e.nombre_empresa])
     );
 
-    // Ordenamos alfabéticamente Conductores y asociamos su empresa
     const conductores = (resCond.data || [])
       .map(c => ({
-        ...c,
         dni_conductor: String(c.dni_conductor || '').trim(),
         nombre_conductor: String(c.nombre_conductor || '').trim(),
         empresa_id: c.empresa_id,
@@ -163,24 +165,21 @@ export const obtenerDatosMaestrosPrestamos = async () => {
         a.nombre_conductor.localeCompare(b.nombre_conductor, 'es', { sensitivity: 'base' })
       );
 
-    // Ordenamos alfabéticamente Placas y asociamos su empresa
     const placas = (resPlac.data || [])
       .map(p => ({
-        ...p,
         nro_placa: String(p.nro_placa || '').trim().toUpperCase(),
         empresa_id: p.empresa_id,
+        volumen_m3: p.volumen_m3,
         empresa_nombre: empresasMap[String(p.empresa_id)] || ''
       }))
       .sort((a, b) =>
         a.nro_placa.localeCompare(b.nro_placa, 'es', { sensitivity: 'base' })
       );
 
-    // Ordenamos alfabéticamente Clientes
     const clientes = (resCli.data || []).sort((a, b) =>
       String(a.nombre_cliente || '').localeCompare(String(b.nombre_cliente || ''), 'es', { sensitivity: 'base' })
     );
 
-    // Ordenamos alfabéticamente Tipos de Paleta
     const tipos_paleta = (resTip.data || []).sort((a, b) =>
       String(a.nombre_tipo || '').localeCompare(String(b.nombre_tipo || ''), 'es', { sensitivity: 'base' })
     );
@@ -193,12 +192,28 @@ export const obtenerDatosMaestrosPrestamos = async () => {
       tipos_paleta
     };
 
-    localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify(dataMaestra));
+    // Guardado seguro en caché: si localStorage está lleno, NO rompe la app
+    try {
+      localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify(dataMaestra));
+    } catch (storageErr) {
+      console.warn('Espacio lleno en localStorage. Limpiando caché antiguo...', storageErr);
+      try {
+        localStorage.removeItem(BOOT_CACHE_KEY);
+        localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify(dataMaestra));
+      } catch {
+        // Si otros módulos llenaron los 5MB de localStorage, continuamos en memoria sin lanzar error
+      }
+    }
+
     return dataMaestra;
   } catch (error) {
     console.warn('Cargando catálogos de préstamos desde caché local...', error);
-    const cache = localStorage.getItem(BOOT_CACHE_KEY);
-    if (cache) return JSON.parse(cache);
+    try {
+      const cache = localStorage.getItem(BOOT_CACHE_KEY);
+      if (cache) return JSON.parse(cache);
+    } catch {
+      // Ignorar errores de lectura de storage
+    }
     throw error;
   }
 };
@@ -313,10 +328,10 @@ export const crearPrestamoPallet = async (payload) => {
 // 3. OBTENER TRACKING DE PRÉSTAMOS (CRUCE SEGURO EN MEMORIA)
 // =========================================================================
 
-export const obtenerTrackingPrestamos = async () => {
+export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
   const [resPrest, maestros] = await Promise.all([
     supabase.from('prestamos').select('*').order('fecha_entrega', { ascending: false }),
-    obtenerDatosMaestrosPrestamos()
+    maestrosPreCargados ? Promise.resolve(maestrosPreCargados) : obtenerDatosMaestrosPrestamos()
   ]);
 
   if (resPrest.error) throw new Error(`Error al cargar el tracking: ${resPrest.error.message}`);
@@ -333,9 +348,11 @@ export const obtenerTrackingPrestamos = async () => {
     const fechaRetornoDate = fRetorno ? new Date(fRetorno) : null;
     const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto'].includes(row.estado);
     const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
+    const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
 
     return {
       ...row,
+      paletas_pendientes: paletasPendientesCalc,
       empresa_transporte_nombre: empMap[String(row.empresa_transporte_id)] || '',
       conductor_nombre: condMap[String(row.dni_conductor)] || row.dni_conductor || '',
       conductor_retorno_nombre: condMap[String(row.conductor_retorno)] || row.conductor_retorno || '',
@@ -354,6 +371,7 @@ export const obtenerTrackingPrestamos = async () => {
 
   return listaFormateada;
 };
+
 
 // =========================================================================
 // 4. REGISTRAR DEVOLUCIÓN / EDICIÓN ADMIN

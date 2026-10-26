@@ -107,10 +107,8 @@ export default function TrackingPrestamos() {
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      const [listaPrestamos, maestros] = await Promise.all([
-        obtenerTrackingPrestamos(),
-        obtenerDatosMaestrosPrestamos()
-      ]);
+      const maestros = await obtenerDatosMaestrosPrestamos();
+      const listaPrestamos = await obtenerTrackingPrestamos(maestros);
       setPrestamos(listaPrestamos);
       setConductores(maestros.conductores || []);
     } catch (err) {
@@ -119,6 +117,7 @@ export default function TrackingPrestamos() {
       setLoading(false);
     }
   };
+
 
   // Lógica Arrastre Tabla
   const handleMouseDown = (e) => {

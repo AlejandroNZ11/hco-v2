@@ -10,7 +10,7 @@
   font-family: "Segoe UI", Arial, sans-serif;
   color: #102033;
   background: #f4f7fa;
-}
+
 
 .card-p {
   background: #ffffff;
@@ -258,22 +258,24 @@
 .btn-guardar-p:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* =========================================
-   MODALES FLOTANTES (CORRECCIÓN IMAGEN 1)
+   MODALES FLOTANTES (DISEÑO BOOTSTRAP 5 / TAILWIND)
    ========================================= */
 .tw-modal-backdrop {
-  position: fixed;     /* <-- ESTO SOLUCIONA EL PROBLEMA */
+  position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(15, 23, 42, 0.6);
+  background-color: rgba(15, 23, 42, 0.65);
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
+  padding: 16px;
 }
 
+/* Modal estándar para Formularios */
 .tw-modal-card {
   background: #ffffff;
   border-radius: 16px;
@@ -281,7 +283,92 @@
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  animation: modalFadeIn 0.3s ease-out;
 }
+
+/* Modal específico para Notificaciones (Alertas bonitas) */
+.tw-modal-card-alert {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  max-width: 420px; /* Esto evita el rectángulo gigante */
+  text-align: center;
+  overflow: hidden;
+  animation: modalFadeIn 0.3s ease-out;
+  border: 1px solid #e2e8f0;
+}
+
+.tw-modal-header-alert {
+  padding: 32px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.tw-modal-icon-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+}
+
+.tw-modal-icon-circle.success { background: #d1fae5; color: #059669; }
+.tw-modal-icon-circle.danger { background: #fee2e2; color: #dc2626; }
+.tw-modal-icon-circle.warning { background: #fef3c7; color: #d97706; }
+
+.tw-modal-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.tw-modal-desc {
+  margin: 0;
+  font-size: 15px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.tw-modal-extra-box {
+  margin-top: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #334155;
+  border: 1px dashed #cbd5e1;
+  width: 100%;
+  font-weight: 600;
+}
+
+.tw-modal-footer-alert {
+  padding: 8px 24px 24px;
+}
+
+.tw-modal-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.tw-modal-btn.success { background: #10b981; }
+.tw-modal-btn.success:hover { background: #059669; }
+.tw-modal-btn.danger { background: #ef4444; }
+.tw-modal-btn.danger:hover { background: #dc2626; }
+.tw-modal-btn.warning { background: #f59e0b; }
+.tw-modal-btn.warning:hover { background: #d97706; }
 
 .firma-box-p {
   background: #ffffff;
@@ -316,6 +403,48 @@
   gap: 12px;
 }
 
+/* =========================================
+   ESTILO PARA INPUT DE ARCHIVOS (FOTO)
+   ========================================= */
+.file-input-p {
+  /* Tratamos el input como bloque normal (NUNCA usar flex en un input) */
+  display: block !important;
+  width: 100% !important;
+  height: 44px !important;
+  padding: 3px 16px !important; /* El 12px izquierdo empujará el botón lejos del borde */
+  box-sizing: border-box !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+}
+
+/* Selector dual para máxima compatibilidad (Chrome, Safari, Edge, Firefox) */
+.file-input-p::-webkit-file-upload-button,
+.file-input-p::file-selector-button {
+  /* Reseteo agresivo de los estilos nativos rebeldes del navegador */
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  
+  /* Fuerza el margen izquierdo a 0 para que respete el padding del input padre */
+  margin: 0 12px 0 0 !important; 
+  height: 100% !important; /* Toma el alto interior sobrante */
+  padding: 0 16px !important;
+  
+  /* Diseño moderno del botón */
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  color: #0f172a !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.file-input-p::-webkit-file-upload-button:hover,
+.file-input-p::file-selector-button:hover {
+  background: #e2e8f0 !important;
+}
+
 /* RESPONSIVE */
 @media (max-width: 992px) {
   .form-grid-p.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -333,4 +462,11 @@
   .footer-actions-p { flex-direction: column; }
   .footer-actions-p button { width: 100%; justify-content: center; }
   .firma-actions-p { flex-direction: column; }
+}
+
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }

@@ -76,11 +76,13 @@ export default function ModalPrestamo() {
   const [nuevaPlaca, setNuevaPlaca] = useState({
     nro_placa: '',
     empresa_id: '',
+    volumen_m3: '', // <-- NUEVO CAMPO AGREGADO
     estadoBusqueda: 'Ingrese 6 caracteres para buscar o crear la placa.',
     colorEstado: '#64748b',
     existe: false,
     infoAuditoria: ''
   });
+
 
   const [avisoFlotante, setAvisoFlotante] = useState({
     visible: false, tipo: 'danger', titulo: '', mensaje: '', detalleExtra: '', onCloseCallback: null
@@ -412,6 +414,7 @@ export default function ModalPrestamo() {
       setNuevaPlaca({
         nro_placa: limpia,
         empresa_id: String(local.empresa_id || ''),
+        volumen_m3: local.volumen_m3 || '',
         existe: true,
         estadoBusqueda: '✓ La placa ya existe. Puede modificar la empresa a la que pertenece.',
         colorEstado: '#16a34a',
@@ -429,6 +432,7 @@ export default function ModalPrestamo() {
         setNuevaPlaca({
           nro_placa: limpia,
           empresa_id: String(remota.empresa_id || ''),
+          volumen_m3: remota.volumen_m3 || '',
           existe: true,
           estadoBusqueda: '✓ La placa ya existe en el sistema. Puede actualizar su empresa.',
           colorEstado: '#16a34a',
@@ -441,6 +445,7 @@ export default function ModalPrestamo() {
           ...prev,
           nro_placa: limpia,
           empresa_id: formData.empresa_transporte_id || '',
+          volumen_m3: '',
           existe: false,
           estadoBusqueda: 'Placa no registrada. Seleccione su empresa de transporte para crearla.',
           colorEstado: '#0f4c81',
@@ -467,6 +472,7 @@ export default function ModalPrestamo() {
       const res = await guardarPlacaMaestra({
         nro_placa: placaLimpia,
         empresa_id: nuevaPlaca.empresa_id,
+        volumen_m3: nuevaPlaca.volumen_m3,
         usuario: nombreUsuarioActual
       });
       await cargarMaestros();
@@ -548,28 +554,29 @@ export default function ModalPrestamo() {
     <div className="registro-page-p">
       {loading && <Loading />}
 
-      {/* AVISO FLOTANTE MODERNO */}
+      {/* AVISO FLOTANTE MODERNO TIPO SWEETALERT / BOOTSTRAP */}
       {avisoFlotante.visible && (
         <div className="tw-modal-backdrop" onClick={cerrarAviso}>
-          <div className={`tw-modal-card tw-modal-${avisoFlotante.tipo}`} onClick={e => e.stopPropagation()}>
-            <div className="tw-modal-header">
+          <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
+            <div className="tw-modal-header-alert">
               <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
                 {avisoFlotante.tipo === 'danger' && <span>✖</span>}
                 {avisoFlotante.tipo === 'warning' && <span>⚠️</span>}
                 {avisoFlotante.tipo === 'success' && <span>✔</span>}
               </div>
-              <div className="tw-modal-text">
-                <h3 className="tw-modal-title">{avisoFlotante.titulo}</h3>
-                <p className="tw-modal-desc">{avisoFlotante.mensaje}</p>
-                {avisoFlotante.detalleExtra && <div className="tw-modal-extra-box">{avisoFlotante.detalleExtra}</div>}
-              </div>
+              <h3 className="tw-modal-title">{avisoFlotante.titulo}</h3>
+              <p className="tw-modal-desc">{avisoFlotante.mensaje}</p>
+              {avisoFlotante.detalleExtra && <div className="tw-modal-extra-box">{avisoFlotante.detalleExtra}</div>}
             </div>
-            <div className="tw-modal-footer">
-              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>Entendido</button>
+            <div className="tw-modal-footer-alert">
+              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>
+                Entendido
+              </button>
             </div>
           </div>
         </div>
       )}
+
 
       {/* TARJETA PRINCIPAL */}
       <section className="card-p mb-4" style={{ maxWidth: '1200px', margin: '0 auto', borderRadius: '16px', padding: '30px' }}>
@@ -703,6 +710,7 @@ export default function ModalPrestamo() {
                       setNuevaPlaca({
                         nro_placa: '',
                         empresa_id: formData.empresa_transporte_id || '',
+                        volumen_m3: '',
                         estadoBusqueda: 'Ingrese 6 caracteres para buscar o crear la placa.',
                         colorEstado: '#64748b',
                         existe: false,
@@ -784,15 +792,16 @@ export default function ModalPrestamo() {
           <div className="form-grid-p cols-1">
             <div className="field-p field-manual-p" style={{ maxWidth: '480px' }}>
               <label>Foto de salida</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', height: '44px', background: '#fff', border: '1.5px solid #c8d8e8', borderRadius: '12px', padding: '0 10px' }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleFotoSalidaChange}
-                  style={{ border: 'none', background: 'transparent', padding: 0, height: 'auto', outline: 'none', width: '100%' }}
-                />
-              </div>
+              
+              {/* INPUT LIMPIO SIN EL DIV ENVOLVENTE */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFotoSalidaChange}
+                className="file-input-p"
+              />
+
               <div style={{ marginTop: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <span className={`badge-firma-p ${formData.foto_salida_base64 ? 'activa' : 'inactiva'}`}>
                   {formData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
@@ -987,6 +996,7 @@ export default function ModalPrestamo() {
                 )}
               </div>
 
+                            {/* CAMPO EMPRESA DE TRANSPORTE (Ya lo tienes, pégalo debajo de este) */}
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>Empresa de Transporte *</label>
                 <select
@@ -1000,6 +1010,19 @@ export default function ModalPrestamo() {
                   ))}
                 </select>
               </div>
+
+              {/* === NUEVO CAMPO: VOLUMEN_M3 === */}
+              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
+                <label>Volumen (m³) - Opcional</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={nuevaPlaca.volumen_m3 || ''}
+                  onChange={e => setNuevaPlaca({ ...nuevaPlaca, volumen_m3: e.target.value })}
+                  placeholder="Ej: 15.5"
+                />
+              </div>
+              {/* =============================== */}
 
               <div className="field-p field-auto-p" style={{ marginBottom: '18px' }}>
                 <label>{nuevaPlaca.existe ? 'Usuario que actualiza' : 'Usuario que registra'}</label>

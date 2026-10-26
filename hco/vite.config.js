@@ -30,7 +30,7 @@ export default defineConfig({
           }
         ]
       },
-      manifest: {
+            manifest: {
         name: 'HCO - Herramientas de Control',
         short_name: 'HCO App',
         description: 'Sistema integral de control operativo y tracking offline',
@@ -40,23 +40,25 @@ export default defineConfig({
         orientation: 'portrait-primary',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'img/pwa-192x192.png', // <-- Agregado img/
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'img/pwa-512x512.png', // <-- Agregado img/
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'img/pwa-512x512.png', // <-- Agregado img/
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
           }
         ]
       }
+
+      
     })
   ]
 });

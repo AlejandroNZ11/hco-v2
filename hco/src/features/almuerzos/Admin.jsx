@@ -419,6 +419,8 @@ export default function Admin() {
         throw new Error(result.message || "No se pudo reiniciar la data.");
       }
 
+      localStorage.setItem("almuerzos_actualizado", Date.now().toString());
+
       setShowReinicio(false);
       mostrarToast(result.message || `Pedidos reiniciados. Eliminados: ${result.deletedRows || 0}`);
       await cargarDashboard();
@@ -545,6 +547,8 @@ export default function Admin() {
         throw new Error(result.message || "No se pudo registrar el adicional.");
       }
 
+      localStorage.setItem("almuerzos_actualizado", Date.now().toString());
+      
       setShowAdicional(false);
       mostrarToast(result.message || `Se registraron ${seleccionadosAdicional.length} almuerzos adicionales.`);
       await cargarDashboard();

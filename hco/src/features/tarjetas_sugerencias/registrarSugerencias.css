@@ -84,7 +84,7 @@
     background: #0f4c81;
   }
 
-  /* TÍTULOS DE SECCIÓN UNIFICADOS (Estilo idéntico al de tus otros módulos) */
+  /* TÍTULOS DE SECCIÓN UNIFICADOS */
   .section-title-row {
     display: flex;
     justify-content: space-between;
@@ -126,7 +126,7 @@
     gap: 14px;
   }
 
-  /* CAMPOS UNIFICADOS (SIN BARRAS LATERALES) */
+  /* CAMPOS UNIFICADOS */
   .field {
     display: flex;
     flex-direction: column;

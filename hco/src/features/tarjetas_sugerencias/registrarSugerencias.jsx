@@ -59,6 +59,58 @@ const normalizar = (txt) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
+/**
+ * Normaliza valores que antes eran ARRAY y ahora son TEXT en Supabase
+ */
+const aTextoPlano = (val) => {
+  if (val === null || val === undefined) return '';
+  if (Array.isArray(val)) return val[0] ? String(val[0]).trim() : '';
+  if (typeof val === 'string') {
+    const limpio = val.trim();
+    if (!limpio) return '';
+    // Si viene serializado como JSON array: '["Cotidiano"]'
+    if (limpio.startsWith('[') && limpio.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(limpio);
+        return Array.isArray(parsed) ? String(parsed[0] || '').trim() : limpio;
+      } catch {
+        return limpio;
+      }
+    }
+    // Si viene como literal de arreglo Postgres: '{"Cotidiano"}'
+    if (limpio.startsWith('{') && limpio.endsWith('}')) {
+      const interno = limpio.slice(1, -1).split(',')[0] || '';
+      return interno.replace(/^"|"$/g, '').trim();
+    }
+    return limpio;
+  }
+  return String(val);
+};
+
+/**
+ * Suma días a una fecha YYYY-MM-DD y devuelve YYYY-MM-DD
+ */
+const sumarDiasFecha = (fechaStr, dias) => {
+  if (!fechaStr) return '';
+  const partes = String(fechaStr).slice(0, 10).split('-').map(Number);
+  if (partes.length !== 3 || partes.some(isNaN)) return '';
+  const d = new Date(Date.UTC(partes[0], partes[1] - 1, partes[2]));
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * Suma meses a una fecha YYYY-MM-DD y devuelve YYYY-MM-DD
+ */
+const sumarMesesFecha = (fechaStr, meses) => {
+  if (!fechaStr) return '';
+  const partes = String(fechaStr).slice(0, 10).split('-').map(Number);
+  if (partes.length !== 3 || partes.some(isNaN)) return '';
+  const d = new Date(Date.UTC(partes[0], partes[1] - 1, partes[2]));
+  d.setUTCMonth(d.getUTCMonth() + meses);
+  return d.toISOString().slice(0, 10);
+};
+
 export default function RegistrarSugerencias() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,6 +123,9 @@ export default function RegistrarSugerencias() {
   const [loading, setLoading] = useState(false);
   const [relojLima, setRelojLima] = useState(() => obtenerFechaHoraLima());
 
+  // Estado guardado en BD al abrir la tarjeta (para saber si ya estaba Concluido)
+  const [estadoInicialDB, setEstadoInicialDB] = useState('Por Validar');
+
   // Catálogos desde Supabase / Dexie
   const [empleados, setEmpleados] = useState([]);
   const [areas, setAreas] = useState([]);
@@ -80,7 +135,7 @@ export default function RegistrarSugerencias() {
   const [busquedaEquipo, setBusquedaEquipo] = useState('');
   const [mostrarDropdownEquipo, setMostrarDropdownEquipo] = useState(false);
 
-  // Estado principal del formulario (unifica Registro y Análisis)
+  // Estado principal del formulario (fuentes, reconocido e impacto son TEXT)
   const [formData, setFormData] = useState({
     id_sugerencia: '',
     estado: 'Por Validar',
@@ -94,7 +149,7 @@ export default function RegistrarSugerencias() {
     cargo_registro: '',
     jefe_registro: '',
     categorias: [],
-    fuentes: [],
+    fuentes: '',
     equipo_ids: [],
     equipo_nombres: [],
     descripcion_sugerencia: '',
@@ -107,8 +162,8 @@ export default function RegistrarSugerencias() {
     nombre_responsable: '',
     responsable_apoyo_id: '',
     responsable_apoyo: '',
-    reconocido: [],
-    impacto: [],
+    reconocido: '',
+    impacto: '',
     plan_accion: '',
     fecha_cierre: '',
     comentario_adicional: '',
@@ -145,20 +200,37 @@ export default function RegistrarSugerencias() {
     if (typeof cb === 'function') cb();
   };
 
-  // Permisos del usuario logueado
+  // =========================================================
+  // PERMISOS POR ROL
+  // - usuario: solo ve en edición (crea en nuevo registro)
+  // - admin: solo ve en edición
+  // - supervisor: edita solo Análisis (Sección 3); Sección 2 bloqueada; si está Concluido pasa a solo ver
+  // - superadmin: todo ve y todo edita siempre
+  // =========================================================
   const rolUsuario = normalizar(
     currentUser?.rol || currentUser?.role || currentUser?.roles?.nombre || ''
   );
-  const puedeAnalizar =
-    rolUsuario === 'superadmin' ||
-    rolUsuario === 'supervisor' ||
-    rolUsuario === 'admin';
 
-  // En modo creación cualquiera puede llenar los datos de la sugerencia;
-  // en modo edición, el creador (si sigue Por Validar) o los supervisores/admins pueden editar.
-  const puedeEditarDetalleInicial = !esModoEdicion || puedeAnalizar || (
-    currentUser?.id && formData.usuario_registro_id === currentUser.id && formData.estado === 'Por Validar'
-  );
+  const esSuperAdmin =
+    rolUsuario === 'superadmin' ||
+    rolUsuario === 'super_admin' ||
+    rolUsuario === 'super administrador';
+
+  const esSupervisor =
+    rolUsuario === 'supervisor' ||
+    rolUsuario === 'supervisores';
+
+  const tarjetaYaConcluida =
+    esModoEdicion && normalizar(estadoInicialDB) === 'concluido';
+
+  // Sección 2 (Clasificación y Detalle):
+  // En creación nueva todos pueden llenar; en edición solo Superadmin puede modificarla.
+  const puedeEditarDetalleInicial = !esModoEdicion || esSuperAdmin;
+
+  // Sección 3 (Análisis y Seguimiento):
+  // Solo en modo edición: Superadmin siempre, o Supervisor si la tarjeta NO está Concluida.
+  const puedeAnalizar =
+    esModoEdicion && (esSuperAdmin || (esSupervisor && !tarjetaYaConcluida));
 
   // Reloj en vivo de Lima cuando es un Nuevo Registro
   useEffect(() => {
@@ -186,7 +258,6 @@ export default function RegistrarSugerencias() {
       setAreas(areaList || []);
       setCargos(cargoList || []);
 
-      // Encontrar datos completos del usuario logueado en la tabla empleados
       const miFicha = (empList || []).find(
         e => (currentUser?.id && String(e.id) === String(currentUser.id)) ||
              (currentUser?.dni && String(e.dni) === String(currentUser.dni))
@@ -229,9 +300,12 @@ export default function RegistrarSugerencias() {
         const cargoCreador = (cargoList || []).find(c => String(c.id) === String(creadorFicha?.cargo_id))?.nombre || '';
         const jefeCreador = (empList || []).find(j => String(j.id) === String(creadorFicha?.jefe_directo_id))?.nombre || '';
 
+        const estadoGuardado = reg.estado || 'Por Validar';
+        setEstadoInicialDB(estadoGuardado);
+
         setFormData({
           id_sugerencia: reg.id_sugerencia || 'PENDIENTE',
-          estado: reg.estado || 'Por Validar',
+          estado: estadoGuardado,
           fecha_registro: reg.fecha_registro || '',
           proceso: reg.proceso || '',
           fecha_plan: reg.fecha_plan ? String(reg.fecha_plan).slice(0, 10) : '',
@@ -242,7 +316,7 @@ export default function RegistrarSugerencias() {
           cargo_registro: cargoCreador || 'Operador / Analista',
           jefe_registro: jefeCreador || '-',
           categorias: Array.isArray(reg.categorias) ? reg.categorias : [],
-          fuentes: Array.isArray(reg.fuentes) ? reg.fuentes : (reg.fuentes ? [reg.fuentes] : []),
+          fuentes: aTextoPlano(reg.fuentes),
           equipo_ids: Array.isArray(reg.equipo_ids) ? reg.equipo_ids : [],
           equipo_nombres: Array.isArray(reg.equipo_nombres) ? reg.equipo_nombres : [],
           descripcion_sugerencia: reg.descripcion_sugerencia || '',
@@ -254,8 +328,8 @@ export default function RegistrarSugerencias() {
           nombre_responsable: reg.nombre_responsable || '',
           responsable_apoyo_id: reg.responsable_apoyo_id || '',
           responsable_apoyo: reg.responsable_apoyo || '',
-          reconocido: Array.isArray(reg.reconocido) ? reg.reconocido : (reg.reconocido ? [reg.reconocido] : []),
-          impacto: Array.isArray(reg.impacto) ? reg.impacto : (reg.impacto ? [reg.impacto] : []),
+          reconocido: aTextoPlano(reg.reconocido),
+          impacto: aTextoPlano(reg.impacto),
           plan_accion: reg.plan_accion || '',
           fecha_cierre: reg.fecha_cierre ? String(reg.fecha_cierre).slice(0, 10) : '',
           comentario_adicional: reg.comentario_adicional || '',
@@ -265,6 +339,7 @@ export default function RegistrarSugerencias() {
           usuario_actualiza: reg.usuario_actualiza || ''
         });
       } else {
+        setEstadoInicialDB('Por Validar');
         setFormData(prev => ({
           ...prev,
           estado: 'Por Validar',
@@ -289,6 +364,24 @@ export default function RegistrarSugerencias() {
     return empleados.filter(e => !normalizar(e.estado).includes('inactivo'));
   }, [empleados]);
 
+  // Empleados filtrados según el "Área Responsable" seleccionada
+  const empleadosPorAreaResponsable = useMemo(() => {
+    if (!formData.area_responsable_id && !formData.area_responsable) return [];
+    return empleadosActivos.filter(emp => {
+      const coincideId =
+        formData.area_responsable_id &&
+        emp.area_id !== undefined &&
+        emp.area_id !== null &&
+        String(emp.area_id) === String(formData.area_responsable_id);
+
+      const coincideNombre =
+        formData.area_responsable &&
+        normalizar(emp.area_nombre || emp.area?.nombre || emp.area) === normalizar(formData.area_responsable);
+
+      return coincideId || coincideNombre;
+    });
+  }, [empleadosActivos, formData.area_responsable_id, formData.area_responsable]);
+
   // Sugerencias de autocompletado para agregar integrantes a "Equipo"
   const sugerenciasEquipo = useMemo(() => {
     const q = normalizar(busquedaEquipo);
@@ -311,14 +404,6 @@ export default function RegistrarSugerencias() {
     });
   };
 
-  // Selección única guardada como array de 1 elemento (Fuentes, Impacto, Reconocido)
-  const handleSelectUnicoEnArray = (campo, valor) => {
-    setFormData(prev => ({
-      ...prev,
-      [campo]: valor ? [valor] : []
-    }));
-  };
-
   // Agregar y quitar empleado en "Equipo"
   const agregarIntegranteEquipo = (emp) => {
     setFormData(prev => ({
@@ -338,15 +423,27 @@ export default function RegistrarSugerencias() {
     }));
   };
 
-  // Cambio de Área Responsable
+  // Cambio de Área Responsable (filtra y limpia responsable si no pertenece a la nueva área)
   const handleAreaResponsableChange = (e) => {
     const idSel = e.target.value;
     const areaObj = areas.find(a => String(a.id) === String(idSel));
-    setFormData(prev => ({
-      ...prev,
-      area_responsable_id: areaObj ? areaObj.id : null,
-      area_responsable: areaObj ? areaObj.nombre : ''
-    }));
+
+    setFormData(prev => {
+      const empActual = empleadosActivos.find(emp => String(emp.id) === String(prev.responsable_id));
+      const perteneceNuevaArea =
+        areaObj &&
+        empActual &&
+        (String(empActual.area_id) === String(areaObj.id) ||
+         normalizar(empActual.area_nombre || empActual.area) === normalizar(areaObj.nombre));
+
+      return {
+        ...prev,
+        area_responsable_id: areaObj ? areaObj.id : '',
+        area_responsable: areaObj ? areaObj.nombre : '',
+        responsable_id: perteneceNuevaArea ? prev.responsable_id : '',
+        nombre_responsable: perteneceNuevaArea ? prev.nombre_responsable : ''
+      };
+    });
   };
 
   // Cambio de Responsable Principal
@@ -355,7 +452,7 @@ export default function RegistrarSugerencias() {
     const empObj = empleadosActivos.find(emp => String(emp.id) === String(idSel));
     setFormData(prev => ({
       ...prev,
-      responsable_id: empObj ? empObj.id : null,
+      responsable_id: empObj ? empObj.id : '',
       nombre_responsable: empObj ? empObj.nombre : ''
     }));
   };
@@ -366,36 +463,80 @@ export default function RegistrarSugerencias() {
     const empObj = empleadosActivos.find(emp => String(emp.id) === String(idSel));
     setFormData(prev => ({
       ...prev,
-      responsable_apoyo_id: empObj ? empObj.id : null,
+      responsable_apoyo_id: empObj ? empObj.id : '',
       responsable_apoyo: empObj ? empObj.nombre : ''
     }));
   };
 
-  // Cálculo automático inteligente del estado según lo llenado en el Análisis
+  // Cambio de Fecha Planificada (valida que Fecha de Cierre siga siendo mayor)
+  const handleFechaPlanChange = (e) => {
+    const nuevaFechaPlan = e.target.value;
+    setFormData(prev => {
+      const cierreValido =
+        nuevaFechaPlan && prev.fecha_cierre && prev.fecha_cierre > nuevaFechaPlan;
+      return {
+        ...prev,
+        fecha_plan: nuevaFechaPlan,
+        fecha_cierre: cierreValido ? prev.fecha_cierre : ''
+      };
+    });
+  };
+
+  // Cambio de Fecha de Cancelación (habilita o limpia Motivo de Cancelación)
+  const handleFechaCancelacionChange = (e) => {
+    const nuevaFechaCancel = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      fecha_cancelacion: nuevaFechaCancel,
+      comentario_cancelacion: nuevaFechaCancel ? prev.comentario_cancelacion : ''
+    }));
+  };
+
+  // Fecha mínima permitida para Fecha de Cierre (estrictamente mayor a Fecha Planificada: +1 día)
+  const minFechaCierre = useMemo(() => {
+    return formData.fecha_plan ? sumarDiasFecha(formData.fecha_plan, 1) : '';
+  }, [formData.fecha_plan]);
+
+  // =========================================================
+  // CÁLCULO AUTOMÁTICO DEL ESTADO
+  // 1. Si tiene Fecha de Cancelación -> 'Cancelado'
+  // 2. Si tiene Fecha de Cierre -> 'Concluido'
+  // 3. Si tiene Fecha Planificada:
+  //    - Mayor a 3 meses -> 'Futuro'
+  //    - Menor o igual a 3 meses -> 'Priorizado'
+  // 4. Por defecto -> 'Por Validar'
+  // =========================================================
   const calcularEstadoAutomatico = (datos) => {
-    if (datos.fecha_cancelacion || (datos.comentario_cancelacion && datos.comentario_cancelacion.trim() !== '')) {
+    if (datos.fecha_cancelacion) {
       return 'Cancelado';
     }
     if (datos.fecha_cierre) {
       return 'Concluido';
     }
-    if (datos.estado === 'Futuro') {
-      return 'Futuro';
-    }
-    if (datos.area_responsable && datos.nombre_responsable && datos.fecha_plan) {
+    if (datos.fecha_plan) {
+      const fechaBase = datos.fecha_registro
+        ? String(datos.fecha_registro).slice(0, 10)
+        : obtenerFechaCortaLima();
+      const fechaLimiteTresMeses = sumarMesesFecha(fechaBase, 3);
+
+      if ( fechaLimiteTresMeses && datos.fecha_plan > fechaLimiteTresMeses ) {
+        return 'Futuro';
+      }
       return 'Priorizado';
     }
-    return datos.estado || 'Por Validar';
+    return 'Por Validar';
   };
+
+  const estadoCalculado = calcularEstadoAutomatico(formData);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Validaciones de Registro de Sugerencia
+    // 1. Validaciones de Registro de Sugerencia (Sección 2)
     if (!formData.proceso.trim()) {
       return mostrarAviso('warning', 'Proceso requerido', 'Por favor escriba el proceso al que pertenece la sugerencia.');
     }
-    if (formData.fuentes.length === 0) {
+    if (!formData.fuentes.trim()) {
       return mostrarAviso('warning', 'Fuente requerida', 'Seleccione una Fuente de la lista desplegable.');
     }
     if (formData.descripcion_sugerencia.trim().length < 10) {
@@ -405,46 +546,79 @@ export default function RegistrarSugerencias() {
       return mostrarAviso('warning', 'Categoría requerida', 'Seleccione al menos una Categoría para la sugerencia.');
     }
 
-    // 2. Validaciones de Análisis (si está en Modo Edición y tiene permisos)
-    const estadoFinal = calcularEstadoAutomatico(formData);
-
+    // 2. Validaciones de Análisis (si está en Modo Edición y tiene permisos para analizar)
     if (esModoEdicion && puedeAnalizar) {
-      const intentaCancelar = Boolean(
-        estadoFinal === 'Cancelado' ||
-        formData.fecha_cancelacion ||
-        formData.comentario_cancelacion.trim()
-      );
-
-      if (intentaCancelar) {
-        if (!formData.fecha_cancelacion || formData.comentario_cancelacion.trim().length < 5) {
+      // Validación de Fecha de Cierre vs Fecha Planificada
+      if (formData.fecha_cierre) {
+        if (!formData.fecha_plan) {
           return mostrarAviso(
             'warning',
-            'Datos de Cancelación Incompletos',
-            'Para cancelar una sugerencia debe indicar la Fecha de cancelación y el Motivo de cancelación (mínimo 5 caracteres).'
+            'Fecha Planificada requerida',
+            'No puede registrar una Fecha de Cierre sin haber definido primero la Fecha Planificada.'
+          );
+        }
+        if (formData.fecha_cierre <= formData.fecha_plan) {
+          return mostrarAviso(
+            'warning',
+            'Fecha de Cierre inválida',
+            'La Fecha de Cierre debe ser mayor a la Fecha Planificada.'
+          );
+        }
+      }
+
+      // Caso A: Cancelación
+      if (formData.fecha_cancelacion) {
+        if (!formData.area_responsable_id || !formData.area_responsable) {
+          return mostrarAviso(
+            'warning',
+            'Área Responsable requerida',
+            'Para cancelar la sugerencia debe seleccionar el Área Responsable.'
+          );
+        }
+        if (!formData.responsable_id || !formData.nombre_responsable) {
+          return mostrarAviso(
+            'warning',
+            'Nombre del Responsable requerido',
+            'Para cancelar la sugerencia debe seleccionar el Nombre del Responsable.'
+          );
+        }
+        if (!formData.comentario_cancelacion.trim() || formData.comentario_cancelacion.trim().length < 5) {
+          return mostrarAviso(
+            'warning',
+            'Motivo de Cancelación obligatorio',
+            'Al ingresar una Fecha de Cancelación, debe escribir el Motivo de Cancelación (mínimo 5 caracteres).'
           );
         }
       } else {
-        const inicioAnalisis = Boolean(
-          formData.area_responsable ||
-          formData.nombre_responsable ||
+        // Caso B: Planificación / Análisis / Cierre
+        const hayDatosAnalisis = Boolean(
           formData.fecha_plan ||
-          formData.impacto.length > 0 ||
-          estadoFinal === 'Priorizado' ||
-          estadoFinal === 'Concluido'
+          formData.fecha_cierre ||
+          formData.area_responsable_id ||
+          formData.responsable_id ||
+          formData.reconocido ||
+          formData.impacto ||
+          formData.plan_accion.trim()
         );
 
-        if (inicioAnalisis) {
-          if (!formData.area_responsable) {
-            return mostrarAviso('warning', 'Área responsable requerida', 'Seleccione el Área responsable del análisis.');
+        if (hayDatosAnalisis) {
+          if (!formData.area_responsable_id || !formData.area_responsable) {
+            return mostrarAviso('warning', 'Área Responsable requerida', 'Seleccione el Área Responsable del análisis.');
           }
-          if (!formData.nombre_responsable) {
-            return mostrarAviso('warning', 'Responsable requerido', 'Seleccione el Nombre del responsable de la sugerencia.');
+          if (!formData.responsable_id || !formData.nombre_responsable) {
+            return mostrarAviso('warning', 'Responsable requerido', 'Seleccione el Nombre del Responsable de la sugerencia.');
           }
           if (!formData.fecha_plan) {
-            return mostrarAviso('warning', 'Fecha planificada requerida', 'Seleccione la Fecha planificada para la implementación.');
+            return mostrarAviso('warning', 'Fecha Planificada requerida', 'Seleccione la Fecha Planificada para la implementación.');
           }
-          if (formData.impacto.length === 0) {
+          if (!formData.reconocido.trim()) {
+            return mostrarAviso('warning', 'Reconocido como requerido', 'Seleccione una opción en el campo "Reconocido como".');
+          }
+          if (!formData.impacto.trim()) {
             return mostrarAviso('warning', 'Impacto requerido', 'Seleccione el tipo de Impacto.');
+          }
+          if (!formData.plan_accion.trim()) {
+            return mostrarAviso('warning', 'Plan de Acción requerido', 'Describa las actividades en el campo Plan de Acción.');
           }
         }
       }
@@ -453,17 +627,17 @@ export default function RegistrarSugerencias() {
     setLoading(true);
     try {
       const payload = {
-        estado: estadoFinal,
+        estado: estadoCalculado,
         proceso: formData.proceso.trim(),
         fecha_plan: formData.fecha_plan || null,
-        area_registro_id: formData.area_registro_id || null,
+        area_registro_id: formData.area_registro_id ? Number(formData.area_registro_id) : null,
         area_registro: formData.area_registro || '',
         usuario_registro_id: formData.usuario_registro_id || null,
         usuario_registro: formData.usuario_registro || '',
         categorias: formData.categorias,
-        fuentes: formData.fuentes,
-        reconocido: formData.reconocido,
-        impacto: formData.impacto,
+        fuentes: formData.fuentes.trim() || null,
+        reconocido: formData.reconocido.trim() || null,
+        impacto: formData.impacto.trim() || null,
         area_responsable_id: formData.area_responsable_id ? Number(formData.area_responsable_id) : null,
         area_responsable: formData.area_responsable || null,
         equipo_ids: formData.equipo_ids,
@@ -475,10 +649,12 @@ export default function RegistrarSugerencias() {
         descripcion_sugerencia: formData.descripcion_sugerencia.trim(),
         beneficios_sugerencia: formData.beneficios_sugerencia.trim() || null,
         plan_accion: formData.plan_accion.trim() || null,
-        fecha_cierre: formData.fecha_cierre || (estadoFinal === 'Concluido' ? obtenerFechaCortaLima() : null),
+        fecha_cierre: formData.fecha_cierre || null,
         comentario_adicional: formData.comentario_adicional.trim() || null,
-        fecha_cancelacion: formData.fecha_cancelacion || (estadoFinal === 'Cancelado' ? obtenerFechaCortaLima() : null),
-        comentario_cancelacion: formData.comentario_cancelacion.trim() || null,
+        fecha_cancelacion: formData.fecha_cancelacion || null,
+        comentario_cancelacion: formData.fecha_cancelacion
+          ? (formData.comentario_cancelacion.trim() || null)
+          : null,
         usuario_actualiza: currentUser?.nombre || 'Usuario'
       };
 
@@ -510,6 +686,8 @@ export default function RegistrarSugerencias() {
       setLoading(false);
     }
   };
+
+  const mostrarBotonGuardar = !esModoEdicion || puedeAnalizar || puedeEditarDetalleInicial;
 
   return (
     <div className="sugerencia-form-page">
@@ -579,8 +757,7 @@ export default function RegistrarSugerencias() {
         <form onSubmit={handleSubmit} noValidate>
           {/* =========================================================
               1. DATOS AUTOMÁTICOS DEL REGISTRO
-              (Oculto en Registro nuevo, visible únicamente en Análisis / Edición)
-             ========================================================= */}
+              ========================================================= */}
           {esModoEdicion && (
             <>
               <div className="section-title-row" style={{ marginTop: 0, borderTop: 'none', paddingTop: 0 }}>
@@ -592,7 +769,7 @@ export default function RegistrarSugerencias() {
                   <label>
                     Estado Actual <span className="field-badge auto">AUTO</span>
                   </label>
-                  <input type="text" value={calcularEstadoAutomatico(formData)} readOnly />
+                  <input type="text" value={estadoCalculado} readOnly />
                 </div>
 
                 <div className="field field-auto">
@@ -625,7 +802,7 @@ export default function RegistrarSugerencias() {
 
           {/* =========================================================
               2. CLASIFICACIÓN Y DETALLE DE LA SUGERENCIA
-             ========================================================= */}
+              ========================================================= */}
           <div
             className="section-title-row"
             style={!esModoEdicion ? { marginTop: 0, borderTop: 'none', paddingTop: 0 } : undefined}
@@ -633,13 +810,20 @@ export default function RegistrarSugerencias() {
             <div className="section-title">
               {esModoEdicion ? '2. Clasificación y Detalle de la Sugerencia' : 'Clasificación y Detalle de la Sugerencia'}
             </div>
+            {esModoEdicion && (
+              <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>
+                {puedeEditarDetalleInicial ? 'Modo Edición Habilitado' : 'Modo Solo Lectura'}
+              </span>
+            )}
           </div>
 
-          {/* PRIMERA FILA: PROCESO | FUENTE (Desplegable de 1 opción) */}
+          {/* PRIMERA FILA: PROCESO | FUENTE */}
           <div className="grid-2-cols">
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
               <label>
-                Proceso <span className="field-badge manual">OBLIGATORIO</span>
+                Proceso <span className={`field-badge ${puedeEditarDetalleInicial ? 'manual' : 'auto'}`}>
+                  {puedeEditarDetalleInicial ? 'OBLIGATORIO' : 'LECTURA'}
+                </span>
               </label>
               <input
                 type="text"
@@ -653,11 +837,13 @@ export default function RegistrarSugerencias() {
 
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
               <label>
-                Fuente <span className="field-badge manual">OBLIGATORIO</span>
+                Fuente <span className={`field-badge ${puedeEditarDetalleInicial ? 'manual' : 'auto'}`}>
+                  {puedeEditarDetalleInicial ? 'OBLIGATORIO' : 'LECTURA'}
+                </span>
               </label>
               <select
-                value={formData.fuentes[0] || ''}
-                onChange={(e) => handleSelectUnicoEnArray('fuentes', e.target.value)}
+                value={formData.fuentes || ''}
+                onChange={(e) => setFormData({ ...formData, fuentes: e.target.value })}
                 disabled={!puedeEditarDetalleInicial}
                 required
               >
@@ -669,7 +855,7 @@ export default function RegistrarSugerencias() {
             </div>
           </div>
 
-          {/* SEGUNDA FILA: SOLO EQUIPO INVOLUCRADO */}
+          {/* SEGUNDA FILA: EQUIPO INVOLUCRADO */}
           <div style={{ marginTop: '12px' }}>
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'} equipo-autocomplete-wrapper`}>
               <label>
@@ -734,7 +920,9 @@ export default function RegistrarSugerencias() {
           <div className="grid-2-cols" style={{ marginTop: '12px' }}>
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
               <label>
-                Descripción de la Sugerencia <span className="field-badge manual">OBLIGATORIO</span>
+                Descripción de la Sugerencia <span className={`field-badge ${puedeEditarDetalleInicial ? 'manual' : 'auto'}`}>
+                  {puedeEditarDetalleInicial ? 'OBLIGATORIO' : 'LECTURA'}
+                </span>
               </label>
               <textarea
                 rows="3"
@@ -762,11 +950,13 @@ export default function RegistrarSugerencias() {
             </div>
           </div>
 
-          {/* CUARTA FILA: CATEGORÍAS (Selección múltiple) */}
+          {/* CUARTA FILA: CATEGORÍAS */}
           <div style={{ marginTop: '12px' }}>
             <div className={`field ${puedeEditarDetalleInicial ? 'field-manual' : 'field-auto'}`}>
               <label>
-                Categorías (Marque una o más) <span className="field-badge manual">OBLIGATORIO</span>
+                Categorías (Marque una o más) <span className={`field-badge ${puedeEditarDetalleInicial ? 'manual' : 'auto'}`}>
+                  {puedeEditarDetalleInicial ? 'OBLIGATORIO' : 'LECTURA'}
+                </span>
               </label>
               <div className="chips-selector-grid">
                 {CATEGORIAS_OPCIONES.map((item) => {
@@ -790,22 +980,28 @@ export default function RegistrarSugerencias() {
 
           {/* =========================================================
               3. ANÁLISIS, RESPONSABLES Y SEGUIMIENTO
-              (Visible únicamente al entrar a Analizar / Editar desde la tabla)
-             ========================================================= */}
+              ========================================================= */}
           {esModoEdicion && (
             <>
               <div className="section-title-row">
                 <div className="section-title">3. Análisis, Asignación y Seguimiento</div>
                 <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>
-                  {puedeAnalizar ? 'Modo Edición Habilitado' : 'Modo Solo Lectura'}
+                  {puedeAnalizar
+                    ? 'Modo Edición Habilitado'
+                    : tarjetaYaConcluida
+                      ? 'Tarjeta Concluida (Solo Lectura)'
+                      : 'Modo Solo Lectura'}
                 </span>
               </div>
 
               {/* PRIMERA FILA: Área responsable - Nombre del responsable - Responsable de apoyo - Fecha planificada */}
               <div className="grid-4-cols">
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Área Responsable <span className="field-badge manual">EDITAR</span>
+                    Área Responsable{' '}
+                    <span className={`field-badge ${(formData.fecha_plan || formData.fecha_cancelacion) ? 'manual' : 'optional'}`}>
+                      {(formData.fecha_plan || formData.fecha_cancelacion) ? 'OBLIGATORIO' : 'EDITAR'}
+                    </span>
                   </label>
                   <select
                     value={formData.area_responsable_id || ''}
@@ -819,23 +1015,36 @@ export default function RegistrarSugerencias() {
                   </select>
                 </div>
 
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar && formData.area_responsable_id ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Nombre del Responsable <span className="field-badge manual">EDITAR</span>
+                    Nombre del Responsable{' '}
+                    <span className={`field-badge ${(formData.fecha_plan || formData.fecha_cancelacion) ? 'manual' : 'optional'}`}>
+                      {(formData.fecha_plan || formData.fecha_cancelacion) ? 'OBLIGATORIO' : 'EDITAR'}
+                    </span>
                   </label>
                   <select
                     value={formData.responsable_id || ''}
                     onChange={handleResponsableChange}
-                    disabled={!puedeAnalizar}
+                    disabled={!puedeAnalizar || !formData.area_responsable_id}
                   >
-                    <option value="">Seleccione responsable...</option>
-                    {empleadosActivos.map((emp) => (
+                    <option value="">
+                      {!formData.area_responsable_id
+                        ? 'Primero seleccione un área...'
+                        : 'Seleccione responsable...'}
+                    </option>
+                    {/* Si ya tenía un responsable guardado que no aparece en el filtro, se conserva visible */}
+                    {formData.responsable_id &&
+                      formData.nombre_responsable &&
+                      !empleadosPorAreaResponsable.some(e => String(e.id) === String(formData.responsable_id)) && (
+                        <option value={formData.responsable_id}>{formData.nombre_responsable}</option>
+                      )}
+                    {empleadosPorAreaResponsable.map((emp) => (
                       <option key={emp.id} value={emp.id}>{emp.nombre}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
                     Responsable de Apoyo <span className="field-badge optional">OPCIONAL</span>
                   </label>
@@ -851,14 +1060,14 @@ export default function RegistrarSugerencias() {
                   </select>
                 </div>
 
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
                     Fecha Planificada <span className="field-badge manual">EDITAR</span>
                   </label>
                   <input
                     type="date"
                     value={formData.fecha_plan}
-                    onChange={(e) => setFormData({ ...formData, fecha_plan: e.target.value })}
+                    onChange={handleFechaPlanChange}
                     disabled={!puedeAnalizar}
                   />
                 </div>
@@ -866,37 +1075,45 @@ export default function RegistrarSugerencias() {
 
               {/* SEGUNDA FILA: Fecha de Cierre - Fecha de Cancelación - Reconocido como - Impacto */}
               <div className="grid-4-cols" style={{ marginTop: '12px' }}>
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar && formData.fecha_plan ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Fecha de Cierre <span className="field-badge optional">CIERRE</span>
+                    Fecha de Cierre{' '}
+                    <span className={`field-badge ${formData.fecha_plan ? 'optional' : 'auto'}`}>
+                      {formData.fecha_plan ? 'CIERRE' : 'BLOQUEADO'}
+                    </span>
                   </label>
                   <input
                     type="date"
+                    min={minFechaCierre || undefined}
                     value={formData.fecha_cierre}
                     onChange={(e) => setFormData({ ...formData, fecha_cierre: e.target.value })}
-                    disabled={!puedeAnalizar}
+                    disabled={!puedeAnalizar || !formData.fecha_plan}
+                    title={!formData.fecha_plan ? 'Primero debe ingresar la Fecha Planificada' : 'Debe ser mayor a la Fecha Planificada'}
                   />
                 </div>
 
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
                     Fecha de Cancelación <span className="field-badge optional">CANCELAR</span>
                   </label>
                   <input
                     type="date"
                     value={formData.fecha_cancelacion}
-                    onChange={(e) => setFormData({ ...formData, fecha_cancelacion: e.target.value })}
+                    onChange={handleFechaCancelacionChange}
                     disabled={!puedeAnalizar}
                   />
                 </div>
 
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Reconocido como <span className="field-badge optional">OPCIONAL</span>
+                    Reconocido como{' '}
+                    <span className={`field-badge ${formData.fecha_plan ? 'manual' : 'optional'}`}>
+                      {formData.fecha_plan ? 'OBLIGATORIO' : 'OPCIONAL'}
+                    </span>
                   </label>
                   <select
-                    value={formData.reconocido[0] || ''}
-                    onChange={(e) => handleSelectUnicoEnArray('reconocido', e.target.value)}
+                    value={formData.reconocido || ''}
+                    onChange={(e) => setFormData({ ...formData, reconocido: e.target.value })}
                     disabled={!puedeAnalizar}
                   >
                     <option value="">Seleccione opción...</option>
@@ -906,13 +1123,16 @@ export default function RegistrarSugerencias() {
                   </select>
                 </div>
 
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Impacto <span className="field-badge manual">EDITAR</span>
+                    Impacto{' '}
+                    <span className={`field-badge ${formData.fecha_plan ? 'manual' : 'optional'}`}>
+                      {formData.fecha_plan ? 'OBLIGATORIO' : 'EDITAR'}
+                    </span>
                   </label>
                   <select
-                    value={formData.impacto[0] || ''}
-                    onChange={(e) => handleSelectUnicoEnArray('impacto', e.target.value)}
+                    value={formData.impacto || ''}
+                    onChange={(e) => setFormData({ ...formData, impacto: e.target.value })}
                     disabled={!puedeAnalizar}
                   >
                     <option value="">Seleccione impacto...</option>
@@ -925,40 +1145,50 @@ export default function RegistrarSugerencias() {
 
               {/* TERCERA FILA: Comentario Adicional - Motivo de Cancelación */}
               <div className="grid-2-cols" style={{ marginTop: '12px' }}>
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Comentario Adicional <span className="field-badge optional">CIERRE</span>
+                    Comentario Adicional <span className="field-badge optional">OPCIONAL</span>
                   </label>
                   <input
                     type="text"
                     maxLength={120}
-                    placeholder="Comentario de seguimiento o cierre..."
+                    placeholder="Comentario de seguimiento o cierre (opcional)..."
                     value={formData.comentario_adicional}
                     onChange={(e) => setFormData({ ...formData, comentario_adicional: e.target.value })}
                     disabled={!puedeAnalizar}
                   />
                 </div>
 
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar && formData.fecha_cancelacion ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Motivo de Cancelación <span className="field-badge optional">CANCELAR</span>
+                    Motivo de Cancelación{' '}
+                    <span className={`field-badge ${formData.fecha_cancelacion ? 'manual' : 'auto'}`}>
+                      {formData.fecha_cancelacion ? 'OBLIGATORIO' : 'BLOQUEADO'}
+                    </span>
                   </label>
                   <input
                     type="text"
                     maxLength={120}
-                    placeholder="Motivo por el cual se cancela..."
+                    placeholder={
+                      formData.fecha_cancelacion
+                        ? 'Escriba el motivo por el cual se cancela...'
+                        : 'Seleccione primero una Fecha de Cancelación...'
+                    }
                     value={formData.comentario_cancelacion}
                     onChange={(e) => setFormData({ ...formData, comentario_cancelacion: e.target.value })}
-                    disabled={!puedeAnalizar}
+                    disabled={!puedeAnalizar || !formData.fecha_cancelacion}
                   />
                 </div>
               </div>
 
               {/* CUARTA FILA: Plan de Acción */}
               <div style={{ marginTop: '12px' }}>
-                <div className="field field-manual">
+                <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Plan de Acción <span className="field-badge manual">EDITAR</span>
+                    Plan de Acción{' '}
+                    <span className={`field-badge ${formData.fecha_plan ? 'manual' : 'optional'}`}>
+                      {formData.fecha_plan ? 'OBLIGATORIO' : 'EDITAR'}
+                    </span>
                   </label>
                   <textarea
                     rows="2"
@@ -970,23 +1200,17 @@ export default function RegistrarSugerencias() {
                 </div>
               </div>
 
-              {/* FILA DE CONTROL Y AUDITORÍA: Estado Manual - Fecha/Hora Actualiza - Usuario Actualiza */}
+              {/* FILA DE CONTROL Y AUDITORÍA: Estado Calculado - Fecha/Hora Actualiza - Usuario Actualiza */}
               <div className="grid-3-cols" style={{ marginTop: '12px' }}>
-                <div className="field field-manual">
+                <div className="field field-auto">
                   <label>
-                    Estado Manual <span className="field-badge optional">ESTADO</span>
+                    Estado Calculado <span className="field-badge auto">AUTO</span>
                   </label>
-                  <select
-                    value={formData.estado}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    disabled={!puedeAnalizar}
-                  >
-                    <option value="Por Validar">Por Validar</option>
-                    <option value="Priorizado">Priorizado</option>
-                    <option value="Futuro">Futuro</option>
-                    <option value="Concluido">Concluido</option>
-                    <option value="Cancelado">Cancelado</option>
-                  </select>
+                  <input
+                    type="text"
+                    value={estadoCalculado}
+                    readOnly
+                  />
                 </div>
 
                 <div className="field field-auto">
@@ -1023,7 +1247,7 @@ export default function RegistrarSugerencias() {
               Volver al Tracking
             </button>
 
-            {(!esModoEdicion || puedeAnalizar || puedeEditarDetalleInicial) && (
+            {mostrarBotonGuardar && (
               <button type="submit" className="primary-btn" disabled={loading}>
                 {esModoEdicion ? 'Actualizar Sugerencia' : 'Registrar Sugerencia'}
               </button>

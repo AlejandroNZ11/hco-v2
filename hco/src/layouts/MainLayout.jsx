@@ -147,38 +147,42 @@ const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opcion
 
   // Función auxiliar que destruye cachés de PWA y reinicia IndexedDB (Dexie)
   async function destruirCacheYBaseLocal() {
-    // 1. Cerrar y eliminar Dexie correctamente esperando la promesa
-    try {
-      localDb.close();
-      await localDb.delete();
-    } catch (e) {
-      console.warn("Aviso cerrando Dexie:", e);
-    }
+    // 1. Activar bandera global para detener useSync y useLiveQuery de inmediato
+    window.__IS_CLEARING_CACHE__ = true;
 
-    // 2. Asegurar borrado de HCO_OfflineDB en el navegador
-    if (window.indexedDB) {
-      await new Promise((resolve) => {
-        const req = indexedDB.deleteDatabase('HCO_OfflineDB');
-        req.onsuccess = () => resolve();
-        req.onerror = () => resolve();
-        req.onblocked = () => resolve();
-      });
-    }
-
-    // 3. Borrar Cache Storage (archivos JS, CSS e imágenes de la PWA)
+    // 2. Borrar Cache Storage (archivos JS, CSS e imágenes de la PWA)
     if ('caches' in window) {
-      const nombresCaches = await caches.keys();
-      await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+      try {
+        const nombresCaches = await caches.keys();
+        await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
+      } catch (e) {
+        console.warn("Aviso borrando caches:", e);
+      }
     }
 
-    // 4. Desregistrar el Service Worker viejo
+    // 3. Desregistrar el Service Worker viejo
     if ('serviceWorker' in navigator) {
-      const registros = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registros.map(registro => registro.unregister()));
+      try {
+        const registros = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registros.map(registro => registro.unregister()));
+      } catch (e) {
+        console.warn("Aviso desregistrando SW:", e);
+      }
     }
 
     localStorage.removeItem('popup_almuerzo_cache_v2');
+
+    // 4. Eliminar Dexie justo al final antes de recargar (sin llamar a localDb.close() antes)
+    try {
+      await Promise.race([
+        localDb.delete(),
+        new Promise((resolve) => setTimeout(resolve, 800))
+      ]);
+    } catch (e) {
+      console.warn("Aviso cerrando Dexie:", e);
+    }
   }
+
 
   // BOTÓN MANUAL: "Limpiar Caché y Actualizar" (Escoba 🧹)
   async function ejecutarLimpiezaCache() {
@@ -252,41 +256,6 @@ const isMenuPage = currentPage === "/menu" || currentPage.includes("/menu-opcion
       setPasswordAlert({ message: error.message || "Error al cambiar la contraseña.", type: "alert-danger" });
       setPasswordLoading(false);
     }
-  }
-
-  async function limpiarAlmacenamientoNavegador() {
-    // 1. Cerrar conexión activa de Dexie y borrar IndexedDB esperando a que termine
-    try {
-      localDb.close();
-      await localDb.delete();
-    } catch (e) {
-      console.warn("Aviso al borrar localDb con Dexie:", e);
-    }
-
-    // 2. Respaldo nativo con Promesa por si existen otras bases de datos
-    if (window.indexedDB) {
-      await new Promise((resolve) => {
-        const req = indexedDB.deleteDatabase('HCO_OfflineDB');
-        req.onsuccess = () => resolve();
-        req.onerror = () => resolve();
-        req.onblocked = () => resolve();
-      });
-    }
-
-    // 3. Borrar todas las Cache Storage de la PWA (archivos JS, CSS, imágenes viejas)
-    if ('caches' in window) {
-      const nombresCaches = await caches.keys();
-      await Promise.all(nombresCaches.map(cache => caches.delete(cache)));
-    }
-
-    // 4. Desregistrar todos los Service Workers activos
-    if ('serviceWorker' in navigator) {
-      const registros = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registros.map(registro => registro.unregister()));
-    }
-
-    // 5. Limpiar cachés residuales en localStorage (conservando versión o sesión según corresponda)
-    localStorage.removeItem('popup_almuerzo_cache_v2');
   }
 
   if (!authUser) return null;

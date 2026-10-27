@@ -2,6 +2,25 @@ import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
 
 /**
+ * Convierte cualquier valor (array antiguo o string) en texto plano o null para columnas TEXT
+ */
+const aTextoColumna = (val) => {
+  if (val === null || val === undefined) return null;
+  if (Array.isArray(val)) return val[0] ? String(val[0]).trim() : null;
+  const txt = String(val).trim();
+  return txt !== '' ? txt : null;
+};
+
+const normalizarCamposTextoSugerencia = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const copia = { ...obj };
+  if ('fuentes' in copia) copia.fuentes = aTextoColumna(copia.fuentes);
+  if ('reconocido' in copia) copia.reconocido = aTextoColumna(copia.reconocido);
+  if ('impacto' in copia) copia.impacto = aTextoColumna(copia.impacto);
+  return copia;
+};
+
+/**
  * Devuelve la fecha y hora actual exacta en zona horaria de Lima, Perú (YYYY-MM-DD HH:mm:ss)
  */
 export const obtenerFechaHoraLima = () => {
@@ -55,7 +74,7 @@ export const sincronizarSugerenciasPendientes = async () => {
             id_sugerencia: _ignoreCorrelativo,
             _sincronizado,
             ...datosParaSupabase
-          } = datos;
+          } = normalizarCamposTextoSugerencia(datos);
 
           const { data: guardada, error } = await supabase
             .from('tarjetas_sugerencias')
@@ -74,7 +93,7 @@ export const sincronizarSugerenciasPendientes = async () => {
           synced++;
         } else if (item.operacion === 'UPDATE') {
           const { idRegistro, cambios } = item.payload;
-          const { _sincronizado, ...cambiosLimpios } = cambios;
+          const { _sincronizado, ...cambiosLimpios } = normalizarCamposTextoSugerencia(cambios);
 
           const { data: actualizada, error } = await supabase
             .from('tarjetas_sugerencias')
@@ -171,12 +190,12 @@ export const obtenerSugerenciaPorId = async (id) => {
  */
 export const crearSugerencia = async (payload) => {
   const fechaHoraLima = obtenerFechaHoraLima();
-  const datosNuevos = {
+  const datosNuevos = normalizarCamposTextoSugerencia({
     ...payload,
     estado: payload.estado || 'Por Validar',
     fecha_registro: payload.fecha_registro || fechaHoraLima,
     fechahora_actualiza: fechaHoraLima
-  };
+  });
 
   if (navigator.onLine) {
     try {
@@ -186,7 +205,9 @@ export const crearSugerencia = async (payload) => {
         .select()
         .single();
 
-      if (!error && data) {
+      if (error) throw error;
+
+      if (data) {
         await localDb.tarjetas_sugerencias.put({ ...data, _sincronizado: true });
         return { ...data, _sincronizado: true };
       }
@@ -219,10 +240,10 @@ export const crearSugerencia = async (payload) => {
  */
 export const actualizarSugerencia = async (id, cambios) => {
   const fechaHoraLima = obtenerFechaHoraLima();
-  const payloadActualizado = {
+  const payloadActualizado = normalizarCamposTextoSugerencia({
     ...cambios,
     fechahora_actualiza: fechaHoraLima
-  };
+  });
 
   // Si aún es un registro local no sincronizado
   if (String(id).startsWith('local_')) {

@@ -274,7 +274,7 @@ export default function Menu() {
             buttonText: "Entrar",
             image: "/img/SUGERENCIA.jpg",
             url: "/sugerencias/tracking", // Debe coincidir exactamente con la ruta de tu router
-            estado: "En Proceso",
+            estado: "Activo",
           },
           {
             title: "Cuadro Q",

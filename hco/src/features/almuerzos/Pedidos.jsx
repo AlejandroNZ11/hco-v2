@@ -60,6 +60,10 @@ function getFotoUsuario(user) {
 async function apiPost(payload) {
   const response = await fetch(APIURL, {
     method: "POST",
+    cache: "no-store", // ⚡ Fuerza a no usar caché HTTP en la PWA
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+    },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -208,7 +212,15 @@ export default function Pedidos() {
           setLoading(false);
           return;
         }
-        const result = await apiPost({ action: "getInitData", dni: dniUsuario, cuenta: cuentaUsuario });
+        
+        // ⚡ Añadimos _ts para evitar que la PWA cachee la respuesta del Google Script
+        const result = await apiPost({ 
+          action: "getInitData", 
+          dni: dniUsuario, 
+          cuenta: cuentaUsuario,
+          _ts: Date.now() 
+        });
+
         if (result.status !== "success") throw new Error("Error inicial.");
         
         setMenuGlobal(result.menu || {});
@@ -274,9 +286,11 @@ export default function Pedidos() {
     };
 
     // 4. EVENTO DE ALMACENAMIENTO (Sincronización entre pestañas o acciones del admin)
+    // 4. EVENTO DE ALMACENAMIENTO (Sincronización instantánea)
     const handleStorage = (e) => {
       if (e.key === CACHEKEY || e.key === "almuerzos_actualizado") {
-        refrescarTodo(true);
+        localStorage.removeItem(CACHEKEY); // ⚡ Borramos la caché vieja guardada
+        refrescarTodo(true); // ⚡ Descargamos el menú nuevo al instante
       }
     };
 

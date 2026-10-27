@@ -24,10 +24,10 @@ const LOGIN_API_URL =
   "https://script.google.com/macros/s/AKfycbw4EHmCBr5HKvZ1S2ugMD_FFNj5g5PGmF8Y8iZVEZQz9YmQZug85CjKzA8Wc8uEquBz/exec";
 
 const PHOTO_CACHE_PREFIX = "almuerzo_foto_cache_v2:";
-
 const PHOTO_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PHOTO_CONCURRENCY = 4;
 const MAX_RESULTADOS_ADICIONAL = 30;
+const ADMIN_CACHE_KEY = "almuerzo_admin_cache_v1";
 
 const photoCache = new Map();
 
@@ -124,7 +124,6 @@ function convertirUrlDrive(url) {
   const fileId = extraerDriveId(value);
 
   if (fileId) {
-    // Usamos el CDN directo lh3.googleusercontent.com para evitar ERR_CONNECTION_RESET de drive.google.com/thumbnail
     return `https://lh3.googleusercontent.com/d/${fileId}=w120`;
   }
 
@@ -133,16 +132,11 @@ function convertirUrlDrive(url) {
   return getAvatarFallback();
 }
 
-function getPhotoCacheKey(identificador) {
-  return PHOTO_CACHE_PREFIX + String(identificador || "").trim();
-}
-
 function leerFotoCachePersistente(identificador) {
   return "";
 }
 
 function guardarFotoCachePersistente(identificador, foto) {
-  // Desactivado para evitar superar la cuota de 5MB del localStorage del navegador
   return;
 }
 
@@ -233,12 +227,23 @@ export default function Admin() {
   const navigate = useNavigate();
 
   const [usuario] = useState(() => getAuthUser());
-  const [loading, setLoading] = useState(true);
+  
+  // ⚡ HIDRATACIÓN INSTANTÁNEA (0ms de espera con caché local)
+  const cacheInicial = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(ADMIN_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const [loading, setLoading] = useState(!cacheInicial?.pedidos);
   const [savingConfig, setSavingConfig] = useState(false);
 
-  const [totalUsuariosEmpresa, setTotalUsuariosEmpresa] = useState(0);
-  const [pedidos, setPedidos] = useState([]);
-  const [resumen, setResumen] = useState({
+  const [totalUsuariosEmpresa, setTotalUsuariosEmpresa] = useState(cacheInicial?.totalUsuariosEmpresa || 0);
+  const [pedidos, setPedidos] = useState(cacheInicial?.pedidos || []);
+  const [resumen, setResumen] = useState(cacheInicial?.resumen || {
     totalEnviados: 0,
     pendientes: 0,
     fondo1: 0,
@@ -246,7 +251,7 @@ export default function Admin() {
     dieta: 0,
   });
 
-  const [config, setConfig] = useState({
+  const [config, setConfig] = useState(cacheInicial?.config || {
     estado: "",
     dia: "",
     actualizador: "",
@@ -280,9 +285,9 @@ export default function Admin() {
 
   const cargarDashboard = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!pedidos.length) setLoading(true);
 
-      const result = await apiPost({ action: "getAdminDashboard" });
+      const result = await apiPost({ action: "getAdminDashboard", _ts: Date.now() });
 
       if (result.status !== "success") {
         throw new Error(result.message || "No se pudo cargar el dashboard.");
@@ -290,26 +295,59 @@ export default function Admin() {
 
       const totalUsuarios = Number(result.totalUsuarios || 0);
       const pedidosResult = Array.isArray(result.pedidos) ? result.pedidos : [];
-
-      setTotalUsuariosEmpresa(totalUsuarios);
-      setPedidos(pedidosResult);
-      setConfig({
+      const configRes = {
         estado: result.config?.estado || "",
         dia: result.config?.dia || "",
         actualizador: result.config?.actualizador || "",
-      });
+      };
+      const resumenRes = result.resumen || calcularTotales(pedidosResult, totalUsuarios);
 
-      setResumen(result.resumen || calcularTotales(pedidosResult, totalUsuarios));
+      setTotalUsuariosEmpresa(totalUsuarios);
+      setPedidos(pedidosResult);
+      setConfig(configRes);
+      setResumen(resumenRes);
+
+      // Guardar en caché para apertura instantánea en futuras visitas
+      try {
+        localStorage.setItem(
+          ADMIN_CACHE_KEY,
+          JSON.stringify({
+            totalUsuariosEmpresa: totalUsuarios,
+            pedidos: pedidosResult,
+            config: configRes,
+            resumen: resumenRes,
+            timestamp: Date.now(),
+          })
+        );
+      } catch (e) {
+        console.warn("No se pudo guardar caché admin:", e);
+      }
+
     } catch (error) {
       console.error(error);
       mostrarToast("No se pudo cargar la información del panel.", "danger");
     } finally {
       setLoading(false);
     }
-  }, [mostrarToast]);
+  }, [mostrarToast, pedidos.length]);
+
+  // ⚡ Sincronización en tiempo real vía eventos de almacenamiento
+  useEffect(() => {
+    const handleStorage = (e) => {
+      if (e.key === "almuerzos_actualizado") {
+        localStorage.removeItem(ADMIN_CACHE_KEY);
+        cargarDashboard();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [cargarDashboard]);
 
   useEffect(() => {
-    // Limpieza automática de cachés pesados antiguos en localStorage
+    // Limpieza automática de cachés pesados antiguos
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
@@ -393,6 +431,7 @@ export default function Admin() {
         throw new Error(result.message || "No se pudo guardar la configuración.");
       }
 
+      localStorage.removeItem(ADMIN_CACHE_KEY);
       localStorage.setItem("almuerzos_actualizado", Date.now().toString());
 
       mostrarToast(`Configuración actualizada: ${nextConfig.estado} / ${nextConfig.dia}`);
@@ -419,6 +458,7 @@ export default function Admin() {
         throw new Error(result.message || "No se pudo reiniciar la data.");
       }
 
+      localStorage.removeItem(ADMIN_CACHE_KEY);
       localStorage.setItem("almuerzos_actualizado", Date.now().toString());
 
       setShowReinicio(false);
@@ -547,8 +587,9 @@ export default function Admin() {
         throw new Error(result.message || "No se pudo registrar el adicional.");
       }
 
+      localStorage.removeItem(ADMIN_CACHE_KEY);
       localStorage.setItem("almuerzos_actualizado", Date.now().toString());
-      
+
       setShowAdicional(false);
       mostrarToast(result.message || `Se registraron ${seleccionadosAdicional.length} almuerzos adicionales.`);
       await cargarDashboard();
@@ -923,15 +964,12 @@ export default function Admin() {
       {showAdicional && (
         <div className="admin-modal-backdrop" style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
           
-          {/* Estructura idéntica al HTML original */}
           <div className="modal-content border-0 shadow" style={{ width: '100%', maxWidth: '500px', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden' }}>
             
-            {/* CABECERA */}
             <div className="modal-header border-0" style={{ backgroundColor: '#ffc107', color: '#212529', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h5 className="modal-title fw-bold m-0 d-flex align-items-center gap-2" style={{ fontSize: '20px' }}>
                 <FaUserPlus /> Adicionar almuerzo
               </h5>
-              {/* Usamos un div en lugar de button para la X para evitar el bug del CSS global */}
               <div 
                 onClick={() => setShowAdicional(false)} 
                 style={{ cursor: 'pointer', fontSize: '22px', opacity: 0.7 }}
@@ -942,7 +980,6 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* CUERPO DEL MODAL */}
             <div className="modal-body p-4 text-start">
               <div className="mb-3">
                 <label className="form-label fw-bold d-block text-center mb-2" style={{ fontSize: '16px', color: '#212529' }}>Buscar persona</label>
@@ -956,7 +993,6 @@ export default function Admin() {
                   style={{ borderRadius: '6px', padding: '10px', border: '1px solid #ced4da' }}
                 />
                 
-                {/* RESULTADOS DE BÚSQUEDA - Cambiado a div para evitar los rectángulos azules */}
                 <div className="list-group mt-2 shadow-sm" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                   {loadingPersonas ? (
                     <div className="list-group-item text-muted small text-center">Cargando personas...</div>
@@ -982,7 +1018,6 @@ export default function Admin() {
                 </div>
               </div>
 
-              {/* LISTA DE SELECCIONADOS */}
               {seleccionadosAdicional.length > 0 && (
                 <div className="adicional-preview mb-3">
                   <div className="mb-2 fw-bold" style={{ color: '#198754', fontSize: '14px' }}>
@@ -1010,7 +1045,6 @@ export default function Admin() {
                             <div className="text-muted" style={{ fontSize: '12px' }}>DNI: {persona.dni || "-"}</div>
                           </div>
                         </div>
-                        {/* X de eliminar cambiado a div para evitar deformación */}
                         <div
                           className="text-danger p-2"
                           style={{ cursor: 'pointer', fontSize: '16px' }}
@@ -1024,13 +1058,11 @@ export default function Admin() {
                 </div>
               )}
 
-              {/* ALERTA DE MENÚ */}
               <div className="alert alert-info mt-3 mb-0 text-start" style={{ backgroundColor: '#cff4fc', color: '#055160', border: '1px solid #b6effb', padding: '12px 16px', borderRadius: '6px' }}>
                 Menú: <strong>ADICIONAL</strong>
               </div>
             </div>
 
-                        {/* FOOTER DEL MODAL */}
             <div 
               className="modal-footer border-0" 
               style={{ 
@@ -1043,7 +1075,6 @@ export default function Admin() {
                 gap: '12px'
               }}
             >
-              {/* Botón Cancelar (Gris) */}
               <div 
                 className="fw-bold px-4 shadow-sm" 
                 style={{ 
@@ -1061,7 +1092,6 @@ export default function Admin() {
                 Cancelar
               </div>
               
-              {/* Botón Registrar (Amarillo) convertido a div para evadir el CSS global azul */}
               <div
                 className="fw-bold px-4 shadow-sm"
                 style={{ 
@@ -1073,7 +1103,6 @@ export default function Admin() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  /* Lógica para simular el estado 'disabled' */
                   cursor: (seleccionadosAdicional.length === 0 || registrandoAdicional) ? 'not-allowed' : 'pointer',
                   opacity: (seleccionadosAdicional.length === 0 || registrandoAdicional) ? 0.6 : 1,
                   pointerEvents: (seleccionadosAdicional.length === 0 || registrandoAdicional) ? 'none' : 'auto'
@@ -1085,12 +1114,9 @@ export default function Admin() {
               </div>
             </div>
 
-
           </div>
         </div>
       )}
-
-
 
       {toast && (
         <div className={`admin-toast ${toast.tipo === "danger" ? "danger" : "success"}`}>

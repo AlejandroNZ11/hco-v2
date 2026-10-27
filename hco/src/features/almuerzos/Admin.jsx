@@ -138,24 +138,7 @@ function getPhotoCacheKey(identificador) {
 }
 
 function leerFotoCachePersistente(identificador) {
-  const key = getPhotoCacheKey(identificador);
-
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return "";
-
-    const data = JSON.parse(raw);
-    const savedAt = Number(data.savedAt || 0);
-
-    if (!savedAt || Date.now() - savedAt > PHOTO_CACHE_TTL_MS) {
-      localStorage.removeItem(key);
-      return "";
-    }
-
-    return String(data.foto || "").trim();
-  } catch {
-    return "";
-  }
+  return "";
 }
 
 function guardarFotoCachePersistente(identificador, foto) {
@@ -324,6 +307,20 @@ export default function Admin() {
       setLoading(false);
     }
   }, [mostrarToast]);
+
+  useEffect(() => {
+    // Limpieza automática de cachés pesados antiguos en localStorage
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("almuerzo_foto_cache_")) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (e) {
+      console.warn("No se pudo limpiar el caché antiguo:", e);
+    }
+  }, []);
 
   useEffect(() => {
     if (!usuario) {

@@ -91,34 +91,20 @@ function cargarCacheLocal(user) {
   }
 }
 
-function esIOS() {
-  return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
-}
-
-function esSafariIOS() {
-  const ua = navigator.userAgent;
-  return esIOS() && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
-}
-
-function estaInstaladaComoApp() {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true
-  );
-}
-
 export default function Pedidos() {
   const [usuarioLogueado] = useState(() => getAuthUser());
-  const [menuGlobal, setMenuGlobal] = useState(null);
-  const [diaActivoServidor, setDiaActivoServidor] = useState("");
-  const [estadoServidor, setEstadoServidor] = useState("");
-  const [pedidoActualUsuario, setPedidoActualUsuario] = useState(null);
-  const [diaVisible, setDiaVisible] = useState("Lunes");
-  const [platoSeleccionado, setPlatoSeleccionado] = useState("");
-  const [loading, setLoading] = useState(true);
+
+  // CARGA INSTANTÁNEA DESDE LA CACHÉ LOCAL AL INICIAR (0ms de espera visual si hay caché)
+  const cacheInicial = useMemo(() => cargarCacheLocal(getAuthUser()), []);
+
+  const [menuGlobal, setMenuGlobal] = useState(cacheInicial?.menuGlobal || null);
+  const [diaActivoServidor, setDiaActivoServidor] = useState(cacheInicial?.diaActivoServidor || "");
+  const [estadoServidor, setEstadoServidor] = useState(cacheInicial?.estadoServidor || "");
+  const [pedidoActualUsuario, setPedidoActualUsuario] = useState(cacheInicial?.pedidoActualUsuario || null);
+  const [diaVisible, setDiaVisible] = useState(cacheInicial?.diaActivoServidor || cacheInicial?.pedidoActualUsuario?.dia || "Lunes");
+  
+  const [platoSeleccionado, setPlatoSeleccionado] = useState(cacheInicial?.pedidoActualUsuario?.plato || "");
+  const [loading, setLoading] = useState(!cacheInicial?.menuGlobal);
   const [offline, setOffline] = useState(!navigator.onLine);
   const [submitting, setSubmitting] = useState(false);
   const [overlay, setOverlay] = useState(null);
@@ -137,7 +123,6 @@ export default function Pedidos() {
 
   const menuDia = menuGlobal?.[diaVisible] || {};
   
-  // LÓGICA CORREGIDA PARA VISUALIZAR SIEMPRE EL DÍA CORRECTO
   const diaDelPedido = pedidoActualUsuario?.dia || pedidoActualUsuario?.diaMenu || diaActivoServidor;
   const diaMostrar = diaActivoServidor || diaDelPedido || diaVisible;
   
@@ -146,7 +131,6 @@ export default function Pedidos() {
   const sistemaActivo = estadoServidor === "Activo";
   const esDiaActivo = diaVisible === (diaActivoServidor || diaDelPedido);
 
-  // Deshabilitamos el select si no es el día activo o el sistema está inactivo
   const disableSelect = offline || !sistemaActivo || !esDiaActivo;
 
   const puedeConfirmar = Boolean(
@@ -220,18 +204,9 @@ export default function Pedidos() {
       if (!usuarioLogueado) return;
       try {
         if (!navigator.onLine) {
-          const cache = cargarCacheLocal(usuarioLogueado);
-          if (cache?.menuGlobal) {
-            setMenuGlobal(cache.menuGlobal);
-            setDiaActivoServidor(cache.diaActivoServidor);
-            setEstadoServidor(cache.estadoServidor);
-            setPedidoActualUsuario(cache.pedidoActualUsuario);
-            setDiaVisible(cache.diaActivoServidor || cache.pedidoActualUsuario?.dia || "Lunes");
-            setOffline(true);
-            setLoading(false);
-            return;
-          }
-          throw new Error("Sin conexión");
+          setOffline(true);
+          setLoading(false);
+          return;
         }
         const result = await apiPost({ action: "getInitData", dni: dniUsuario, cuenta: cuentaUsuario });
         if (result.status !== "success") throw new Error("Error inicial.");
@@ -273,25 +248,31 @@ export default function Pedidos() {
       return;
     }
     refrescarTodo(false);
-    const intRev = setInterval(() => refrescarTodo(true), 60000);
+    
+    const intRev = setInterval(() => refrescarTodo(true), 10000); // Revisión cada 10s
     const onLine = () => { setOffline(false); refrescarTodo(true); };
     const offLine = () => setOffline(true);
+    const onFocus = () => { refrescarTodo(true); }; // Se actualiza al volver a la app/pestaña
+
     window.addEventListener("online", onLine);
     window.addEventListener("offline", offLine);
+    window.addEventListener("focus", onFocus);
+
     return () => {
       clearInterval(intRev);
       window.removeEventListener("online", onLine);
       window.removeEventListener("offline", offLine);
+      window.removeEventListener("focus", onFocus);
     };
   }, [usuarioLogueado, refrescarTodo]);
 
   useEffect(() => {
     if (hayPedidoEsteDia && pedidoActualUsuario?.plato) {
       setPlatoSeleccionado(pedidoActualUsuario.plato);
-    } else {
+    } else if (!cacheInicial) {
       setPlatoSeleccionado("");
     }
-  }, [hayPedidoEsteDia, pedidoActualUsuario, diaVisible]);
+  }, [hayPedidoEsteDia, pedidoActualUsuario, diaVisible, cacheInicial]);
 
   async function solicitarPermisoNotificacionesManual() {
     if (!("Notification" in window)) {
@@ -340,8 +321,8 @@ export default function Pedidos() {
     return (
       <div className="row g-0 py-2 border-bottom border-dark align-items-center px-2">
         <div className="col-12 col-md-2 text-start">{label} :</div>
-        <div className={`col-12 col-md-8 text-center fst-italic text-uppercase ${loading ? "loading-dots" : ""}`}>
-          {loading ? "CARGANDO" : texto || "-"}
+        <div className={`col-12 col-md-8 text-center fst-italic text-uppercase ${loading && !menuDia.entrada ? "loading-dots" : ""}`}>
+          {loading && !menuDia.entrada ? "CARGANDO" : texto || "-"}
         </div>
         <div className="col-12 col-md-2 text-md-end text-center">
           (<FaFire className="text-danger" /> {calorias || "0"}.00 Cal)
@@ -350,9 +331,6 @@ export default function Pedidos() {
     );
   }
 
-  // LÓGICA CORREGIDA PARA LAS BARRAS DE ESTADO 
- // LÓGICA CORREGIDA PARA LAS BARRAS DE ESTADO 
-  // En móvil ubica el botón de recordatorios debajo del mensaje de pedido y antes de la alerta de inactivo
   function renderMensajesEstado() {
     const mensajes = [];
     const btnNotifMobile = (
@@ -431,7 +409,7 @@ export default function Pedidos() {
   return (
     <div className="pedidos-page">
       <main className="pedidos-container">
-                
+        
         <div className={`card shadow-sm border-dark ${!sistemaActivo || !esDiaActivo ? "menu-inactivo" : ""}`}>
           <div className="card-header text-center fw-bold fs-5 menu-title">
             <FaUtensils className="me-2" /> Menú del Día
@@ -444,7 +422,10 @@ export default function Pedidos() {
                 className={`col py-2 tab-dia ${index < DIAS.length - 1 ? "border-end border-dark" : ""} ${
                   diaVisible === dia.value ? "day-active text-white" : ""
                 }`}
-                onClick={() => setDiaVisible(dia.value)}
+                onClick={() => {
+                  setDiaVisible(dia.value);
+                  refrescarTodo(true); // <-- Forzamos actualización al cambiar de día
+                }}
               >
                 {dia.label}
               </div>
@@ -458,8 +439,8 @@ export default function Pedidos() {
             
             <div className="row g-0 py-2 align-items-center px-2">
               <div className="col-12 col-md-2 text-start">DIETA :</div>
-              <div className={`col-12 col-md-8 text-center fst-italic text-uppercase ${loading ? "loading-dots" : ""}`}>
-                {loading ? "CARGANDO" : menuDia.dieta || "-"}
+              <div className={`col-12 col-md-8 text-center fst-italic text-uppercase ${loading && !menuDia.dieta ? "loading-dots" : ""}`}>
+                {loading && !menuDia.dieta ? "CARGANDO" : menuDia.dieta || "-"}
               </div>
               <div className="col-12 col-md-2 text-md-end text-center">
                 (<FaFire className="text-danger" /> {menuDia.calDieta || "0"}.00 Cal)
@@ -468,7 +449,6 @@ export default function Pedidos() {
           </div>
         </div>
         
-        {/* Siempre mostramos la sección del formulario para visualizar, pero lo deshabilitamos si no se debe interactuar */}
         <div id="seccionPedido" className="pedidos-actions">
           <button
             type="button"

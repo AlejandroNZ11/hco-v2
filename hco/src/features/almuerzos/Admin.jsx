@@ -393,6 +393,8 @@ export default function Admin() {
         throw new Error(result.message || "No se pudo guardar la configuración.");
       }
 
+      localStorage.setItem("almuerzos_actualizado", Date.now().toString());
+
       mostrarToast(`Configuración actualizada: ${nextConfig.estado} / ${nextConfig.dia}`);
       await cargarDashboard();
     } catch (error) {

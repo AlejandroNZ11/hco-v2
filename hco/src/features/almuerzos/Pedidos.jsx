@@ -247,22 +247,51 @@ export default function Pedidos() {
       window.location.href = "/";
       return;
     }
-    refrescarTodo(false);
     
-    const intRev = setInterval(() => refrescarTodo(true), 10000); // Revisión cada 10s
-    const onLine = () => { setOffline(false); refrescarTodo(true); };
-    const offLine = () => setOffline(true);
-    const onFocus = () => { refrescarTodo(true); }; // Se actualiza al volver a la app/pestaña
+    // Carga inicial instantánea
+    refrescarTodo(false);
 
-    window.addEventListener("online", onLine);
-    window.addEventListener("offline", offLine);
-    window.addEventListener("focus", onFocus);
+    // 1. EVENTO DE FOCO: Cuando el usuario vuelve a mirar la app en el celular
+    const handleFocus = () => {
+      refrescarTodo(true);
+    };
+
+    // 2. EVENTO DE VISIBILIDAD: Cuando la app pasa de segundo plano a primer plano
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refrescarTodo(true);
+      }
+    };
+
+    // 3. EVENTO DE CONEXIÓN A INTERNET
+    const handleOnline = () => {
+      setOffline(false);
+      refrescarTodo(true);
+    };
+
+    const handleOffline = () => {
+      setOffline(true);
+    };
+
+    // 4. EVENTO DE ALMACENAMIENTO (Sincronización entre pestañas o acciones del admin)
+    const handleStorage = (e) => {
+      if (e.key === CACHEKEY || e.key === "almuerzos_actualizado") {
+        refrescarTodo(true);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("storage", handleStorage);
 
     return () => {
-      clearInterval(intRev);
-      window.removeEventListener("online", onLine);
-      window.removeEventListener("offline", offLine);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("storage", handleStorage);
     };
   }, [usuarioLogueado, refrescarTodo]);
 

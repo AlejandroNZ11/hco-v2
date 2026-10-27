@@ -494,38 +494,34 @@ const registrosFiltrados = useMemo(() => {
       {/* 3. SECCIÓN INFERIOR: TABLA Y PAGINACIÓN */}
       <section className="table-section-card">
         <div className="table-topbar">
-          <div className="pagination-bar">
-            <span className="records-counter">
-              Mostrando <strong>{registrosPaginados.length}</strong> registros de <strong>{registrosFiltrados.length}</strong>
+          <span className="records-counter">
+            Mostrando <strong>{registrosPaginados.length}</strong> registros de <strong>{registrosFiltrados.length}</strong>
+          </span>
+
+          <div className="pagination-controls">
+            <button
+              type="button"
+              className="page-nav-btn"
+              disabled={paginaActual <= 1}
+              onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
+            >
+              <FaChevronLeft className="nav-chevron" />
+              <span>Anterior</span>
+            </button>
+
+            <span className="pagination-text-indicator">
+              Página {paginaActual} de {totalPaginas}
             </span>
 
-            <div className="pagination-controls">
-              <button
-                type="button"
-                className="page-nav-btn"
-                disabled={paginaActual <= 1}
-                onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
-              >
-                <FaChevronLeft className="nav-chevron" />
-                <span>Anterior</span>
-              </button>
-
-              <span className="pagination-text-indicator">
-                Página {paginaActual} de {totalPaginas}
-              </span>
-
-              <button
-                type="button"
-                className="page-nav-btn"
-                disabled={paginaActual >= totalPaginas}
-                onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
-              >
-                <span>Siguiente</span>
-                <FaChevronRight className="nav-chevron" />
-              </button>
-            </div>
-
-
+            <button
+              type="button"
+              className="page-nav-btn"
+              disabled={paginaActual >= totalPaginas}
+              onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
+            >
+              <span>Siguiente</span>
+              <FaChevronRight className="nav-chevron" />
+            </button>
           </div>
 
           <button

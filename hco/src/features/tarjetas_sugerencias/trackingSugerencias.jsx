@@ -435,7 +435,7 @@ export default function TrackingSugerencias() {
             </select>
           </div>
 
-          <div className="filter-group">
+         <div className="filter-group filter-responsable">
             <label>Responsable cierre</label>
             <select
               value={filtrosForm.responsable}
@@ -500,32 +500,34 @@ export default function TrackingSugerencias() {
       {/* 3. SECCIÓN INFERIOR: TABLA Y PAGINACIÓN */}
       <section className="table-section-card">
         <div className="table-topbar">
-          <div className="pagination-bar">
-            <span className="records-counter">
-              Mostrando <strong>{sugerenciasPaginadas.length}</strong> registros de <strong>{sugerenciasFiltradas.length}</strong>
+          <span className="records-counter">
+            Mostrando <strong>{sugerenciasPaginadas.length}</strong> registros de <strong>{sugerenciasFiltradas.length}</strong>
+          </span>
+
+          <div className="pagination-controls">
+            <button
+              type="button"
+              className="page-nav-btn"
+              disabled={paginaActual <= 1}
+              onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+            >
+              <FaChevronLeft className="nav-chevron" />
+              <span>Anterior</span>
+            </button>
+
+            <span className="page-indicator">
+              Página {paginaActual} de {totalPaginas}
             </span>
 
-            <div className="pagination-controls">
-              <button
-                type="button"
-                className="page-nav-btn"
-                disabled={paginaActual <= 1}
-                onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
-              >
-                <span>Anterior</span>
-                <FaChevronLeft className="nav-chevron" />
-              </button>
-
-              <button
-                type="button"
-                className="page-nav-btn"
-                disabled={paginaActual >= totalPaginas}
-                onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
-              >
-                <FaChevronRight className="nav-chevron" />
-                <span>Siguiente</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              className="page-nav-btn"
+              disabled={paginaActual >= totalPaginas}
+              onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+            >
+              <span>Siguiente</span>
+              <FaChevronRight className="nav-chevron" />
+            </button>
           </div>
 
           <button

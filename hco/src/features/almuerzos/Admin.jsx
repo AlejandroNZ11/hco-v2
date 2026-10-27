@@ -23,7 +23,8 @@ const API_URL =
 const LOGIN_API_URL =
   "https://script.google.com/macros/s/AKfycbw4EHmCBr5HKvZ1S2ugMD_FFNj5g5PGmF8Y8iZVEZQz9YmQZug85CjKzA8Wc8uEquBz/exec";
 
-const PHOTO_CACHE_PREFIX = "almuerzo_foto_cache_v1:";
+const PHOTO_CACHE_PREFIX = "almuerzo_foto_cache_v2:";
+
 const PHOTO_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PHOTO_CONCURRENCY = 4;
 const MAX_RESULTADOS_ADICIONAL = 30;
@@ -123,7 +124,8 @@ function convertirUrlDrive(url) {
   const fileId = extraerDriveId(value);
 
   if (fileId) {
-    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w120`;
+    // Usamos el CDN directo lh3.googleusercontent.com para evitar ERR_CONNECTION_RESET de drive.google.com/thumbnail
+    return `https://lh3.googleusercontent.com/d/${fileId}=w120`;
   }
 
   if (/^https?:\/\//i.test(value)) return value;
@@ -157,19 +159,8 @@ function leerFotoCachePersistente(identificador) {
 }
 
 function guardarFotoCachePersistente(identificador, foto) {
-  if (!identificador || !foto) return;
-
-  try {
-    localStorage.setItem(
-      getPhotoCacheKey(identificador),
-      JSON.stringify({
-        foto,
-        savedAt: Date.now(),
-      })
-    );
-  } catch (error) {
-    console.warn("No se pudo guardar foto en caché local:", error);
-  }
+  // Desactivado para evitar superar la cuota de 5MB del localStorage del navegador
+  return;
 }
 
 async function obtenerFotoUsuarioCorporativa(pedido) {
@@ -196,11 +187,12 @@ async function obtenerFotoUsuarioCorporativa(pedido) {
     let foto = getAvatarFallback();
 
     if (result?.ok && result?.found && result?.user) {
-      foto =
+      const rawFoto =
         String(result.user.fotoDataUrl || "").trim() ||
         String(result.user.foto || "").trim() ||
-        String(result.user.fotoWeb || "").trim() ||
-        getAvatarFallback();
+        String(result.user.fotoWeb || "").trim();
+
+      foto = rawFoto ? convertirUrlDrive(rawFoto) : getAvatarFallback();
     } else {
       foto = convertirUrlDrive(pedido?.foto);
     }
@@ -789,7 +781,8 @@ export default function Admin() {
           <div className="lbl-ultima-actualizacion">
             {config.actualizador ? (
               <>
-                <FaUserEdit /> Act. por: {config.actualizador}
+                <FaUserEdit className="act-icon" />
+                <span>Act. por: {config.actualizador}</span>
               </>
             ) : null}
           </div>
@@ -865,6 +858,7 @@ export default function Admin() {
                           src={foto}
                           alt="Foto"
                           loading="lazy"
+                          referrerPolicy="no-referrer"
                           onError={(e) => {
                             e.currentTarget.onerror = null;
                             e.currentTarget.src = getAvatarFallback();

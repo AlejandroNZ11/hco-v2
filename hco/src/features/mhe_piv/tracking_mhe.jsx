@@ -497,7 +497,7 @@ export default function TrackingMHE() {
             />
           </div>
 
-          <div className="filter-group">
+          <div className="filter-group filter-categoria">
             <label>Categoría</label>
             <select
               value={filtrosForm.categoria}
@@ -591,38 +591,34 @@ export default function TrackingMHE() {
       {/* 3. SECCIÓN INFERIOR: PAGINACIÓN, EXPORTAR Y TABLA */}
       <section className="table-section-card">
         <div className="table-topbar">
-          <div className="pagination-bar">
-            <span className="records-counter">
-              Mostrando <strong>{inspeccionesPaginadas.length}</strong> registros de <strong>{inspeccionesFiltradas.length}</strong>
+          <span className="records-counter">
+            Mostrando <strong>{inspeccionesPaginadas.length}</strong> registros de <strong>{inspeccionesFiltradas.length}</strong>
+          </span>
+
+          <div className="pagination-controls">
+            <button
+              type="button"
+              className="page-nav-btn"
+              disabled={paginaActual <= 1}
+              onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
+            >
+              <FaChevronLeft className="nav-chevron" />
+              <span>Anterior</span>
+            </button>
+
+            <span className="page-indicator">
+              Página {paginaActual} de {totalPaginas}
             </span>
 
-            <div className="pagination-controls">
-              <button
-                type="button"
-                className="page-nav-btn"
-                disabled={paginaActual <= 1}
-                onClick={() => setPaginaActual((prev) => Math.max(1, prev - 1))}
-              >
-                <FaChevronLeft className="nav-chevron" />
-                <span>Anterior</span>
-              </button>
-
-              {/* NUEVO: Indicador de página central */}
-              <span className="page-indicator">
-                Página {paginaActual} de {totalPaginas}
-              </span>
-
-              <button
-                type="button"
-                className="page-nav-btn"
-                disabled={paginaActual >= totalPaginas}
-                onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
-              >
-                <span>Siguiente</span>
-                <FaChevronRight className="nav-chevron" />
-              </button>
-            </div>
-
+            <button
+              type="button"
+              className="page-nav-btn"
+              disabled={paginaActual >= totalPaginas}
+              onClick={() => setPaginaActual((prev) => Math.min(totalPaginas, prev + 1))}
+            >
+              <span>Siguiente</span>
+              <FaChevronRight className="nav-chevron" />
+            </button>
           </div>
 
           <button
@@ -640,7 +636,7 @@ export default function TrackingMHE() {
             <span>Exportar</span>
           </button>
         </div>
-
+        
         <div
           ref={tableContainerRef}
           className={`table-container ${isDragging ? 'dragging' : ''}`}

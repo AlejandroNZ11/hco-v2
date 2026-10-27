@@ -129,14 +129,22 @@
   color: #ffffff;
   font-size: 16px;
   font-style: italic;
-  line-height: 1.45;
+  line-height: 1.4;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 7px;
+  gap: 8px;
   padding-left: 10px;
   min-height: 70px;
   grid-column: span 2;
+}
+
+.lbl-ultima-actualizacion svg,
+.lbl-ultima-actualizacion .act-icon {
+  flex-shrink: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 20px !important;
 }
 
 /* Barra de botones */
@@ -646,5 +654,47 @@
 
   .admin-modal-adicional .form-control {
     font-size: 18px;
+  }
+
+  .admin-header-title {
+    padding: 14px 10px !important;
+  }
+
+  /* Título y logo del mismo tamaño y en una sola fila */
+  .admin-header-title h2 {
+    font-size: 17.5px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    gap: 8px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .admin-header-title h2 svg {
+    flex-shrink: 0 !important;
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 18px !important;
+  }
+
+  /* Texto "Act. por:" con ícono bien proporcionado en móvil */
+  .lbl-ultima-actualizacion {
+    grid-column: 1 / -1 !important;
+    font-size: 13px !important;
+    min-height: auto !important;
+    padding: 4px 6px 0 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 8px !important;
+  }
+
+  .lbl-ultima-actualizacion svg,
+  .lbl-ultima-actualizacion .act-icon {
+    flex-shrink: 0 !important;
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 18px !important;
   }
 }

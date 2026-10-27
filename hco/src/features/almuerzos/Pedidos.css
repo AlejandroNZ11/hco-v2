@@ -60,6 +60,38 @@
   font-weight: 800;
 }
 
+/* =========================================
+   ESTADO INACTIVO DEL MENÚ (TONOS GRISES)
+========================================= */
+.pedidos-page .card.menu-inactivo .menu-title {
+  background-color: #c5c7ca !important;
+  color: #212529 !important;
+}
+
+.pedidos-page .card.menu-inactivo .days-header {
+  background-color: #e9ecef !important;
+  color: #495057;
+}
+
+.pedidos-page .card.menu-inactivo .tab-dia:hover {
+  background-color: #6c757d !important;
+  color: #ffffff;
+}
+
+.pedidos-page .card.menu-inactivo .day-active {
+  background-color: #495057 !important;
+  color: #ffffff !important;
+}
+
+.pedidos-page .card.menu-inactivo .menu-body {
+  background-color: #c5c7ca !important;
+  color: #212529 !important;
+}
+
+.pedidos-page .card.menu-inactivo .menu-body .text-danger {
+  color: #5c636a !important;
+}
+
 /* Acciones */
 .pedidos-actions {
   width: 100%;
@@ -91,6 +123,11 @@
 
 .btn-notificaciones svg {
   font-size: 17px;
+}
+
+/* En PC se oculta el botón inferior y se muestra el de la izquierda */
+.mobile-only-notif {
+  display: none !important;
 }
 
 .pedidos-label {
@@ -154,15 +191,25 @@
   background: #157347;
 }
 
-/* Mensajes */
+/* =========================================
+   ESTILOS DE MENSAJES Y APILAMIENTO
+========================================= */
+.mensajes-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  margin-top: 24px;
+}
+
 .pedido-status {
   width: 100%;
-  margin-top: 20px;
-  padding: 21px 18px;
-  border-radius: 7px;
+  padding: 16px;
+  border-radius: 6px;
   text-align: center;
-  font-weight: 800;
-  font-size: 18px;
+  font-weight: 700;
+  font-size: 16px;
+  margin-top: 0;
 }
 
 .pedido-status-warning {
@@ -181,6 +228,12 @@
   background: #e2e3e5;
   border: 1px solid #d3d6d8;
   color: #41464b;
+}
+
+.pedido-status-info {
+  background: #cff4fc;
+  border: 1px solid #b6effb;
+  color: #055160;
 }
 
 /* Overlay */
@@ -271,34 +324,83 @@
 
   .pedidos-actions {
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 12px;
+    margin-top: 20px;
   }
 
-  .btn-notificaciones {
-    width: 100%;
-    height: 70px;
+  /* Ocultamos el botón grande superior en móvil y mostramos el compacto de abajo */
+  .desktop-only-notif {
+    display: none !important;
+  }
+
+  .mobile-only-notif {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    height: 38px;
+    padding: 0 16px;
+    margin: 0 auto;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 500;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .mobile-only-notif svg {
+    font-size: 14px;
+  }
+
+  .pedidos-label {
+    font-size: 15.5px;
   }
 
   .select-custom {
     width: 100%;
+    height: 42px;
+    font-size: 15px;
   }
 
   .btn-confirmar-pedido {
     width: 100%;
+    height: 44px;
+  }
+
+  .btn-confirmar-pedido svg {
+    font-size: 20px;
+  }
+
+  .mensajes-container {
+    margin-top: 16px;
+    gap: 14px;
+  }
+
+  .pedido-status {
+    font-size: 14.5px;
+    padding: 14px 12px;
   }
 }
 
 @media (max-width: 768px) {
   .menu-title {
-    font-size: 21px !important;
+    font-size: 19px !important;
+    padding: 10px !important;
   }
 
   .tab-dia {
-    font-size: 16px;
+    font-size: 14.5px;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
   }
 
   .menu-body {
-    font-size: 15px;
+    font-size: 13.5px;
+  }
+
+  .menu-body .row {
+    min-height: 44px;
   }
 
   .icon-size {
@@ -312,32 +414,4 @@
   .text-size {
     font-size: 1rem;
   }
-}
-
-/* =========================================
-   ESTILOS DE MENSAJES Y APILAMIENTO
-========================================= */
-.mensajes-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px; /* Separación exacta entre la caja verde y amarilla */
-  width: 100%;
-  margin-top: 24px;
-}
-
-.pedido-status {
-  width: 100%;
-  padding: 16px;
-  border-radius: 6px;
-  text-align: center;
-  font-weight: 700;
-  font-size: 16px;
-  margin-top: 0; /* Lo controla el gap del contenedor */
-}
-
-/* Color azul suave para cuando toca elegir pedido */
-.pedido-status-info {
-  background: #cff4fc;
-  border: 1px solid #b6effb;
-  color: #055160;
 }

@@ -351,9 +351,20 @@ export default function Pedidos() {
   }
 
   // LÓGICA CORREGIDA PARA LAS BARRAS DE ESTADO 
-  // Ahora permite que aparezcan ambas barras a la vez para poder visualizar tu pedido enviado siempre
+ // LÓGICA CORREGIDA PARA LAS BARRAS DE ESTADO 
+  // En móvil ubica el botón de recordatorios debajo del mensaje de pedido y antes de la alerta de inactivo
   function renderMensajesEstado() {
     const mensajes = [];
+    const btnNotifMobile = (
+      <button
+        key="btn-notif-mob"
+        type="button"
+        className="btn-notificaciones mobile-only-notif"
+        onClick={solicitarPermisoNotificacionesManual}
+      >
+        <FaBell /> <span>{textoNotificaciones}</span>
+      </button>
+    );
 
     if (offline) {
       mensajes.push(
@@ -363,6 +374,7 @@ export default function Pedidos() {
             : `Sin conexión. No se puede enviar pedido.`}
         </div>
       );
+      mensajes.push(btnNotifMobile);
       return <div className="mensajes-container">{mensajes}</div>;
     }
 
@@ -374,6 +386,7 @@ export default function Pedidos() {
           </div>
         );
       }
+      mensajes.push(btnNotifMobile);
       mensajes.push(
         <div key="warn" className="pedido-status pedido-status-warning">
           El sistema de pedidos está actualmente inactivo.
@@ -387,6 +400,7 @@ export default function Pedidos() {
           </div>
         );
       }
+      mensajes.push(btnNotifMobile);
       mensajes.push(
         <div key="warn" className="pedido-status pedido-status-warning">
           Estás viendo el menú del {diaVisible}. Solo se reciben pedidos para el {diaMostrar}.
@@ -406,6 +420,7 @@ export default function Pedidos() {
           </div>
         );
       }
+      mensajes.push(btnNotifMobile);
     }
 
     return <div className="mensajes-container">{mensajes}</div>;
@@ -416,8 +431,8 @@ export default function Pedidos() {
   return (
     <div className="pedidos-page">
       <main className="pedidos-container">
-        
-        <div className="card shadow-sm border-dark">
+                
+        <div className={`card shadow-sm border-dark ${!sistemaActivo || !esDiaActivo ? "menu-inactivo" : ""}`}>
           <div className="card-header text-center fw-bold fs-5 menu-title">
             <FaUtensils className="me-2" /> Menú del Día
           </div>
@@ -455,7 +470,11 @@ export default function Pedidos() {
         
         {/* Siempre mostramos la sección del formulario para visualizar, pero lo deshabilitamos si no se debe interactuar */}
         <div id="seccionPedido" className="pedidos-actions">
-          <button type="button" className="btn-notificaciones" onClick={solicitarPermisoNotificacionesManual}>
+          <button
+            type="button"
+            className="btn-notificaciones desktop-only-notif"
+            onClick={solicitarPermisoNotificacionesManual}
+          >
             <FaBell /> {textoNotificaciones}
           </button>
           

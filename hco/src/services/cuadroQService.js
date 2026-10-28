@@ -40,7 +40,8 @@ export const ERRORES_POR_AREA = {
     "Error en envío de información",
     "No se realizó relocate",
     "Error en Picking por cruce de SKUs",
-    "Checklist de equipo No Aprobado"
+    "Checklist de equipo No Aprobado",
+    "Error de embalaje"
   ],
   "INVENTARIO": [
     "Diferencia de Inventario al cliente",

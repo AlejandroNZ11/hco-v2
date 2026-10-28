@@ -37,6 +37,7 @@ export default function RadarCuadroQ() {
   const [selectedArea, setSelectedArea] = useState('');
 
   const [registros, setRegistros] = useState([]);
+  const [activeDay, setActiveDay] = useState(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -114,7 +115,7 @@ export default function RadarCuadroQ() {
     });
   }, [registros, selectedArea, selectedYear]);
 
-  // Construir índice de días
+// Construir índice de días
   const dayIndex = useMemo(() => {
     const map = {};
 
@@ -129,17 +130,20 @@ export default function RadarCuadroQ() {
 
       const key = dateKey(date);
       if (!map[key]) {
-        map[key] = { approved: 0, rejection: 0 };
+        map[key] = { approved: 0, rejection: 0, internal: 0 };
       }
 
       map[key].approved++;
       if (hasRejection(item)) {
         map[key].rejection++;
+      } else {
+        map[key].internal++;
       }
     });
 
     return map;
   }, [registrosFiltrados, selectedYear]);
+
 
   // Feriados de Perú
   function getPeruHolidays(year) {
@@ -275,14 +279,25 @@ export default function RadarCuadroQ() {
     return "internal";
   }
 
-  function getStatusLabel(status) {
+  function getStatusLabel(status, year, monthIndex, day) {
+    const key = dateKey(new Date(year, monthIndex, day));
+    const info = dayIndex[key];
+
+    if (status === "internal") {
+      const count = info ? info.internal : 0;
+      return `${count} Errores Internos`;
+    }
+    if (status === "rejection") {
+      const count = info ? info.rejection : 0;
+      return `${count} Rechazos`;
+    }
     if (status === "quality") return "Calidad Total";
-    if (status === "internal") return "Errores Internos";
-    if (status === "rejection") return "Rechazos";
     if (status === "stop") return "Paro programado";
     if (status === "future") return "Día futuro";
     return "";
   }
+
+
 
   // Calcular totales anuales de los 12 meses
   const resultadosAnuales = useMemo(() => {
@@ -328,9 +343,10 @@ export default function RadarCuadroQ() {
 
   const areaTextoLabel = selectedArea ? ` · Área: ${selectedArea}` : " · Todas las áreas";
 
-  return (
-    <div className="radar-page">
+    return (
+    <div className="radar-page" onClick={() => setActiveDay(null)}>
       {loading && <Loading />}
+
 
       {/* CABECERA COMPACTA ESTILO CUADRO Q */}
       <section className="radar-header-card">
@@ -415,10 +431,35 @@ export default function RadarCuadroQ() {
         {resultadosAnuales.mesesData.map(({ mesNombre, monthIndex, daysInMonth }) => {
           const holidaysMap = getPeruHolidays(Number(selectedYear));
 
+          // Verificar si hay un día tocado/activo en este mes
+          const isMonthActive = activeDay && activeDay.monthIndex === monthIndex;
+          const activeStatus = isMonthActive
+            ? getDayStatus(selectedYear, monthIndex, activeDay.day, holidaysMap)
+            : "";
+          const activeText = isMonthActive
+            ? `${mesNombre} ${activeDay.day} - ${getStatusLabel(activeStatus, selectedYear, monthIndex, activeDay.day)}`
+            : "";
+          const activeRow = isMonthActive && Q_POSITIONS[activeDay.day]
+            ? Q_POSITIONS[activeDay.day][0]
+            : 1;
+
           return (
             <article className="month-card" key={monthIndex}>
               <div className="month-title">{mesNombre}</div>
               <div className="month-body">
+                {/* CARTEL FLOTANTE AL DAR CLIC / TOCAR EN CELULAR */}
+                {isMonthActive && (
+                  <div
+                    className={`q-touch-tooltip ${activeRow <= 8 ? "pos-bottom" : "pos-top"}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveDay(null);
+                    }}
+                  >
+                    {activeText}
+                  </div>
+                )}
+
                 <div className="q-board">
                   {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
                     const pos = Q_POSITIONS[day];
@@ -428,18 +469,31 @@ export default function RadarCuadroQ() {
 
                     let className = "empty-box";
                     let label = "";
+                    let tooltipText = "";
+                    const isValidDay = day <= daysInMonth;
+                    const isSelected = isMonthActive && activeDay.day === day;
 
-                    if (day <= daysInMonth) {
+                    if (isValidDay) {
                       className = getDayStatus(selectedYear, monthIndex, day, holidaysMap);
                       label = String(day);
+                      tooltipText = `${mesNombre} ${day} - ${getStatusLabel(className, selectedYear, monthIndex, day)}`;
                     }
 
                     return (
                       <div
                         key={day}
-                        className={`q-day ${className}`}
+                        className={`q-day ${className} ${isSelected ? "active-day" : ""}`}
                         style={{ gridRow: row, gridColumn: col }}
-                        title={day <= daysInMonth ? `${mesNombre} ${day} - ${getStatusLabel(className)}` : ""}
+                        title={tooltipText}
+                        onClick={(e) => {
+                          if (!isValidDay) return;
+                          e.stopPropagation();
+                          setActiveDay((prev) =>
+                            prev && prev.monthIndex === monthIndex && prev.day === day
+                              ? null
+                              : { monthIndex, day }
+                          );
+                        }}
                       >
                         {label}
                       </div>
@@ -462,6 +516,7 @@ export default function RadarCuadroQ() {
           );
         })}
       </section>
+      
     </div>
   );
 }

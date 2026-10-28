@@ -326,6 +326,48 @@
   color: #000;
 }
 
+/* Cursor interactivo y resaltado al tocar/clickear un día */
+.q-day:not(.empty-box) {
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.q-day.active-day {
+  z-index: 5 !important;
+  outline: 2.5px solid #072B5C !important;
+  box-shadow: 0 0 8px rgba(7, 43, 92, 0.45);
+  transform: scale(1.08);
+}
+
+/* Tooltip flotante al hacer clic o tocar en móvil */
+.q-touch-tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(38, 38, 38, 0.96);
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Se ubica abajo si tocas un día de arriba, y arriba si tocas un día de abajo */
+.q-touch-tooltip.pos-bottom {
+  top: 165px;
+}
+
+.q-touch-tooltip.pos-top {
+  top: 85px;
+}
+
 
 /* Leyenda inferior de cada mes (con espacio entre ítems) */
 .month-legend {

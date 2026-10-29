@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight, 
+  FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight,  FaIdCard, FaTruck,
   FaEdit, FaEye, FaCheck 
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
@@ -406,6 +406,27 @@ export default function TrackingPrestamos() {
           <button type="button" className="btn-action-secondary" onClick={handleLimpiarFiltros}>
             <FaUndo /> <span>Limpiar</span>
           </button>
+
+          {!esExterno && (
+            <button 
+                type="button" 
+                className="btn-action-primary" 
+                onClick={() => navigate('/conductores/tracking')}
+            >
+                <FaIdCard /> <span>Ir a Conductores</span>
+            </button>
+            )}
+          {!esExterno && (
+            <button 
+                type="button" 
+                className="btn-action-primary" 
+                onClick={() => navigate('/placas/tracking')}
+            >
+                <FaTruck /> <span>Placas</span>
+            </button>
+            )}
+
+
         </div>
       </section>
 

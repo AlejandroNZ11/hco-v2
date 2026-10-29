@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight,  FaIdCard, FaTruck,
+  FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight,  FaIdCard, FaTruck, FaUserTie,
   FaEdit, FaEye, FaCheck 
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
@@ -425,7 +425,15 @@ export default function TrackingPrestamos() {
                 <FaTruck /> <span>Placas</span>
             </button>
             )}
-
+          {!esExterno && (
+            <button 
+                type="button" 
+                className="btn-action-primary" 
+                onClick={() => navigate('/clientes/tracking')}
+            >
+                <FaUserTie /> <span>Clientes</span>
+            </button>
+            )}
 
         </div>
       </section>

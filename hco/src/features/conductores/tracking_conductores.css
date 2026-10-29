@@ -509,17 +509,6 @@
     animation: tcModalFadeIn 0.18s ease-out;
   }
 
-  @keyframes tcModalFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(-8px) scale(0.98);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
   .tc-modal-header {
     background: linear-gradient(180deg, #0f4c81 0%, #0b3963 100%);
     color: #ffffff;
@@ -825,3 +814,15 @@
     }
   }
 }
+
+
+  @keyframes tcModalFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }

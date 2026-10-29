@@ -8,7 +8,8 @@ import {
   obtenerErroresPorNombreArea,
   obtenerCuadroQPorId,
   crearRegistroCuadroQ,
-  actualizarRegistroCuadroQ
+  actualizarRegistroCuadroQ,
+  calcularEstadoAutomaticoCuadroQ
 } from '../../services/cuadroQService';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '../../services/localDb';
@@ -19,13 +20,6 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-// Obtener fecha local actual en formato YYYY-MM-DD
-function obtenerFechaHoyLocal() {
-  const hoy = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${hoy.getFullYear()}-${pad(hoy.getMonth() + 1)}-${pad(hoy.getDate())}`;
-}
-
 // Convertir ISO a formato YYYY-MM-DDTHH:mm para input datetime-local
 function isoADatetimeLocal(isoStr) {
   if (!isoStr) return "";
@@ -34,30 +28,6 @@ function isoADatetimeLocal(isoStr) {
   if (isNaN(d.getTime())) return "";
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-// Cálculo automático del Estado del Cuadro Q
-function calcularEstadoAutomatico({ evaluacion, fecha_planificada, fecha_cierre }) {
-  if (evaluacion === "CANCELADO") {
-    return "CANCELADO";
-  }
-
-  if (fecha_cierre && String(fecha_cierre).trim() !== "") {
-    return "CONCLUIDO";
-  }
-
-  const hoyStr = obtenerFechaHoyLocal();
-  const planStr = fecha_planificada ? String(fecha_planificada).slice(0, 10) : "";
-
-  if (planStr && hoyStr > planStr) {
-    return "ATRAZADO";
-  }
-
-  if (evaluacion === "APROBADO") {
-    return "EN PROCESO";
-  }
-
-  return "PENDIENTE";
 }
 
 export default function RegistroCuadroQ() {
@@ -221,7 +191,9 @@ export default function RegistroCuadroQ() {
         ...prev,
         registrador_id: currentUser.id || "",
         nombre_registrador: currentUser.nombre || "Usuario",
-        area_registrador: areaDelUsuarioLogueado
+        area_registrador: areaDelUsuarioLogueado,
+        estado: "PENDIENTE",
+        fecha_cierre: ""
       }));
     }
   }, [esModoAnalisis, currentUser, areaDelUsuarioLogueado]);
@@ -237,19 +209,21 @@ export default function RegistroCuadroQ() {
       if (registroEditId) {
         const reg = await obtenerCuadroQPorId(registroEditId);
         const fechaPlan = reg.fecha_planificada ? String(reg.fecha_planificada).slice(0, 10) : "";
-        const fechaCierreLocal = isoADatetimeLocal(reg.fecha_cierre);
+
+        // Si el registro nunca fue evaluado ni planificado, ignoramos cualquier fecha_cierre residual
+        const tieneAnalisisPrevio = Boolean(reg.evaluacion || fechaPlan || reg.estado === "CONCLUIDO");
+        const fechaCierreLocal = tieneAnalisisPrevio ? isoADatetimeLocal(reg.fecha_cierre) : "";
 
         const evalInicial =
           reg.evaluacion || (reg.estado === "CANCELADO" ? "CANCELADO" : "");
 
-        const estadoCalculado = calcularEstadoAutomatico({
+        const estadoCalculado = calcularEstadoAutomaticoCuadroQ({
           evaluacion: evalInicial,
           fecha_planificada: fechaPlan,
           fecha_cierre: fechaCierreLocal
         });
 
-        const estabaConcluido =
-          estadoCalculado === "CONCLUIDO" || reg.estado === "CONCLUIDO";
+        const estabaConcluido = estadoCalculado === "CONCLUIDO";
 
         setYaEstabaConcluidoEnBD(estabaConcluido);
         setCierreConfirmadoUI(estabaConcluido);
@@ -266,7 +240,7 @@ export default function RegistroCuadroQ() {
           proceso: reg.proceso || "",
           error: reg.error || "",
           descripcion_error: reg.descripcion_error || "",
-          estado: estabaConcluido ? "CONCLUIDO" : estadoCalculado,
+          estado: estadoCalculado,
 
           responsabilidad: reg.responsabilidad || "",
           impacto: reg.impacto || "",
@@ -338,19 +312,22 @@ export default function RegistroCuadroQ() {
 
     setFormData((prev) => {
       const nuevaFechaCierre = nuevaEval === "CANCELADO" ? "" : prev.fecha_cierre;
+      const nuevaFechaPlan = nuevaEval === "CANCELADO" ? "" : prev.fecha_planificada;
+
       if (nuevaEval === "CANCELADO") {
         setCierreConfirmadoUI(false);
       }
 
-      const nuevoEstado = calcularEstadoAutomatico({
+      const nuevoEstado = calcularEstadoAutomaticoCuadroQ({
         evaluacion: nuevaEval,
-        fecha_planificada: prev.fecha_planificada,
+        fecha_planificada: nuevaFechaPlan,
         fecha_cierre: nuevaFechaCierre
       });
 
       return {
         ...prev,
         evaluacion: nuevaEval,
+        fecha_planificada: nuevaFechaPlan,
         fecha_cierre: nuevaFechaCierre,
         estado: nuevoEstado,
         motivo_cancelacion: nuevaEval === "CANCELADO" ? prev.motivo_cancelacion : ""
@@ -363,14 +340,18 @@ export default function RegistroCuadroQ() {
     const nuevaFechaPlan = e.target.value;
 
     setFormData((prev) => {
-      const nuevoEstado = calcularEstadoAutomatico({
-        evaluacion: prev.evaluacion,
+      const evalEfectiva =
+        nuevaFechaPlan && !prev.evaluacion ? "APROBADO" : prev.evaluacion;
+
+      const nuevoEstado = calcularEstadoAutomaticoCuadroQ({
+        evaluacion: evalEfectiva,
         fecha_planificada: nuevaFechaPlan,
         fecha_cierre: prev.fecha_cierre
       });
 
       return {
         ...prev,
+        evaluacion: evalEfectiva,
         fecha_planificada: nuevaFechaPlan,
         estado: nuevoEstado
       };
@@ -387,7 +368,7 @@ export default function RegistroCuadroQ() {
           ? "APROBADO"
           : prev.evaluacion;
 
-      const nuevoEstado = calcularEstadoAutomatico({
+      const nuevoEstado = calcularEstadoAutomaticoCuadroQ({
         evaluacion: evalEfectiva,
         fecha_planificada: prev.fecha_planificada,
         fecha_cierre: nuevaFechaCierre
@@ -511,15 +492,14 @@ export default function RegistroCuadroQ() {
           () => navigate('/cuadro_q/trackingCuadroQ')
         );
       } else {
-        const estadoFinal = calcularEstadoAutomatico({
+        const estadoFinal = calcularEstadoAutomaticoCuadroQ({
           evaluacion: formData.evaluacion,
-          fecha_planificada: formData.fecha_planificada,
+          fecha_planificada: esCancelado ? "" : formData.fecha_planificada,
           fecha_cierre: esCancelado ? "" : formData.fecha_cierre
         });
 
-        //  AHORA (Mantiene la hora exacta seleccionada en el formulario):
         const fechaCierreFormateada =
-        !esCancelado && formData.fecha_cierre
+          !esCancelado && formData.fecha_cierre && formData.fecha_cierre.trim() !== ""
             ? formData.fecha_cierre.replace('T', ' ') + (formData.fecha_cierre.length === 16 ? ':00' : '')
             : null;
 
@@ -551,7 +531,7 @@ export default function RegistroCuadroQ() {
           'success',
           'Análisis Guardado',
           'Los datos de seguimiento y análisis del Cuadro Q se actualizaron correctamente.',
-          `Código: ${actualizado.id_cuadro_q || formData.id_cuadro_q} | Estado: ${actualizado.estado || estadoFinal}`,
+          `Código: ${actualizado?.id_cuadro_q || formData.id_cuadro_q} | Estado: ${actualizado?.estado || estadoFinal}`,
           () => navigate('/cuadro_q/trackingCuadroQ')
         );
       }

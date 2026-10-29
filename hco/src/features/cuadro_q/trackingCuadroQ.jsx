@@ -7,7 +7,8 @@ import {
   FaUndo,
   FaChevronLeft,
   FaChevronRight,
-  FaChartBar, FaBullseye
+  FaChartBar,
+  FaBullseye
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './trackingCuadroQ.css';
@@ -53,7 +54,7 @@ export default function TrackingCuadroQ() {
     areaError: 'Todas',
     estado: 'Todos',
     impacto: 'Todos',
-     fechaIni: '',
+    fechaIni: '',
     fechaFin: '',
     buscar: ''
   });
@@ -139,27 +140,26 @@ export default function TrackingCuadroQ() {
     return registros.filter((r) => r.estado === 'CONCLUIDO').length;
   }, [registros]);
 
-
-function formatearFecha(fecha) {
+  function formatearFecha(fecha) {
     if (!fecha) return '-';
     return new Date(fecha)
-    .toLocaleString('es-PE', {
+      .toLocaleString('es-PE', {
         dateStyle: 'short',
         timeStyle: 'short'
-    })
-    .replace(',', '');
-}
+      })
+      .replace(',', '');
+  }
 
-function formatearSoloFecha(fechaStr) {
+  function formatearSoloFecha(fechaStr) {
     if (!fechaStr) return "-";
     const soloFecha = String(fechaStr).slice(0, 10);
     const partes = soloFecha.split('-');
     if (partes.length !== 3) return fechaStr;
     const [anio, mes, dia] = partes;
     return `${dia}/${mes}/${anio}`;
-}
+  }
 
-const registrosFiltrados = useMemo(() => {
+  const registrosFiltrados = useMemo(() => {
     return registros.filter((reg) => {
       const estadoReg = (reg.estado || 'PENDIENTE').toUpperCase();
       const areaErr = reg.area_error || '';
@@ -244,31 +244,21 @@ const registrosFiltrados = useMemo(() => {
     setPaginaActual(1);
   };
 
-  // Nuevos colores para la columna Estado
+  // Colores para la columna Estado
   const getEstadoBadgeClass = (estado) => {
     const est = String(estado || 'PENDIENTE').toUpperCase().trim();
-    
+
     if (est === 'CONCLUIDO') return 'cq-estado-concluido';
     if (est === 'PENDIENTE') return 'cq-estado-pendiente';
     if (est === 'CANCELADO') return 'cq-estado-cancelado';
     if (est === 'EN PROCESO') return 'cq-estado-proceso';
     if (est === 'ATRAZADO' || est === 'ATRASADO') return 'cq-estado-atrasado';
-    
+
     return 'cq-estado-default';
-  };
-
-
-  const getImpactoPillClass = (impacto) => {
-    const imp = String(impacto || '').toUpperCase();
-    if (imp === 'ALTO') return 'no-apto';
-    if (imp === 'MEDIO') return 'observado';
-    if (imp === 'BAJO') return 'apto';
-    return '';
   };
 
   const handleEditarAnalisis = (reg) => {
     navigate(`/cuadro_q/Registro-cuadroQ?id=${reg.id}`, { state: { registro: reg } });
-
   };
 
   const handleExportarExcel = () => {
@@ -401,12 +391,13 @@ const registrosFiltrados = useMemo(() => {
             >
               <option value="Todos">Todos</option>
               <option value="PENDIENTE">PENDIENTE</option>
+              <option value="EN PROCESO">EN PROCESO</option>
+              <option value="ATRAZADO">ATRAZADO</option>
               <option value="CONCLUIDO">CONCLUIDO</option>
               <option value="CANCELADO">CANCELADO</option>
             </select>
           </div>
 
-          {/* Le agregamos la clase mobile-hidden-filter al div */}
           <div className="filter-group mobile-hidden-filter">
             <label>Impacto</label>
             <select
@@ -419,7 +410,6 @@ const registrosFiltrados = useMemo(() => {
               <option value="BAJO">BAJO</option>
             </select>
           </div>
-
 
           <div className="filter-group mobile-hidden-filter">
             <label>Fecha ini</label>
@@ -441,54 +431,51 @@ const registrosFiltrados = useMemo(() => {
         </div>
 
         <div className="filters-actions-row">
-        <button
+          <button
             type="button"
             className="btn-action-primary"
             onClick={() => navigate('/cuadro_q/Registro-cuadroQ')}
-        >
+          >
             <FaPlus />
             <span>Registrar</span>
-        </button>
+          </button>
 
-        <button
+          <button
             type="button"
             className="btn-action-primary"
             onClick={handleAplicarFiltros}
-        >
+          >
             <FaSearch />
             <span>Buscar</span>
-        </button>
+          </button>
 
-        <button
+          <button
             type="button"
             className="btn-action-secondary"
             onClick={handleLimpiarFiltros}
-        >
+          >
             <FaUndo />
             <span>Limpiar</span>
-        </button>
+          </button>
 
-        <button
+          <button
             type="button"
             className="btn-action-primary btn-graficos"
             onClick={() => navigate('/cuadro_q/pizarraCuadroQ')}
-        >
+          >
             <FaChartBar />
             <span>Ver Gráficos</span>
-        </button>
+          </button>
 
-        <button
+          <button
             type="button"
             className="btn-action-primary btn-radar"
             onClick={() => navigate('/cuadro_q/radarCuadroQ')}
-        >
+          >
             <FaBullseye />
             <span>Radar</span>
-        </button>
+          </button>
         </div>
-
-
-
       </section>
 
       {/* 3. SECCIÓN INFERIOR: TABLA Y PAGINACIÓN */}
@@ -556,16 +543,15 @@ const registrosFiltrados = useMemo(() => {
                 <th>Área Error</th>
                 <th>Proceso</th>
                 <th>Error</th>
-                <th>Descripción</th>                
+                <th>Descripción</th>
                 <th>F. Planificada</th>
-             
                 <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {registrosPaginados.length === 0 ? (
                 <tr>
-                  <td colSpan="21" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
+                  <td colSpan="12" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
                     No se encontraron registros en Cuadro Q con los filtros seleccionados.
                   </td>
                 </tr>
@@ -621,4 +607,3 @@ const registrosFiltrados = useMemo(() => {
     </div>
   );
 }
-

@@ -116,6 +116,12 @@ export const ERRORES_POR_AREA = {
   ]
 };
 
+// Genera fecha local actual (YYYY-MM-DD)
+export const obtenerFechaHoyLocal = () => {
+  const hoy = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${hoy.getFullYear()}-${pad(hoy.getMonth() + 1)}-${pad(hoy.getDate())}`;
+};
 
 // Genera fecha y hora local (YYYY-MM-DD HH:mm:ss) sin adelanto UTC
 const obtenerFechaHoraLocal = () => {
@@ -124,6 +130,63 @@ const obtenerFechaHoraLocal = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+/**
+ * Calcula el estado del Cuadro Q según las reglas de negocio:
+ * 1. Si evaluación es CANCELADO -> CANCELADO
+ * 2. Si tiene fecha_cierre -> CONCLUIDO
+ * 3. Si tiene fecha_planificada:
+ *    - Si hoy > fecha_planificada -> ATRAZADO
+ *    - Si hoy <= fecha_planificada -> EN PROCESO
+ * 4. Si no tiene fecha_planificada -> PENDIENTE
+ */
+export const calcularEstadoAutomaticoCuadroQ = ({ evaluacion, fecha_planificada, fecha_cierre }) => {
+  if (evaluacion === "CANCELADO") {
+    return "CANCELADO";
+  }
+
+  if (fecha_cierre && String(fecha_cierre).trim() !== "") {
+    return "CONCLUIDO";
+  }
+
+  const hoyStr = obtenerFechaHoyLocal();
+  const planStr = fecha_planificada ? String(fecha_planificada).slice(0, 10) : "";
+
+  if (planStr) {
+    if (hoyStr > planStr) {
+      return "ATRAZADO";
+    }
+    return "EN PROCESO";
+  }
+
+  return "PENDIENTE";
+};
+
+/**
+ * Normaliza un registro proveniente de BD:
+ * - Limpia fecha_cierre si el registro sigue PENDIENTE sin evaluación (evita falsos cierres por DEFAULT now() en BD)
+ * - Recalcula el estado dinámico (ej. pasa de EN PROCESO a ATRAZADO si ya venció la fecha_planificada)
+ */
+const normalizarRegistroCuadroQ = (reg) => {
+  if (!reg) return reg;
+
+  const estadoBD = String(reg.estado || 'PENDIENTE').toUpperCase().trim();
+  const sinAnalisisPrevio = estadoBD === 'PENDIENTE' && !reg.evaluacion && !reg.fecha_planificada;
+
+  const fechaCierreLimpia = sinAnalisisPrevio ? null : (reg.fecha_cierre || null);
+  const evalEfectiva = reg.evaluacion || (estadoBD === 'CANCELADO' ? 'CANCELADO' : '');
+
+  const estadoCalculado = calcularEstadoAutomaticoCuadroQ({
+    evaluacion: evalEfectiva,
+    fecha_planificada: reg.fecha_planificada,
+    fecha_cierre: fechaCierreLimpia
+  });
+
+  return {
+    ...reg,
+    fecha_cierre: fechaCierreLimpia,
+    estado: estadoCalculado
+  };
+};
 
 /**
  * Devuelve la lista de errores correspondiente al nombre del área
@@ -138,9 +201,8 @@ export const obtenerErroresPorNombreArea = (nombreArea) => {
 
   if (ERRORES_POR_AREA[limpio]) return ERRORES_POR_AREA[limpio];
 
-  // Coincidencia flexible por si en BD se llama "ASEGURAMIENTO DE LA CALIDAD", "RECURSOS HUMANOS", etc.
   if (limpio.includes("CALIDAD")) return ERRORES_POR_AREA["CALIDAD"];
-  if (limpio.includes("RECURSOS HUMANOS") || limpio.includes("RRHH")) return ERRORES_POR_AREA["RRHH"];
+  if (limpio.includes("RECURSOS HUMANOS") || limpio.includes("RRHH")) return ERRORES_POR_AREA["RR.HH."];
   if (limpio.includes("LOGISTICS") || limpio.includes("SOPORTE")) return ERRORES_POR_AREA["LOGISTICS SUPPORT"];
   if (limpio.includes("EXCELENCIA") || limpio.includes("BPE")) return ERRORES_POR_AREA["BPE"];
 
@@ -152,18 +214,10 @@ export const obtenerErroresPorNombreArea = (nombreArea) => {
 };
 
 /**
- * Obtiene catálogos para el formulario:
- * 1. Todas las áreas (para identificar el área del registrador)
- * 2. Áreas con cuadro_q = 'Activo' (para el desplegable AREA_ERROR)
- * 3. Empleados con tipo = 'WHITE' y estado = 'Activo' (para el desplegable RESPONSABLE)
- */
-
-/**
  * Obtiene catálogos para el formulario
  */
 export const obtenerCatalogosCuadroQ = async () => {
   try {
-    // ✨ LA SOLUCIÓN TAMBIÉN AQUÍ
     await supabase.auth.getSession();
 
     const [resAreas, resWhite] = await Promise.all([
@@ -179,7 +233,7 @@ export const obtenerCatalogosCuadroQ = async () => {
     const areasErrorActivas = todasAreas.filter(a => String(a.cuadro_q || '').trim().toUpperCase() === 'ACTIVO');
 
     return { todasAreas, areasError: areasErrorActivas, personalWhite: resWhite.data || [] };
-  } catch (err){
+  } catch (err) {
     console.warn("Error cargando catálogos de Cuadro Q desde Supabase, usando respaldo local:", err);
     const todasAreas = localDb?.areas ? await localDb.areas.toArray() : [];
     const todosUsuarios = localDb?.usuarios ? await localDb.usuarios.toArray() : [];
@@ -196,12 +250,12 @@ export const obtenerCatalogosCuadroQ = async () => {
     return { todasAreas, areasError, personalWhite };
   }
 };
+
 /**
- * Obtiene todos los registros de la tabla cuadro_q 
+ * Obtiene todos los registros de la tabla cuadro_q
  */
 export const obtenerRegistrosCuadroQ = async () => {
   try {
-    // ✨ LA SOLUCIÓN: Esperar a que Supabase recupere la sesión tras recargar la página
     await supabase.auth.getSession();
 
     const { data, error } = await supabase
@@ -211,16 +265,20 @@ export const obtenerRegistrosCuadroQ = async () => {
 
     if (error) throw new Error(error.message);
 
-    if (data && data.length > 0 && localDb.cuadro_q) {
-      await localDb.cuadro_q.bulkPut(data);
+    const normalizados = (data || []).map(normalizarRegistroCuadroQ);
+
+    if (normalizados.length > 0 && localDb.cuadro_q) {
+      await localDb.cuadro_q.bulkPut(normalizados);
     }
 
-    return data || [];
+    return normalizados;
   } catch (err) {
     console.warn(`Modo Offline o error de red: ${err.message}. Leyendo caché...`);
     if (localDb.cuadro_q) {
       const registrosLocales = await localDb.cuadro_q.toArray();
-      return registrosLocales.sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro));
+      return registrosLocales
+        .map(normalizarRegistroCuadroQ)
+        .sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro));
     }
     return [];
   }
@@ -237,12 +295,12 @@ export const obtenerCuadroQPorId = async (id) => {
     .single();
 
   if (error) throw new Error(`Error al cargar el registro: ${error.message}`);
-  return data;
+  return normalizarRegistroCuadroQ(data);
 };
 
 /**
  * Crea un nuevo registro en cuadro_q (Fase 1: Registro)
- * Estado inicial siempre es 'PENDIENTE'
+ * Estado inicial siempre es 'PENDIENTE' y fecha_cierre es explícitamente null
  */
 export const crearRegistroCuadroQ = async (datosRegistro) => {
   const payload = {
@@ -255,6 +313,8 @@ export const crearRegistroCuadroQ = async (datosRegistro) => {
     error: datosRegistro.error,
     descripcion_error: datosRegistro.descripcion_error,
     estado: 'PENDIENTE',
+    fecha_planificada: null,
+    fecha_cierre: null
   };
 
   const { data, error } = await supabase
@@ -264,7 +324,7 @@ export const crearRegistroCuadroQ = async (datosRegistro) => {
     .single();
 
   if (error) throw new Error(`Error al registrar Cuadro Q: ${error.message}`);
-  return data;
+  return normalizarRegistroCuadroQ(data);
 };
 
 /**
@@ -277,7 +337,8 @@ export const actualizarRegistroCuadroQ = async (id, datosAnalisis) => {
     .from('cuadro_q')
     .update({
       ...camposActualizar,
-      fecha_hora_actualiza: obtenerFechaHoraLocal() // ⬅️ Usar hora local en lugar de toISOString()
+      fecha_cierre: camposActualizar.fecha_cierre || null,
+      fecha_hora_actualiza: obtenerFechaHoraLocal()
     })
     .eq('id', id)
     .select()
@@ -287,5 +348,5 @@ export const actualizarRegistroCuadroQ = async (id, datosAnalisis) => {
     throw new Error(`Error al actualizar Cuadro Q: ${error.message}`);
   }
 
-  return data;
+  return normalizarRegistroCuadroQ(data);
 };

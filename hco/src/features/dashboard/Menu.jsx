@@ -297,6 +297,16 @@ export default function Menu() {
             estado: "Activo",
           },
           {
+            title: "LUP's",
+            description: "Realizar y registrar LUP's.",
+            Icon: FaClipboardCheck,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/lup.png",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
             title: "Auditoría 5S",
             description: "Realizar y registrar auditorías 5S.",
             Icon: FaClipboardCheck,

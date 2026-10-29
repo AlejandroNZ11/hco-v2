@@ -1,0 +1,726 @@
+/* =========================================
+   DASHBOARD SUGERENCIAS - ESTILOS DEFINITIVOS
+   ========================================= */
+
+.dashboard-sugerencias-wrapper {
+  --azul-900: #0a3a70;
+  --azul-700: #0b4f9c;
+  --azul-500: #1584d6;
+  --azul-100: #eaf4fd;
+  --borde-card: #bcd7f0;
+  --texto: #0b2a4a;
+
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  
+  /* PROTECCIONES VITALES CONTRA COLAPSO POR CONTENEDORES PADRE FLEX */
+  flex: 1 0 auto !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  height: auto !important;
+  min-height: 100vh;
+  
+  padding: 16px 20px 60px;
+  color: var(--texto);
+  background-color: #f4f7fb;
+}
+
+.dashboard-sugerencias-wrapper *,
+.dashboard-sugerencias-wrapper *::before,
+.dashboard-sugerencias-wrapper *::after {
+  box-sizing: border-box;
+}
+
+.dash-loading-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--azul-700);
+  border: 1px solid #e2e8f0;
+}
+
+/* ---------- 1. CABECERA Y FILTROS ---------- */
+.dash-header-filter {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.dash-pill {
+  background: #eef2f8;
+  color: #1e3a6d;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.dash-header-titles h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0b2239;
+}
+
+.dash-selectors {
+  display: flex;
+  gap: 14px;
+}
+
+.dash-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-select-group label {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.dash-select-group select {
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background-color: #fff;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+/* ---------- 2. GRID GENERAL ---------- */
+.dash-row {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+
+.top-row {
+  grid-template-columns: 1.25fr 1fr 1fr;
+}
+
+/* Modifica la distribución de la fila inferior */
+.bottom-row {
+  grid-template-columns: 1.15fr 1.1fr 1.35fr; /* Le da más ancho a Origen y balancea Categorías */
+  gap: 16px;
+}
+
+/* ---------- 3. DIVISOR DE SECCIÓN ---------- */
+.dash-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(90deg, #0b4f9c 0%, #1584d6 55%, #8fcbf6 100%);
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 6px rgba(9, 71, 135, 0.15);
+}
+
+
+/* ---------- 4. TARJETAS (CARDS) ---------- */
+.dash-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1.5px solid var(--borde-card);
+  box-shadow: 0 2px 8px rgba(11, 79, 156, 0.07);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  
+  /* ALTURA MÍNIMA QUE NUNCA PODRÁ SER APLASTADA */
+  min-height: 360px !important;
+  height: auto !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important; /* Esquinas exactas */
+  padding: 0 !important;
+}
+
+.dash-card-header {
+  background: linear-gradient(180deg, #0f63b5 0%, #0a478a 100%);
+  color: #fff;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.dash-card-header svg {
+  flex-shrink: 0;
+}
+
+
+.dash-card-header h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1.25;
+}
+
+/* Cabecera clara (fila inferior) */
+.dash-card-header.claro {
+  background: linear-gradient(90deg, #e6f2fd 0%, #f6fafe 100%);
+  color: var(--azul-700);
+  border-bottom: 1px solid #d7e7f7;
+  border-radius: 0;
+  margin: 0;
+}
+
+.dash-card-header.claro h3 {
+  color: var(--azul-900);
+  text-transform: none;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.dash-card-body {
+  position: relative;
+  padding: 16px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 290px; /* Asegura espacio interno amplio */
+}
+
+.no-data {
+  color: #94a3b8;
+  font-size: 13px;
+  text-align: center;
+  margin: auto;
+  font-weight: 600;
+}
+
+/* ---------- CARD 1: PODIO TOP 3 (FOTOS Y ELEMENTOS BALANCEADOS) ---------- */
+.podio-container {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Mismo espacio interno a los lados (14px) que la separación entre columnas (14px) */
+  gap: 14px;
+  padding: 14px 14px 16px !important;
+  align-items: start;
+  box-sizing: border-box;
+}
+
+.podio-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+/* FOTO CUADRADA CON BORDES */
+.podio-foto {
+  width: 100%;
+  aspect-ratio: 1 / 1 !important;
+  height: auto !important;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #cbdcf2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c0d7f0;
+  box-shadow: 0 1px 4px rgba(11, 79, 156, 0.08);
+}
+
+.podio-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+
+.podio-iniciales {
+  font-size: 34px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 1px;
+}
+
+/* FILA INFERIOR: MEDALLA + CONTENIDO */
+.podio-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent !important;
+  padding: 0 4px; /* Despega la medalla del borde izquierdo */
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* MEDALLA MÁS PROMINENTE */
+.medalla-svg {
+  width: 44px !important;
+  height: 52px !important;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.16));
+}
+
+.medalla-num {
+  font-size: 19px !important;
+  font-weight: 900;
+  fill: #ffffff;
+}
+
+/* BLOQUE DE TEXTO Y VALOR */
+.podio-texto {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Centra el nombre y el conteo en su columna */
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.podio-nombre {
+  width: 100%;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0b2239;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 3px;
+  letter-spacing: 0.2px;
+}
+
+/* NÚMERO Y SUG. CENTRADOS EN LÍNEA */
+.podio-conteo {
+  display: flex;
+  align-items: baseline;
+  justify-content: center; /* Centrado debajo del nombre */
+  gap: 4px;
+  width: 100%;
+}
+
+.podio-num {
+  font-size: 26px;
+  font-weight: 900;
+  color: #083c74; /* Azul oscuro corporativo como en la imagen */
+  line-height: 1;
+}
+
+.podio-unit {
+  font-size: 13px;
+  font-weight: 700;
+  color: #083c74;
+}
+/* ---------- 6. BARRAS HORIZONTALES (CARDS 2 Y 3) ---------- */
+.hchart {
+  /* Ancho ampliado para que 'Astrid Blas', 'William Valdivia', etc. queden completos sin '...' */
+  --label-w: 110px;
+  --extra-w: 34px;
+  width: 100%;
+}
+
+.hchart-cols {
+  display: grid;
+  grid-template-columns: var(--label-w) minmax(0, 1fr);
+  column-gap: 12px;
+}
+
+.hchart.con-extra .hchart-cols {
+  grid-template-columns: var(--label-w) minmax(0, 1fr) var(--extra-w);
+}
+
+.hchart-body {
+  position: relative;
+}
+
+.hchart-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hchart-lines-area {
+  position: relative;
+  height: 100%;
+}
+
+.hchart-lines-area i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e3ebf5;
+}
+
+.hchart-lines-area i.eje {
+  background: #94a3b8;
+}
+
+.hchart-rows {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0;
+}
+
+.hchart-row {
+  align-items: center;
+  height: 28px;
+}
+
+.hchart-label {
+  text-align: right;
+  font-size: 13px; /* Tamaño legible idéntico a la imagen */
+  font-weight: 600;
+  color: #0b2239;
+  white-space: nowrap;
+  overflow: visible; /* No corta los nombres */
+  text-overflow: unset;
+}
+
+.hchart-track {
+  position: relative;
+  height: 100%;
+}
+
+.hchart-bar {
+  height: 100%;
+  min-width: 4px;
+  border-radius: 0 4px 4px 0;
+  transition: width 0.4s ease;
+}
+
+.bar-c0 { background: #0077c8; }
+.bar-c1 { background: #2699fb; }
+.bar-c2 { background: #5db5f7; }
+.bar-c3 { background: #8ecdfa; }
+.bar-c4 { background: #bfe2fc; }
+.bar-gris { background: #cbd2dc; }
+
+.hchart-val {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--azul-900);
+  white-space: nowrap;
+}
+
+.hchart-val.dentro {
+  right: 8px;
+  color: #fff;
+}
+
+.hchart-extra {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hchart-axis-area {
+  position: relative;
+  height: 24px;
+}
+
+.hchart-axis-area em {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  font-style: normal;
+  font-size: 11px;
+  color: #475569;
+}
+
+.medalla-circulo {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.ranking-1 { background: #f59e0b; }
+.ranking-2 { background: #94a3b8; }
+.ranking-3 { background: #d97706; }
+
+/* ---------- 7. CARD 3: BADGE TOTAL ---------- */
+.top5-body {
+  position: relative;
+}
+
+.top5-badge-resumen {
+  position: absolute;
+  right: 14px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1.5px solid #0b4f9c; /* Borde azul */
+  border-radius: 14px;
+  padding: 10px 18px 10px 14px;
+  box-shadow: 0 4px 12px rgba(11, 79, 156, 0.12);
+}
+
+.badge-icono {
+  color: var(--azul-700);
+  display: flex;
+}
+
+.badge-roseta-svg {
+  width: 46px;
+  height: 54px;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(6, 50, 102, 0.25));
+}
+
+.badge-text-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.05;
+}
+
+.badge-sub {
+  font-size: 10.5px;
+  color: #0b2239;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge-total {
+  font-size: 32px;
+  font-weight: 900;
+  color: #083c74;
+  line-height: 1.05;
+  margin: 2px 0;
+}
+
+.badge-sug {
+  font-size: 11px;
+  color: #0b2239;
+  font-weight: 600;
+}
+
+/* ---------- 8. CARD 4: LÍNEA DE TENDENCIA ---------- */
+.chart-svg {
+  width: 100%;
+  height: 240px !important;
+  display: block;
+}
+
+.svg-num {
+  font-size: 11.5px;
+  font-weight: 800;
+  fill: var(--azul-900);
+}
+
+.svg-mes {
+  font-size: 11px;
+  font-weight: 600;
+  fill: #334155;
+}
+
+.svg-eje {
+  font-size: 11px;
+  fill: #475569;
+}
+
+/* ---------- CARDS 5 Y 6: DONAS (GRÁFICOS AMPLIADOS HASTA LA MITAD) ---------- */
+.donut-card-body {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 20px !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* LA DONA OCUPA HASTA EL 50% DEL ANCHO */
+.dona-wrap {
+  width: 240px !important;
+  min-width: 220px !important;
+  height: 240px !important;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dona-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.dona-pct {
+  font-size: 15px;
+  font-weight: 800;
+  fill: #ffffff;
+}
+
+.dona-num {
+  font-size: 34px;
+  font-weight: 900;
+  fill: var(--texto);
+}
+
+.dona-sub {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #64748b;
+}
+
+/* LEYENDA EN LA OTRA MITAD */
+.donut-legend {
+  flex: 1;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.leg-label {
+  flex: 1;
+  min-width: 0;
+  color: #12365f;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.leg-pct {
+  margin-left: auto;
+  min-width: 48px;
+  text-align: right;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--texto);
+}
+
+/* ---------- 10. RESPONSIVE ---------- */
+@media (max-width: 1200px) {
+  .top-row,
+  .bottom-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- RESPONSIVE MÓVIL (CABECERA Y FILTROS) ---------- */
+@media (max-width: 768px) {
+  .dashboard-sugerencias-wrapper {
+    padding: 10px 10px 40px !important;
+  }
+
+  .dash-header-filter {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 12px 14px !important;
+  }
+
+  .dash-header-titles {
+    width: 100%;
+  }
+
+  .dash-header-titles h2 {
+    font-size: 18px !important;
+    line-height: 1.2;
+  }
+
+  /* Los dos selectores ocupan el 100% en una fila dividida en 2 partes iguales */
+  .dash-selectors {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .dash-select-group {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .dash-select-group select {
+    width: 100% !important;
+    min-width: 0 !important; /* Quita el min-width que desborda el mes */
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-sugerencias-wrapper {
+    padding: 10px;
+  }
+
+  .podio-container {
+    grid-template-columns: 1fr;
+  }
+
+  .top5-badge-resumen {
+    position: static;
+    margin-top: 14px;
+    align-self: center;
+  }
+
+  .donut-card-body {
+    flex-direction: column !important;
+  }
+}

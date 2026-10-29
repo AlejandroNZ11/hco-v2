@@ -7,6 +7,7 @@ import {
   FaSearch,
   FaUndo,
   FaChevronLeft,
+  FaChartPie,
   FaChevronRight
 } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
@@ -494,6 +495,17 @@ export default function TrackingSugerencias() {
             <FaUndo />
             <span>Limpiar</span>
           </button>
+
+          <button 
+            type="button" 
+            className="btn-action-primary" 
+            onClick={() => navigate('/sugerencias/dashboard')}
+            >
+            <FaChartPie /> <span>Dashboard</span>
+          </button>
+
+
+
         </div>
       </section>
 

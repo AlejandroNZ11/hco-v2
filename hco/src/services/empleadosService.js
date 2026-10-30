@@ -48,7 +48,8 @@ export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_
   if (!dataUrlBase64 || !String(dataUrlBase64).startsWith('data:image')) return '';
 
   const folderId =
-    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_PERSONAL_ID;
+    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_PERSONAL_ID ||
+    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
 
   const accessToken = await obtenerAccessTokenGoogleDrive();
   const blobImagen = base64ABlob(dataUrlBase64);
@@ -56,7 +57,7 @@ export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_
   const dniLimpio = String(dniEmpleado || 'sin_dni').trim().replace(/[^a-zA-Z0-9_-]/g, '');
   const nombreDeseado = `${dniLimpio}.png`;
 
-  // 1. Renombrar archivo anterior si existe (mantiene tu lógica anterior)
+  // 1. Renombrar archivo anterior si existe
   if (folderId) {
     try {
       const query = `'${folderId}' in parents and name = '${nombreDeseado}' and trashed = false`;
@@ -82,7 +83,7 @@ export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_
     }
   }
 
-  // 2. Subir la nueva foto
+  // 2. Subida robusta compatible con entornos de producción (Evita el error HTTP2)
   const metadata = {
     name: nombreDeseado,
     mimeType: 'image/png',
@@ -90,14 +91,19 @@ export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_
   };
 
   const form = new FormData();
+  // Forzamos la creación explícita de un Blob JSON para evitar problemas de compatibilidad en producción
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
   form.append('file', blobImagen);
 
   const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
     {
       method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { 
+        Authorization: `Bearer ${accessToken}`
+        // NOTA: No incluyas 'Content-Type': 'multipart/form-data' manualmente, 
+        // el navegador debe generarlo solo con el boundary para evitar el ERR_HTTP2_PROTOCOL_ERROR.
+      },
       body: form
     }
   );
@@ -107,27 +113,8 @@ export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_
     throw new Error(fileData?.error?.message || 'Error al subir la foto a Google Drive.');
   }
 
-  // 3. NUEVO: Hacer el archivo público para lectura (Evita el ERR_CONNECTION_RESET)
-  try {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        role: 'reader',
-        type: 'anyone'
-      })
-    });
-  } catch (permErr) {
-    console.warn('No se pudo otorgar permiso público automático:', permErr);
-  }
-
-    // 4. Retornar enlace web optimizado que sí permite lectura sin cortes
   return `https://drive.google.com/file/d/${fileData.id}/view`;
 };
-
 
 
 // =========================================================================

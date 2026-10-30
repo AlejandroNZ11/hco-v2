@@ -48,8 +48,7 @@ export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_
   if (!dataUrlBase64 || !String(dataUrlBase64).startsWith('data:image')) return '';
 
   const folderId =
-    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_PERSONAL_ID ||
-    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_PERSONAL_ID;
 
   const accessToken = await obtenerAccessTokenGoogleDrive();
   const blobImagen = base64ABlob(dataUrlBase64);

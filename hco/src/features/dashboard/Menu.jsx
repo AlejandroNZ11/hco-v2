@@ -303,8 +303,8 @@ export default function Menu() {
             accent: "accent-violet",
             buttonText: "Entrar",
             image: "/img/lup.png",
-            url: "#",
-            estado: "Inactivo",
+            url: "/lup/tracking",
+            estado: "En Proceso",
           },
           {
             title: "Auditoría 5S",

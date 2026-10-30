@@ -58,15 +58,15 @@ export function useAuth() {
     // 2. ACTUALIZA LA TABLA VISUAL 'EMPLEADOS'
     if (authUser?.id) {
       const { error: dbError } = await supabase.from('empleados')
-        .update({ clave: nuevaPass })
+        .update({ cl: nuevaPass })
         .eq('id', authUser.id);
       
       if (dbError) throw new Error("Auth actualizado, pero falló la tabla: " + dbError.message);
       
-      const sessionActual = { ...authUser, clave: nuevaPass };
+      const sessionActual = { ...authUser, cl: nuevaPass };
       localStorage.setItem("authUser", JSON.stringify(sessionActual));
       sessionStorage.setItem("authUser", JSON.stringify(sessionActual));
-      setAuthUser(sessionActual); // Actualizar estado local
+      setAuthUser(sessionActual);
     }
   };
 

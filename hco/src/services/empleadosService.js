@@ -104,7 +104,8 @@ export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_
         // NOTA: No incluyas 'Content-Type': 'multipart/form-data' manualmente, 
         // el navegador debe generarlo solo con el boundary para evitar el ERR_HTTP2_PROTOCOL_ERROR.
       },
-      body: form
+      body: form,
+      duplex: 'half'
     }
   );
 

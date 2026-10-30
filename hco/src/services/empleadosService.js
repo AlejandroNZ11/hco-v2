@@ -1,5 +1,140 @@
 import { supabase } from '../config/supabaseClient';
 
+// =========================================================================
+// SUBIDA DIRECTA DESDE REACT A GOOGLE DRIVE API V3 (FOTOS DE PERSONAL)
+// =========================================================================
+
+const obtenerAccessTokenGoogleDrive = async () => {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
+  const refreshToken = import.meta.env.VITE_GOOGLE_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Faltan las credenciales VITE_GOOGLE_* en el archivo .env para conectar con Google Drive.');
+  }
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token'
+    })
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.access_token) {
+    throw new Error(data.error_description || 'No se pudo obtener el token de acceso de Google Drive.');
+  }
+  return data.access_token;
+};
+
+const base64ABlob = (dataUrl) => {
+  const partes = dataUrl.split(',');
+  const mimeMatch = partes[0].match(/:(.*?);/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+  const byteString = atob(partes[1]);
+  const arrayBuffer = new ArrayBuffer(byteString.length);
+  const intArray = new Uint8Array(arrayBuffer);
+  for (let i = 0; i < byteString.length; i++) {
+    intArray[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([intArray], { type: mimeType });
+};
+
+export const subirFotoEmpleadoADrive = async (dataUrlBase64, dniEmpleado = 'sin_dni') => {
+  if (!dataUrlBase64 || !String(dataUrlBase64).startsWith('data:image')) return '';
+
+  const folderId =
+    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_PERSONAL_ID ||
+    import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
+
+  const accessToken = await obtenerAccessTokenGoogleDrive();
+  const blobImagen = base64ABlob(dataUrlBase64);
+
+  const dniLimpio = String(dniEmpleado || 'sin_dni').trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  const nombreDeseado = `${dniLimpio}.png`;
+
+  // 1. Renombrar archivo anterior si existe (mantiene tu lógica anterior)
+  if (folderId) {
+    try {
+      const query = `'${folderId}' in parents and name = '${nombreDeseado}' and trashed = false`;
+      const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      const searchData = await searchRes.json();
+
+      if (searchData.files && searchData.files.length > 0) {
+        const archivoAnterior = searchData.files[0];
+        const nuevoNombreAnterior = `${dniLimpio}_2.png`;
+        await fetch(`https://www.googleapis.com/drive/v3/files/${archivoAnterior.id}`, {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name: nuevoNombreAnterior })
+        });
+      }
+    } catch (err) {
+      console.warn('No se pudo renombrar el archivo anterior:', err);
+    }
+  }
+
+  // 2. Subir la nueva foto
+  const metadata = {
+    name: nombreDeseado,
+    mimeType: 'image/png',
+    ...(folderId ? { parents: [folderId] } : {})
+  };
+
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  form.append('file', blobImagen);
+
+  const res = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form
+    }
+  );
+
+  const fileData = await res.json();
+  if (!res.ok || !fileData.id) {
+    throw new Error(fileData?.error?.message || 'Error al subir la foto a Google Drive.');
+  }
+
+  // 3. NUEVO: Hacer el archivo público para lectura (Evita el ERR_CONNECTION_RESET)
+  try {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        role: 'reader',
+        type: 'anyone'
+      })
+    });
+  } catch (permErr) {
+    console.warn('No se pudo otorgar permiso público automático:', permErr);
+  }
+
+    // 4. Retornar enlace web optimizado que sí permite lectura sin cortes
+  return `https://drive.google.com/file/d/${fileData.id}/view`;
+};
+
+
+
+// =========================================================================
+// FUNCIONES CRUD DE EMPLEADOS Y CATÁLOGOS
+// =========================================================================
+
 export const obtenerTodosLosEmpleados = async () => {
   const { data, error } = await supabase
     .from('empleados')

@@ -10,7 +10,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 
 // Importamos supabase para Auth y RPC
 import { supabase } from '../../config/supabaseClient';
-// Importamos todas las funciones necesarias de empleadosService
+// Importamos todas las funciones necesarias de empleadosService (incluyendo subirFotoEmpleadoADrive)
 import {
   crearEmpleado,
   actualizarEmpleado,
@@ -20,7 +20,8 @@ import {
   obtenerAreas,
   obtenerCargos,
   obtenerJefes,
-  obtenerRoles
+  obtenerRoles,
+  subirFotoEmpleadoADrive
 } from '../../services/empleadosService';
 
 function getStoredAuthUser() {
@@ -70,15 +71,17 @@ const convertirDriveUrl = (url) => {
   if (cleanUrl.startsWith("data:image/")) return cleanUrl;
   const driveId = extraerIdDrive(cleanUrl);
   if (driveId) {
-    // Usa directamente el CDN de imágenes de Google en lugar de drive.google.com
+    // Esto evita que intente usar el endpoint "uc?export=view" que bloquea Google
     return `https://lh3.googleusercontent.com/d/${driveId}=w1000`;
   }
   return cleanUrl;
 };
 
+
+
 const parseId = (val) => {
   if (val === "" || val === null || val === undefined) return null;
-  return /^\d+\$/.test(String(val)) ? parseInt(val, 10) : val;
+  return /^\d+$/.test(String(val)) ? parseInt(val, 10) : val;
 };
 
 export default function RegistrarUsuario() {
@@ -300,6 +303,7 @@ export default function RegistrarUsuario() {
     return `${base}@hco.com`.toLowerCase();
   };
 
+  // 1. Cuando el usuario escribe o pega un Link manualmente, funciona normal y limpia el base64 local
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData(prev => {
@@ -308,41 +312,65 @@ export default function RegistrarUsuario() {
       if (id === 'provincia') { next.distrito = ""; }
       return next;
     });
-    if (id === "foto") { setPhotoDataUrl(""); setPhotoPreview(convertirDriveUrl(value)); }
+    if (id === "foto") {
+      setPhotoDataUrl("");
+      setPhotoPreview(convertirDriveUrl(value));
+    }
     if (formErrors.includes(id)) setFormErrors(prev => prev.filter(field => field !== id));
   };
 
   const handleNombreBlur = () => setFormData(prev => ({ ...prev, nombre: formatearNombre(prev.nombre) }));
 
-  const handlePhotoSelected = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    try {
-      const dataUrl = await compressImage(file, 900, 0.72);
-      setPhotoDataUrl(dataUrl); setPhotoPreview(dataUrl); setFormData(prev => ({ ...prev, foto: "" }));
-    } catch (error) { setMessage({ text: "No se pudo procesar la foto.", type: "error" }); }
-    e.target.value = "";
-  };
-
-  const clearPhoto = () => { setPhotoDataUrl(""); setPhotoPreview(""); setFormData(prev => ({ ...prev, foto: "" })); };
-
-  const compressImage = (file, maxWidth, quality) => {
+  // 2. Compresor a PNG de 1280px (idéntico a modal-prestamo.jsx)
+  const comprimirImagenAPng = (file, maxWidth = 1280) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
-          let { width, height } = img;
-          if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+          const scale = Math.min(1, maxWidth / img.width);
           const canvas = document.createElement("canvas");
-          canvas.width = width; canvas.height = height;
-          const ctx = canvas.getContext("2d"); ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/jpeg", quality));
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/png"));
         };
-        img.onerror = reject; img.src = reader.result;
+        img.onerror = reject;
+        img.src = reader.result;
       };
-      reader.onerror = reject; reader.readAsDataURL(file);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
+  };
+
+  // 3. Cuando el usuario presiona "Seleccionar foto"
+  const handlePhotoSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setMessage({ text: "Seleccione un archivo de imagen válido.", type: "error" });
+      e.target.value = "";
+      return;
+    }
+    try {
+      setLoading(true);
+      const dataUrlPng = await comprimirImagenAPng(file, 1280);
+      setPhotoDataUrl(dataUrlPng);
+      setPhotoPreview(dataUrlPng);
+      setFormData(prev => ({ ...prev, foto: "" })); // Limpiamos el campo URL manual porque se usará el archivo
+    } catch {
+      setMessage({ text: "No se pudo procesar la fotografía.", type: "error" });
+    } finally {
+      setLoading(false);
+      e.target.value = "";
+    }
+  };
+
+  const clearPhoto = () => {
+    setPhotoDataUrl("");
+    setPhotoPreview("");
+    setFormData(prev => ({ ...prev, foto: "" }));
   };
 
   const handleSubmit = async (e) => {
@@ -401,6 +429,20 @@ export default function RegistrarUsuario() {
         }
       }
 
+      // 2. Lógica de Foto: Link manual vs Subida a Google Drive
+      let fotoUrlFinal = formData.foto ? convertirDriveUrl(formData.foto) : null;
+
+      if (photoDataUrl) {
+        if (isOnline) {
+          // Subimos la foto comprimida a la carpeta de Personal en Google Drive
+          const linkDriveSubido = await subirFotoEmpleadoADrive(photoDataUrl, dniLimpio);
+          fotoUrlFinal = convertirDriveUrl(linkDriveSubido);
+        } else {
+          // Si está en modo Offline, guardamos el Base64 temporalmente para no perder la foto
+          fotoUrlFinal = photoDataUrl;
+        }
+      }
+
       const recordData = {
         id: finalUserId,
         estado: formData.fechaSalida ? "Inactivo" : (formData.estado || "Activo"),
@@ -434,10 +476,10 @@ export default function RegistrarUsuario() {
         rubrica: String(formData.rubrica || "").trim() || null,
         ruta_movilidad: formData.rutaMovilidad || null,
         motivo_salida: String(formData.motivoSalida || "").trim() || null,
-        foto_url: photoDataUrl ? photoDataUrl : (formData.foto ? convertirDriveUrl(formData.foto) : null)
+        foto_url: fotoUrlFinal
       };
 
-      // 2. Guardamos PRIMERO en Supabase cuando estamos Online y luego actualizamos localDb
+      // 3. Guardamos PRIMERO en Supabase cuando estamos Online y luego actualizamos localDb
       if (isOnline) {
         let savedRecord;
         if (editingId) {
@@ -618,15 +660,26 @@ export default function RegistrarUsuario() {
                 <div className="photo-inputs-split">
                   <div className="field">
                     <label>URL de la foto (Drive o Web)</label>
-                    <input type="url" id="foto" placeholder="Pegar enlace aquí" value={formData.foto} onChange={handleChange} />
+                    <input
+                      type="url"
+                      id="foto"
+                      placeholder="Pegar enlace aquí"
+                      value={formData.foto}
+                      onChange={handleChange}
+                    />
                   </div>
                   <div className="field">
                     <label>O Cargar foto</label>
                     <div className="custom-file-upload">
-                      <input type="file" id="file-upload" accept="image/*" onChange={handlePhotoSelected} />
+                      <input
+                        type="file"
+                        id="file-upload"
+                        accept="image/*"
+                        onChange={handlePhotoSelected}
+                      />
                       <label htmlFor="file-upload" className="file-btn-centered">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                        <span>Seleccionar foto</span>
+                        <span>{photoDataUrl ? "Foto lista para subir (Cambiar)" : "Seleccionar foto"}</span>
                       </label>
                     </div>
                   </div>

@@ -10,6 +10,7 @@
   font-family: "Segoe UI", Arial, sans-serif;
   color: #102033;
   background: #f4f7fa;
+  box-sizing: border-box;
 }
 
 .card-p {
@@ -36,6 +37,17 @@
   align-items: center;
 }
 
+.despachador-subtext-p {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.despachador-subtext-p strong {
+  color: #1e3a6d;
+  font-weight: 700;
+}
+
 .section-title-p {
   font-size: 13px;
   font-weight: 800;
@@ -48,7 +60,7 @@
 }
 
 /* =========================================
-   PILLS DE ESTADO (IMAGEN 1)
+   PILLS DE ESTADO
    ========================================= */
 .tag-pill {
   font-size: 9.5px;
@@ -60,20 +72,9 @@
   display: inline-block;
 }
 
-.tag-pill.obligatorio {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.tag-pill.opcional {
-  background: #e2e8f0;
-  color: #475569;
-}
-
-.tag-pill.recomendado {
-  background: #dbeafe;
-  color: #2563eb;
-}
+.tag-pill.obligatorio { background: #fef3c7; color: #d97706; }
+.tag-pill.opcional { background: #e2e8f0; color: #475569; }
+.tag-pill.recomendado { background: #dbeafe; color: #2563eb; }
 
 .label-head-p {
   display: flex;
@@ -113,6 +114,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Previene desbordamiento en flex y grid */
 }
 
 .field-p input,
@@ -180,13 +182,25 @@
 }
 .link-action-p:hover { text-decoration: underline; }
 
-/* MULTISELECT DE CLIENTES CHIPS */
+/* CONTENEDOR MULTISELECT DE CLIENTES CHIPS */
+.clientes-input-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.clientes-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
 .clientes-chips-box {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
 }
+
 .cliente-chip {
   background: #0f4c81;
   color: #ffffff;
@@ -197,7 +211,11 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+  box-sizing: border-box;
+  word-break: break-word;
 }
+
 .chip-close {
   cursor: pointer;
   font-size: 13px;
@@ -283,9 +301,9 @@
   border: 1px solid #cbd5e1;
   color: #0f172a;
   height: 42px;
-  padding: 0 24px;
+  padding: 0 20px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
@@ -444,32 +462,38 @@
   cursor: pointer !important;
 }
 
-.despachador-subtext-p {
-  font-size: 13px;
-  color: #64748b;
-  margin-top: 4px;
-}
-
-.despachador-subtext-p strong {
-  color: #1e3a6d;
-  font-weight: 700;
-}
-
-
 @keyframes modalFadeIn {
   from { opacity: 0; transform: translateY(-20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* RESPONSIVE MÓVIL EXACTO */
 @media (max-width: 992px) {
   .form-grid-p.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid-retorna-obs { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 600px) {
-  .registro-page-p { padding: 12px; }
-  .card-p { padding: 20px 16px; }
-  .form-grid-p.cols-4, .form-grid-p.cols-3, .form-grid-p.cols-2 { grid-template-columns: 1fr; }
+  .registro-page-p { padding: 10px 8px; }
+  .card-p { padding: 16px 12px; }
+  .form-grid-p.cols-4, .form-grid-p.cols-3, .form-grid-p.cols-2 { grid-template-columns: 1fr !important; }
+  
+  /* Asegurar que el campospan 2 de Clientes Múltiples no rompa la pantalla */
+  .form-grid-p .field-p[style*="grid-column: span 2"] {
+    grid-column: span 1 !important;
+  }
+  
+  .clientes-input-row {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  
+  .clientes-input-row button {
+    white-space: nowrap;
+    padding: 0 12px !important;
+  }
+
+  .grid-retorna-obs { grid-template-columns: 1fr; }
   .footer-form-p { flex-direction: column; align-items: stretch; gap: 16px; }
   .footer-actions-p { flex-direction: column; }
   .footer-actions-p button { width: 100%; justify-content: center; }

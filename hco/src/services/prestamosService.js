@@ -43,13 +43,21 @@ export const calcularFechaRetornoPeru = (fechaInicioInput, diasHabiles = 7) => {
   return f.toISOString();
 };
 
+// CACHÉ DE TOKEN EN MEMORIA PARA MÁXIMA VELOCIDAD
+let tokenGoogleCache = { token: null, expira: 0 };
+
 const obtenerAccessTokenGoogleDrive = async () => {
+  const ahora = Date.now();
+  if (tokenGoogleCache.token && ahora < tokenGoogleCache.expira) {
+    return tokenGoogleCache.token;
+  }
+
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
   const refreshToken = import.meta.env.VITE_GOOGLE_REFRESH_TOKEN;
 
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Faltan las credenciales VITE_GOOGLE_* en el archivo .env para conectar con Google Drive.');
+    throw new Error('Faltan credenciales VITE_GOOGLE_* en .env');
   }
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -65,8 +73,15 @@ const obtenerAccessTokenGoogleDrive = async () => {
 
   const data = await res.json();
   if (!res.ok || !data.access_token) {
-    throw new Error(data.error_description || 'No se pudo obtener el token de acceso de Google Drive.');
+    throw new Error(data.error_description || 'Error obteniendo token Drive');
   }
+
+  // Guardar por 50 minutos
+  tokenGoogleCache = {
+    token: data.access_token,
+    expira: Date.now() + 50 * 60 * 1000
+  };
+
   return data.access_token;
 };
 
@@ -81,11 +96,11 @@ const base64ABlob = (dataUrl) => {
   return new Blob([intArray], { type: 'image/png' });
 };
 
-export const subirImagenADrive = async (dataUrlBase64, nombreArchivo) => {
+export const subirImagenADrive = async (dataUrlBase64, nombreArchivo, tokenPreviamenteObtenido = null) => {
   if (!dataUrlBase64 || !String(dataUrlBase64).startsWith('data:image')) return '';
 
   const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
-  const accessToken = await obtenerAccessTokenGoogleDrive();
+  const accessToken = tokenPreviamenteObtenido || await obtenerAccessTokenGoogleDrive();
   const blobImagen = base64ABlob(dataUrlBase64);
 
   const metadata = {
@@ -109,25 +124,18 @@ export const subirImagenADrive = async (dataUrlBase64, nombreArchivo) => {
 
   const fileData = await res.json();
   if (!res.ok || !fileData.id) {
-    throw new Error(fileData?.error?.message || 'Error al subir la imagen a Google Drive.');
+    throw new Error(fileData?.error?.message || 'Error al subir imagen');
   }
 
-  // Asignar permiso público al archivo
-  try {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        role: 'reader',
-        type: 'anyone'
-      })
-    });
-  } catch (e) {
-    console.warn("No se pudo asignar permiso público:", e);
-  }
+  // Permiso público rápido
+  fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' })
+  }).catch(e => console.warn("Permiso diferido:", e));
 
   return `https://drive.google.com/file/d/${fileData.id}/view`;
 };
@@ -139,7 +147,7 @@ const esRegistroActivo = (item) => {
 };
 
 // =========================================================================
-// 1. OBTENER CATÁLOGOS MAESTROS (SOLO ACTIVOS)
+// 1. OBTENER CATÁLOGOS MAESTROS (OPTIMIZADO CON DICCIONARIOS)
 // =========================================================================
 export const obtenerDatosMaestrosPrestamos = async () => {
   try {
@@ -155,7 +163,6 @@ export const obtenerDatosMaestrosPrestamos = async () => {
       throw new Error(resEmp.error.message);
     }
 
-    // Filtrar solo los registros que estén activos
     const empresasActivas = (resEmp.data || []).filter(esRegistroActivo);
     const conductoresActivos = (resCond.data || []).filter(esRegistroActivo);
     const placasActivas = (resPlac.data || []).filter(esRegistroActivo);
@@ -166,16 +173,18 @@ export const obtenerDatosMaestrosPrestamos = async () => {
       String(a.nombre_empresa || '').localeCompare(String(b.nombre_empresa || ''), 'es', { sensitivity: 'base' })
     );
 
-    const empresasMap = Object.fromEntries(
-      empresas.map(e => [String(e.id), e.nombre_empresa])
-    );
+    // Diccionario rápido id -> nombre_empresa
+    const empresasMap = {};
+    for (let i = 0; i < empresas.length; i++) {
+      empresasMap[empresas[i].id] = empresas[i].nombre_empresa;
+    }
 
     const conductores = conductoresActivos
       .map(c => ({
         dni_conductor: String(c.dni_conductor || '').trim(),
         nombre_conductor: String(c.nombre_conductor || '').trim(),
         empresa_id: c.empresa_id,
-        empresa_nombre: empresasMap[String(c.empresa_id)] || ''
+        empresa_nombre: empresasMap[c.empresa_id] || ''
       }))
       .sort((a, b) => a.nombre_conductor.localeCompare(b.nombre_conductor, 'es', { sensitivity: 'base' }));
 
@@ -184,7 +193,7 @@ export const obtenerDatosMaestrosPrestamos = async () => {
         nro_placa: String(p.nro_placa || '').trim().toUpperCase(),
         empresa_id: p.empresa_id,
         volumen_m3: p.volumen_m3,
-        empresa_nombre: empresasMap[String(p.empresa_id)] || ''
+        empresa_nombre: empresasMap[p.empresa_id] || ''
       }))
       .sort((a, b) => a.nro_placa.localeCompare(b.nro_placa, 'es', { sensitivity: 'base' }));
 
@@ -196,23 +205,15 @@ export const obtenerDatosMaestrosPrestamos = async () => {
       String(a.nombre_tipo || '').localeCompare(String(b.nombre_tipo || ''), 'es', { sensitivity: 'base' })
     );
 
-    const dataMaestra = {
-      empresas,
-      conductores,
-      placas,
-      clientes,
-      tipos_paleta
-    };
+    const dataMaestra = { empresas, conductores, placas, clientes, tipos_paleta };
 
     try {
       localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify(dataMaestra));
-    } catch {
-      // Ignorar saturación de storage
-    }
+    } catch {}
 
     return dataMaestra;
   } catch (error) {
-    console.warn('Cargando catálogos de préstamos desde caché local...', error);
+    console.warn('Cargando catálogos desde caché local...', error);
     try {
       const cache = localStorage.getItem(BOOT_CACHE_KEY);
       if (cache) return JSON.parse(cache);
@@ -222,7 +223,7 @@ export const obtenerDatosMaestrosPrestamos = async () => {
 };
 
 // =========================================================================
-// 2. CREAR PRÉSTAMO PALLET
+// 2. CREAR PRÉSTAMO PALLET (SUBIDA PARALELA Y RÁPIDA)
 // =========================================================================
 export const crearPrestamoPallet = async (payload) => {
   const ahoraISO = obtenerFechaHoraPeruISO();
@@ -235,25 +236,19 @@ export const crearPrestamoPallet = async (payload) => {
   let dniConductorFinal = payload.dni_conductor || null;
   let observacionFinal = payload.observacion_salida || '';
 
-  // CASO ESPECIAL: CLIENTE RECOGE
   if (esClienteRecoge) {
-    // 1. Obtener o crear empresa OTHER si no viene una seleccionada
     if (!empresaIdFinal) {
       empresaIdFinal = await obtenerOcrearEmpresaOther(payload.usuario_registra);
     }
-
-    // 2. Registrar la placa en la tabla 'placas' si no existe (evita prestamos_nro_placa_fkey)
     await asegurarPlacaExiste(payload.nro_placa, empresaIdFinal, payload.usuario_registra);
 
-    // 3. Conductor libre: DNI queda null y el nombre se guarda en la observación
-    dniConductorFinal = null; 
+    dniConductorFinal = null;
     const conductorTexto = payload.conductor_nombre ? `[CONDUCTOR RECOGE: ${payload.conductor_nombre.trim().toUpperCase()}]` : '';
     observacionFinal = observacionFinal 
       ? `${conductorTexto} - ${observacionFinal}`
       : conductorTexto;
   }
 
-  // Clientes múltiples en OUTBOUND PRINCIPAL
   if (Array.isArray(payload.clientes_multiples) && payload.clientes_multiples.length > 0) {
     const listadoTexto = payload.clientes_multiples.join(', ');
     observacionFinal = observacionFinal
@@ -290,47 +285,54 @@ export const crearPrestamoPallet = async (payload) => {
     .single();
 
   if (errorInsert) {
-    throw new Error(`Error al generar el préstamo en Supabase: ${errorInsert.message}`);
+    throw new Error(`Error en Supabase: ${errorInsert.message}`);
   }
 
-  // Subida de imágenes a Drive...
   const idPrestamo = prestamoCreado.id_prestamo;
-  let urlFirmaSalida = '';
-  let urlFotoSalida = '';
 
-  if (payload.firma_conductor_base64) {
-    urlFirmaSalida = await subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`);
-  }
-  if (payload.foto_salida_base64) {
-    urlFotoSalida = await subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`);
-  }
+  // SUBIDAS EN PARALELO CON TOKEN COMPARTIDO (MUCHO MÁS RÁPIDO)
+  if (payload.firma_conductor_base64 || payload.foto_salida_base64) {
+    const token = await obtenerAccessTokenGoogleDrive();
 
-  if (urlFirmaSalida || urlFotoSalida) {
-    const { data: prestamoActualizado, error: errorUpdateUrl } = await supabase
-      .from('prestamos')
-      .update({
-        firma_conductor: urlFirmaSalida || null,
-        foto_salida: urlFotoSalida || null
-      })
-      .eq('uuid', prestamoCreado.uuid)
-      .select()
-      .single();
+    const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
+      payload.firma_conductor_base64 
+        ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`, token)
+        : Promise.resolve(''),
+      payload.foto_salida_base64 
+        ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`, token)
+        : Promise.resolve('')
+    ]);
 
-    if (errorUpdateUrl) throw new Error(errorUpdateUrl.message);
-    return prestamoActualizado;
+    if (urlFirmaSalida || urlFotoSalida) {
+      const { data: prestamoActualizado } = await supabase
+        .from('prestamos')
+        .update({
+          firma_conductor: urlFirmaSalida || null,
+          foto_salida: urlFotoSalida || null
+        })
+        .eq('uuid', prestamoCreado.uuid)
+        .select()
+        .single();
+
+      return prestamoActualizado || prestamoCreado;
+    }
   }
 
   return prestamoCreado;
 };
 
+// =========================================================================
+// 3. OBTENER TRACKING (CON EXTRAER CONDUCTOR EN CLIENTE RECOGE)
+// =========================================================================
 export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
   const [resPrest, maestros] = await Promise.all([
     supabase.from('prestamos').select('*').order('fecha_entrega', { ascending: false }),
     maestrosPreCargados ? Promise.resolve(maestrosPreCargados) : obtenerDatosMaestrosPrestamos()
   ]);
 
-  if (resPrest.error) throw new Error(`Error al cargar el tracking: ${resPrest.error.message}`);
+  if (resPrest.error) throw new Error(`Error al cargar tracking: ${resPrest.error.message}`);
 
+  // Diccionarios en memoria (O(1) lookups)
   const empMap = Object.fromEntries((maestros.empresas || []).map(e => [String(e.id), e.nombre_empresa]));
   const condMap = Object.fromEntries((maestros.conductores || []).map(c => [String(c.dni_conductor), c.nombre_conductor]));
   const cliMap = Object.fromEntries((maestros.clientes || []).map(c => [String(c.id), c.nombre_cliente]));
@@ -345,11 +347,18 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
     const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
     const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
 
+    // Si es CLIENTE RECOGE y no hay DNI, extraemos el conductor guardado en la observación
+    let conductorFinal = condMap[String(row.dni_conductor)] || row.dni_conductor || '';
+    if (!conductorFinal && row.observacion_salida) {
+      const matchConductor = row.observacion_salida.match(/\[CONDUCTOR RECOGE:\s*([^\]]+)\]/i);
+      if (matchConductor) conductorFinal = matchConductor[1].trim();
+    }
+
     return {
       ...row,
       paletas_pendientes: paletasPendientesCalc,
       empresa_transporte_nombre: empMap[String(row.empresa_transporte_id)] || (row.empresa_transporte_id === 0 ? 'OTHER' : ''),
-      conductor_nombre: condMap[String(row.dni_conductor)] || row.dni_conductor || '',
+      conductor_nombre: conductorFinal || '-',
       conductor_retorno_nombre: condMap[String(row.conductor_retorno)] || row.conductor_retorno || '',
       cliente_nombre: cliMap[String(row.cliente_id)] || '',
       tipo_paleta_nombre: tipMap[String(row.tipo_paleta_id)] || '',
@@ -457,7 +466,7 @@ export const guardarConductorMaestro = async ({ dni, nombre, empresa_id, usuario
       .select()
       .single();
 
-    if (error) throw new Error(`Error al actualizar conductor: ${error.message}`);
+    if (error) throw new Error(error.message);
     return { accion: 'actualizado', conductor: data };
   } else {
     const { data, error } = await supabase
@@ -474,7 +483,7 @@ export const guardarConductorMaestro = async ({ dni, nombre, empresa_id, usuario
       .select()
       .single();
 
-    if (error) throw new Error(`Error al crear conductor: ${error.message}`);
+    if (error) throw new Error(error.message);
     return { accion: 'creado', conductor: data };
   }
 };
@@ -515,7 +524,7 @@ export const guardarPlacaMaestra = async ({ nro_placa, empresa_id, volumen_m3, u
       .select()
       .single();
 
-    if (error) throw new Error(`Error al actualizar placa: ${error.message}`);
+    if (error) throw new Error(error.message);
     return { accion: 'actualizada', placa: data };
   } else {
     const nuevoRegistro = {
@@ -534,25 +543,21 @@ export const guardarPlacaMaestra = async ({ nro_placa, empresa_id, volumen_m3, u
       .select()
       .single();
 
-    if (error) throw new Error(`Error al registrar placa: ${error.message}`);
+    if (error) throw new Error(error.message);
     return { accion: 'creada', placa: data };
   }
 };
 
-// Asegura que exista la empresa comodín para externos/cliente recoge
 export const obtenerOcrearEmpresaOther = async (usuario) => {
   const ahoraISO = obtenerFechaHoraPeruISO();
-  
-  // 1. Buscar si ya existe una empresa OTHER / OTRO / CLIENTE RECOGE
   const { data: existente } = await supabase
     .from('empresas_transporte')
     .select('id')
-    .or('nombre_empresa.ilike.%OTHER%,nombre_empresa.ilike.%CLIENTE RECOGE%')
+    .or('nombre_empresa.ilike.%OTHER%,nombre_empresa.ilike.%OTRO%')
     .maybeSingle();
 
   if (existente) return existente.id;
 
-  // 2. Si no existe, se crea automáticamente
   const { data: nueva, error } = await supabase
     .from('empresas_transporte')
     .insert([{
@@ -565,11 +570,10 @@ export const obtenerOcrearEmpresaOther = async (usuario) => {
     .select('id')
     .single();
 
-  if (error) throw new Error(`No se pudo generar la empresa comodín: ${error.message}`);
+  if (error) throw new Error(error.message);
   return nueva.id;
 };
 
-// Asegura que la placa exista antes de vincular el préstamo
 export const asegurarPlacaExiste = async (nroPlaca, empresaId, usuario) => {
   const placaLimpia = String(nroPlaca || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
   const ahoraISO = obtenerFechaHoraPeruISO();
@@ -581,7 +585,6 @@ export const asegurarPlacaExiste = async (nroPlaca, empresaId, usuario) => {
     .maybeSingle();
 
   if (!existe) {
-    // Si no existe, la registramos en automático para no violar la llave foránea
     const { error } = await supabase
       .from('placas')
       .insert([{
@@ -593,6 +596,6 @@ export const asegurarPlacaExiste = async (nroPlaca, empresaId, usuario) => {
         estado: 'ACTIVO'
       }]);
 
-    if (error) throw new Error(`Error al registrar la placa externa: ${error.message}`);
+    if (error) throw new Error(error.message);
   }
 };

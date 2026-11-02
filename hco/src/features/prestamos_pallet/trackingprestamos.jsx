@@ -482,79 +482,100 @@ export default function TrackingPrestamos() {
           onMouseUp={handleMouseUpOrLeave}
           onMouseMove={handleMouseMove}
         >
-          <table>
-            <thead>
-              <tr>
-                <th style={{ textAlign: 'center', width: '40px' }}>N°</th>
-                <th>ID Préstamo</th>
-                <th>Fecha entrega</th>
-                <th>Fecha retorno</th>
-                <th>Empresa</th>
-                <th>Conductor</th>
-                <th>Ruta</th>
-                <th>Placa</th>
-                <th>Paletas</th>
-                <th>Devueltas</th>
-                <th>Pendientes</th>
-                <th>Estado</th>
-                <th>Fecha devolución</th>
-                <th style={{ textAlign: 'center' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {prestamosPaginados.length === 0 ? (
-                <tr>
-                  <td colSpan="14" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
-                    No se encontraron registros de préstamos.
-                  </td>
-                </tr>
-              ) : (
-                prestamosPaginados.map((r, index) => {
-                  const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto'].includes(r.estado);
-                  const numFila = indiceInicio + index + 1;
-                  const fEntrega = r.fecha_entrega ? new Date(r.fecha_entrega).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
-                  const fRetorno = r.fecha_retorno_calculada ? new Date(r.fecha_retorno_calculada).toLocaleDateString('es-PE') : '-';
-                  const fDev = r.fecha_devolucion ? new Date(r.fecha_devolucion).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+      <table>
+        <thead>
+            <tr>
+            <th style={{ textAlign: 'center', width: '40px' }}>N°</th>
+            <th>ID Préstamo</th>
+            <th style={{ textAlign: 'left' }}>Área proceso</th>
+            <th>Fecha entrega</th>
+            <th>Fecha retorno</th>
+            <th>Empresa</th>
+            <th style={{ textAlign: 'left' }}>Conductor</th>
+            <th>Ruta</th>
+            <th>Placa</th>
+            <th>Paletas</th>
+            <th>Devueltas</th>
+            <th>Pendientes</th>
+            <th>Estado</th>
+            <th>Fecha devolución</th>
+            <th style={{ textAlign: 'center' }}>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {prestamosPaginados.length === 0 ? (
+            <tr>
+                <td colSpan="15" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
+                No se encontraron registros de préstamos.
+                </td>
+            </tr>
+            ) : (
+            prestamosPaginados.map((r, index) => {
+                const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto'].includes(r.estado);
+                const numFila = indiceInicio + index + 1;
+                const fEntrega = r.fecha_entrega ? new Date(r.fecha_entrega).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+                const fRetorno = r.fecha_retorno_calculada ? new Date(r.fecha_retorno_calculada).toLocaleDateString('es-PE') : '-';
+                const fDev = r.fecha_devolucion ? new Date(r.fecha_devolucion).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
 
-                  return (
-                    <tr key={r.uuid} className={r.atrasado ? 'table-danger' : ''}>
-                      <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>{numFila}</td>
-                      <td style={{ fontWeight: '800', color: '#0f4c81' }}>{r.id_prestamo}</td>
-                      <td>{fEntrega}</td>
-                      <td style={{ fontWeight: 700, color: r.atrasado ? '#dc2626' : '#16a34a' }}>{fRetorno}</td>
-                      <td>{r.empresa_transporte_nombre}</td>
-                      <td>{r.conductor_nombre}</td>
-                      <td>{r.nr_ruta}</td>
-                      <td style={{ fontWeight: 800 }}>{r.nro_placa}</td>
-                      <td>{r.nr_paletas}</td>
-                      <td style={{ fontWeight: 700, color: '#0f4c81' }}>{r.nr_paletas_devueltas}</td>
-                      <td style={{ fontWeight: 700, color: Number(r.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>{r.paletas_pendientes}</td>
-                      <td>{renderBadgeEstado(r.estado)}</td>
-                      <td>{fDev}</td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div className="acciones-cell">
-                          {estaCerrado && !esAdmin ? (
-                            <button type="button" className="btn-tabla-editar" onClick={() => abrirModalDevolucion(r, true)} title="Ver detalle (Solo lectura)">
-                              <FaEye />
-                            </button>
-                          ) : (
-                            <button 
-                              type="button" 
-                              className={`btn-tabla-aprobar ${estaCerrado ? 'is-approved' : ''}`} 
-                              onClick={() => abrirModalDevolucion(r, false)} 
-                              title={estaCerrado ? 'Modificar Registro (Admin)' : 'Registrar Devolución'}
-                            >
-                              <FaEdit />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                return (
+                <tr key={r.uuid} className={r.atrasado ? 'table-danger' : ''}>
+                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>{numFila}</td>
+                    <td style={{ fontWeight: '800', color: '#0f4c81' }}>{r.id_prestamo}</td>
+                    
+                    {/* 1. Área del proceso: Alineada a la izquierda */}
+                    <td style={{ textAlign: 'left' }}>
+                    <span style={{
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: r.area_proceso === 'CLIENTE RECOGE' ? '#f3e8ff' : '#e0f2fe',
+                        color: r.area_proceso === 'CLIENTE RECOGE' ? '#6b21a8' : '#0369a1'
+                    }}>
+                        {r.area_proceso || '-'}
+                    </span>
+                    </td>
+
+                    <td>{fEntrega}</td>
+                    <td style={{ fontWeight: 700, color: r.atrasado ? '#dc2626' : '#16a34a' }}>{fRetorno}</td>
+                    <td style={{ fontWeight: 600 }}>{r.empresa_transporte_nombre}</td>
+                    
+                    {/* 2. Conductor: Alineado a la izquierda y SIN negrita */}
+                    <td style={{ textAlign: 'left', fontWeight: 'normal', color: '#1e293b' }}>
+                    {r.conductor_nombre}
+                    </td>
+
+                    <td>{r.nr_ruta || '-'}</td>
+                    <td style={{ fontWeight: 800 }}>{r.nro_placa}</td>
+                    <td>{r.nr_paletas}</td>
+                    <td style={{ fontWeight: 700, color: '#0f4c81' }}>{r.nr_paletas_devueltas}</td>
+                    <td style={{ fontWeight: 700, color: Number(r.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>{r.paletas_pendientes}</td>
+                    <td>{renderBadgeEstado(r.estado)}</td>
+                    <td>{fDev}</td>
+                    <td style={{ textAlign: 'center' }}>
+                    <div className="acciones-cell">
+                        {estaCerrado && !esAdmin ? (
+                        <button type="button" className="btn-tabla-editar" onClick={() => abrirModalDevolucion(r, true)} title="Ver detalle (Solo lectura)">
+                            <FaEye />
+                        </button>
+                        ) : (
+                        <button 
+                            type="button" 
+                            className={`btn-tabla-aprobar ${estaCerrado ? 'is-approved' : ''}`} 
+                            onClick={() => abrirModalDevolucion(r, false)} 
+                            title={estaCerrado ? 'Modificar Registro (Admin)' : 'Registrar Devolución'}
+                        >
+                            <FaEdit />
+                        </button>
+                        )}
+                    </div>
+                    </td>
+                </tr>
+                );
+            })
+            )}
+        </tbody>
+        </table>
         </div>
       </section>
 

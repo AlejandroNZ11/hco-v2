@@ -845,48 +845,48 @@ export default function ModalPrestamo() {
 
             {/* 10. Clientes: OUTBOUND PRINCIPAL (Múltiples Clientes) */}
             {esOutboundPrincipal && (
-              <div className="field-p field-manual-p" style={{ gridColumn: 'span 2' }}>
+            <div className="field-p field-manual-p" style={{ gridColumn: 'span 2' }}>
                 <div className="label-head-p">
-                  <label>Clientes (Múltiples)</label>
-                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                <label>Clientes (Múltiples)</label>
+                <span className="tag-pill obligatorio">OBLIGATORIO</span>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
+                <div className="clientes-input-row">
+                <input
                     list="listaCli"
                     value={clienteInputTemporal}
                     onChange={e => setClienteInputTemporal(e.target.value.toUpperCase())}
                     onKeyDown={e => {
-                      if (e.key === 'Enter') {
+                    if (e.key === 'Enter') {
                         e.preventDefault();
                         handleAgregarClienteChip(clienteInputTemporal);
-                      }
+                    }
                     }}
-                    placeholder="Escriba o seleccione y presione Añadir..."
-                  />
-                  <button
+                    placeholder="Escriba o seleccione..."
+                />
+                <button
                     type="button"
                     className="btn-limpiar-p"
-                    style={{ height: '44px', padding: '0 16px' }}
+                    style={{ height: '44px' }}
                     onClick={() => handleAgregarClienteChip(clienteInputTemporal)}
-                  >
+                >
                     Añadir
-                  </button>
+                </button>
                 </div>
                 <datalist id="listaCli">
-                  {clientes.map(cli => <option key={cli.id} value={cli.nombre_cliente} />)}
+                {clientes.map(cli => <option key={cli.id} value={cli.nombre_cliente} />)}
                 </datalist>
 
+                {/* Tags de clientes agregados */}
                 <div className="clientes-chips-box">
-                  {clientesSeleccionados.map((cli, idx) => (
+                {clientesSeleccionados.map((cli, idx) => (
                     <span key={idx} className="cliente-chip">
-                      {cli}
-                      <FaTimes className="chip-close" onClick={() => handleRemoverClienteChip(idx)} />
+                    {cli}
+                    <FaTimes className="chip-close" onClick={() => handleRemoverClienteChip(idx)} />
                     </span>
-                  ))}
+                ))}
                 </div>
-              </div>
+            </div>
             )}
-
 
 
             {/* 11. Tipo de Paleta: SOLO EN OUTBOUND RETAIL */}

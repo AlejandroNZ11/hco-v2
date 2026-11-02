@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaPenNib, FaSave, FaEraser, FaUserPlus, FaTruck, FaChartLine } from 'react-icons/fa';
+import { FaPenNib, FaSave, FaEraser, FaUserPlus, FaTruck, FaFileSignature, FaTimes } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './modal-prestamo.css';
 
@@ -27,12 +27,19 @@ export default function ModalPrestamo() {
   const [loading, setLoading] = useState(false);
   const [reloj, setReloj] = useState('');
 
-  // Listas de Tablas Maestras
+  // Catálogos Maestros
   const [empresas, setEmpresas] = useState([]);
   const [conductores, setConductores] = useState([]);
   const [placas, setPlacas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [tiposPaleta, setTiposPaleta] = useState([]);
+
+  // Estado si la empresa fue bloqueada por selección de placa
+  const [empresaBloqueadaPorPlaca, setEmpresaBloqueadaPorPlaca] = useState(false);
+
+  // Múltiples clientes para OUTBOUND PRINCIPAL
+  const [clientesSeleccionados, setClientesSeleccionados] = useState([]);
+  const [clienteInputTemporal, setClienteInputTemporal] = useState('');
 
   const nombreUsuarioActual = currentUser?.nombre || currentUser?.usuario || 'Usuario';
 
@@ -61,7 +68,7 @@ export default function ModalPrestamo() {
   const dibujandoRef = useRef(false);
   const tieneTrazoRef = useRef(false);
 
-  // Estado para Buscador / Creador / Editor de Conductor
+  // Modal Conductor
   const [nuevoCond, setNuevoCond] = useState({
     dni: '',
     nombre: '',
@@ -72,17 +79,16 @@ export default function ModalPrestamo() {
     infoAuditoria: ''
   });
 
-  // Estado para Buscador / Creador / Editor de Placa
+  // Modal Placa
   const [nuevaPlaca, setNuevaPlaca] = useState({
     nro_placa: '',
     empresa_id: '',
-    volumen_m3: '', // <-- NUEVO CAMPO AGREGADO
+    volumen_m3: '',
     estadoBusqueda: 'Ingrese 6 caracteres para buscar o crear la placa.',
     colorEstado: '#64748b',
     existe: false,
     infoAuditoria: ''
   });
-
 
   const [avisoFlotante, setAvisoFlotante] = useState({
     visible: false, tipo: 'danger', titulo: '', mensaje: '', detalleExtra: '', onCloseCallback: null
@@ -136,20 +142,103 @@ export default function ModalPrestamo() {
     }
   };
 
-  const esInbound = formData.area_proceso === 'INBOUND';
+  // Reglas por Área
+  const esClienteRecoge = formData.area_proceso === 'CLIENTE RECOGE';
+  const esOutboundPrincipal = formData.area_proceso === 'OUTBOUND PRINCIPAL';
+  const esOutboundRetail = formData.area_proceso === 'OUTBOUND RETAIL';
+
   const cantPaletasNum = formData.nr_paletas === '' ? 0 : Number(formData.nr_paletas);
   const sinSalidaPallet = formData.nr_paletas === '' || cantPaletasNum === 0;
 
+  // Filtrado reactivo de conductores dependientes de la empresa seleccionada
+  const conductoresFiltradosPorEmpresa = useMemo(() => {
+    if (!formData.empresa_transporte_id) return conductores;
+    return conductores.filter(c => String(c.empresa_id) === String(formData.empresa_transporte_id));
+  }, [conductores, formData.empresa_transporte_id]);
+
+  // Manejo de cambio de Área de Proceso
   const handleAreaChange = (e) => {
     const nuevaArea = e.target.value;
+    if (nuevaArea === 'CLIENTE RECOGE') {
+      const empresaOther = empresas.find(
+        emp => emp.nombre_empresa.toUpperCase().includes('OTHER') || emp.nombre_empresa.toUpperCase().includes('OTRO')
+      );
+      setFormData(prev => ({
+        ...prev,
+        area_proceso: nuevaArea,
+        empresa_transporte_id: empresaOther ? String(empresaOther.id) : '',
+        conductor_nombre: '',
+        dni_conductor: '',
+        nr_ruta: '',
+        cliente_nombre: '',
+        tipo_paleta_id: '',
+        retorno: 'NO'
+      }));
+      setEmpresaBloqueadaPorPlaca(true);
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        area_proceso: nuevaArea,
+        empresa_transporte_id: '',
+        conductor_nombre: '',
+        dni_conductor: '',
+        tipo_paleta_id: '',
+        retorno: 'NO'
+      }));
+      setEmpresaBloqueadaPorPlaca(false);
+    }
+    setClientesSeleccionados([]);
+  };
+
+  // Manejo de cambio de Placa: Bloquea y autoselecciona la empresa de transporte
+  const handlePlacaInputForm = (e) => {
+    const placaVal = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
+    const placaObj = placas.find(p => p.nro_placa === placaVal);
+
+    if (placaObj && placaObj.empresa_id) {
+      setFormData(prev => ({
+        ...prev,
+        nro_placa: placaVal,
+        empresa_transporte_id: String(placaObj.empresa_id),
+        conductor_nombre: '',
+        dni_conductor: ''
+      }));
+      setEmpresaBloqueadaPorPlaca(true);
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        nro_placa: placaVal
+      }));
+      if (!esClienteRecoge) setEmpresaBloqueadaPorPlaca(false);
+    }
+  };
+
+  // Manejo de cambio de Conductor
+  const handleConductorChange = (e) => {
+    const valorEscrito = e.target.value;
+    if (esClienteRecoge) {
+      setFormData(prev => ({ ...prev, conductor_nombre: valorEscrito, dni_conductor: '' }));
+      return;
+    }
+
+    const normalizar = (str) => String(str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const buscado = normalizar(valorEscrito);
+
+    const encontrado = conductoresFiltradosPorEmpresa.find(
+      c => normalizar(c.nombre_conductor) === buscado
+    );
+
     setFormData(prev => ({
       ...prev,
-      area_proceso: nuevaArea,
-      cliente_nombre: nuevaArea === 'INBOUND' ? '' : prev.cliente_nombre,
-      tipo_paleta_id: nuevaArea === 'INBOUND' ? '' : prev.tipo_paleta_id
+      conductor_nombre: valorEscrito,
+      dni_conductor: encontrado ? encontrado.dni_conductor : '',
+      empresa_transporte_id: (!prev.empresa_transporte_id && encontrado?.empresa_id)
+        ? String(encontrado.empresa_id)
+        : prev.empresa_transporte_id
     }));
   };
 
+  // Manejo de paletas
   const handlePaletasChange = (e) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 3);
     const num = val === '' ? 0 : Number(val);
@@ -163,36 +252,17 @@ export default function ModalPrestamo() {
     }));
   };
 
-  // Buscador de conductor en el formulario principal -> Autocompleta DNI y Empresa
-  const handleConductorChange = (e) => {
-    const valorEscrito = e.target.value;
-    const normalizar = (str) => String(str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const buscado = normalizar(valorEscrito);
-
-    const encontrado = conductores.find(
-      c => normalizar(c.nombre_conductor) === buscado
-    );
-
-    setFormData(prev => ({
-      ...prev,
-      conductor_nombre: valorEscrito,
-      dni_conductor: encontrado ? encontrado.dni_conductor : '',
-      empresa_transporte_id: encontrado?.empresa_id ? String(encontrado.empresa_id) : prev.empresa_transporte_id
-    }));
+  // Manejo de Clientes Múltiples (Outbound Principal)
+  const handleAgregarClienteChip = (cliNombre) => {
+    const limpio = cliNombre.trim().toUpperCase();
+    if (limpio && !clientesSeleccionados.includes(limpio)) {
+      setClientesSeleccionados([...clientesSeleccionados, limpio]);
+    }
+    setClienteInputTemporal('');
   };
 
-  // Buscador de placa en el formulario principal -> Si tiene empresa asociada y no hay empresa elegida, la selecciona
-  const handlePlacaInputForm = (e) => {
-    const placaVal = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
-    const placaObj = placas.find(p => p.nro_placa === placaVal);
-
-    setFormData(prev => ({
-      ...prev,
-      nro_placa: placaVal,
-      empresa_transporte_id: (!prev.empresa_transporte_id && placaObj?.empresa_id)
-        ? String(placaObj.empresa_id)
-        : prev.empresa_transporte_id
-    }));
+  const handleRemoverClienteChip = (indexRemover) => {
+    setClientesSeleccionados(clientesSeleccionados.filter((_, idx) => idx !== indexRemover));
   };
 
   const handleFotoSalidaChange = async (e) => {
@@ -234,9 +304,7 @@ export default function ModalPrestamo() {
     });
   };
 
-  // =========================================================================
-  // CANVAS DE FIRMA
-  // =========================================================================
+  // Canvas Firma
   useEffect(() => {
     if (mostrarModalFirma && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -258,7 +326,6 @@ export default function ModalPrestamo() {
     ctx.beginPath();
     ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
   };
-
   const moverTrazo = (e) => {
     if (!dibujandoRef.current || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -266,16 +333,13 @@ export default function ModalPrestamo() {
     ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
     ctx.stroke();
   };
-
   const finalizarTrazo = () => { dibujandoRef.current = false; };
-
   const limpiarCanvas = () => {
     if (!canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     tieneTrazoRef.current = false;
   };
-
   const confirmarFirmaCanvas = () => {
     if (!tieneTrazoRef.current) {
       return mostrarAviso('warning', 'Firma vacía', 'Por favor dibuje la firma antes de guardar.');
@@ -284,26 +348,12 @@ export default function ModalPrestamo() {
     setMostrarModalFirma(false);
   };
 
-  // =========================================================================
-  // LÓGICA MODAL CONDUCTOR (BUSCADOR + CREADOR + EDITOR)
-  // =========================================================================
+  // Modales Maestros de Conductor y Placa
   const handleBuscarDniModal = async (dniInput) => {
     const limpio = dniInput.replace(/\D/g, '').slice(0, 8);
     setNuevoCond(prev => ({ ...prev, dni: limpio }));
+    if (limpio.length < 8) return;
 
-    if (limpio.length < 8) {
-      setNuevoCond(prev => ({
-        ...prev,
-        dni: limpio,
-        existe: false,
-        estadoBusqueda: 'Ingrese 8 dígitos para buscar si el conductor ya existe.',
-        colorEstado: '#64748b',
-        infoAuditoria: ''
-      }));
-      return;
-    }
-
-    // 1. Buscar en lista local cargada
     const local = conductores.find(c => String(c.dni_conductor) === limpio);
     if (local) {
       setNuevoCond({
@@ -311,16 +361,12 @@ export default function ModalPrestamo() {
         nombre: local.nombre_conductor || '',
         empresa_id: String(local.empresa_id || ''),
         existe: true,
-        estadoBusqueda: '✓ DNI encontrado. Puede editar el nombre o la empresa.',
+        estadoBusqueda: '✓ Conductor activo encontrado.',
         colorEstado: '#16a34a',
-        infoAuditoria: local.usuario_actualiza
-          ? `Última edición por: ${local.usuario_actualiza}`
-          : (local.usuario_registra ? `Registrado por: ${local.usuario_registra}` : '')
+        infoAuditoria: ''
       });
       return;
     }
-
-    // 2. Buscar en Supabase directamente
     try {
       const remoto = await buscarConductorPorDni(limpio);
       if (remoto) {
@@ -329,11 +375,9 @@ export default function ModalPrestamo() {
           nombre: remoto.nombre_conductor || '',
           empresa_id: String(remoto.empresa_id || ''),
           existe: true,
-          estadoBusqueda: '✓ DNI encontrado en base de datos. Puede editar sus datos.',
+          estadoBusqueda: '✓ Conductor encontrado en base de datos.',
           colorEstado: '#16a34a',
-          infoAuditoria: remoto.usuario_actualiza
-            ? `Última edición por: ${remoto.usuario_actualiza}`
-            : (remoto.usuario_registra ? `Registrado por: ${remoto.usuario_registra}` : '')
+          infoAuditoria: ''
         });
       } else {
         setNuevoCond(prev => ({
@@ -342,24 +386,18 @@ export default function ModalPrestamo() {
           nombre: '',
           empresa_id: formData.empresa_transporte_id || '',
           existe: false,
-          estadoBusqueda: 'DNI no registrado. Complete nombre y empresa para crearlo.',
+          estadoBusqueda: 'DNI no registrado. Complete para crearlo.',
           colorEstado: '#0f4c81',
           infoAuditoria: ''
         }));
       }
-    } catch {
-      setNuevoCond(prev => ({
-        ...prev,
-        estadoBusqueda: 'Complete los datos para guardar el conductor.',
-        colorEstado: '#d97706'
-      }));
-    }
+    } catch {}
   };
 
   const handleGuardarConductorModal = async (e) => {
     e.preventDefault();
     if (nuevoCond.dni.length !== 8 || !nuevoCond.nombre.trim() || !nuevoCond.empresa_id) {
-      return mostrarAviso('warning', 'Campos obligatorios', 'Debe ingresar el DNI de 8 dígitos, el nombre en mayúsculas y seleccionar la empresa.');
+      return mostrarAviso('warning', 'Campos obligatorios', 'Complete DNI, nombre y empresa.');
     }
     setLoading(true);
     try {
@@ -377,38 +415,19 @@ export default function ModalPrestamo() {
         empresa_transporte_id: String(res.conductor.empresa_id)
       }));
       setMostrarModalConductor(false);
-      mostrarAviso(
-        'success',
-        res.accion === 'actualizado' ? 'Conductor Actualizado' : 'Conductor Creado',
-        `El conductor ${res.conductor.nombre_conductor} (${res.conductor.dni_conductor}) fue ${res.accion} correctamente.`
-      );
+      mostrarAviso('success', 'Éxito', `Conductor guardado correctamente.`);
     } catch (err) {
-      mostrarAviso('danger', 'Error al guardar conductor', err.message);
+      mostrarAviso('danger', 'Error', err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // =========================================================================
-  // LÓGICA MODAL PLACA (BUSCADOR + CREADOR + EDITOR)
-  // =========================================================================
   const handleBuscarPlacaModal = async (inputPlaca) => {
     const limpia = inputPlaca.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
     setNuevaPlaca(prev => ({ ...prev, nro_placa: limpia }));
+    if (limpia.length < 6) return;
 
-    if (limpia.length < 6) {
-      setNuevaPlaca(prev => ({
-        ...prev,
-        nro_placa: limpia,
-        existe: false,
-        estadoBusqueda: 'Ingrese los 6 caracteres de la placa para buscar si ya existe.',
-        colorEstado: '#64748b',
-        infoAuditoria: ''
-      }));
-      return;
-    }
-
-    // 1. Buscar en lista local
     const local = placas.find(p => p.nro_placa === limpia);
     if (local) {
       setNuevaPlaca({
@@ -416,16 +435,12 @@ export default function ModalPrestamo() {
         empresa_id: String(local.empresa_id || ''),
         volumen_m3: local.volumen_m3 || '',
         existe: true,
-        estadoBusqueda: '✓ La placa ya existe. Puede modificar la empresa a la que pertenece.',
+        estadoBusqueda: '✓ Placa activa encontrada.',
         colorEstado: '#16a34a',
-        infoAuditoria: local.usuario_actualiza
-          ? `Última edición por: ${local.usuario_actualiza}`
-          : (local.usuario_registra ? `Registrada por: ${local.usuario_registra}` : '')
+        infoAuditoria: ''
       });
       return;
     }
-
-    // 2. Buscar en Supabase
     try {
       const remota = await buscarPlacaPorNro(limpia);
       if (remota) {
@@ -434,11 +449,9 @@ export default function ModalPrestamo() {
           empresa_id: String(remota.empresa_id || ''),
           volumen_m3: remota.volumen_m3 || '',
           existe: true,
-          estadoBusqueda: '✓ La placa ya existe en el sistema. Puede actualizar su empresa.',
+          estadoBusqueda: '✓ Placa encontrada.',
           colorEstado: '#16a34a',
-          infoAuditoria: remota.usuario_actualiza
-            ? `Última edición por: ${remota.usuario_actualiza}`
-            : (remota.usuario_registra ? `Registrada por: ${remota.usuario_registra}` : '')
+          infoAuditoria: ''
         });
       } else {
         setNuevaPlaca(prev => ({
@@ -447,25 +460,19 @@ export default function ModalPrestamo() {
           empresa_id: formData.empresa_transporte_id || '',
           volumen_m3: '',
           existe: false,
-          estadoBusqueda: 'Placa no registrada. Seleccione su empresa de transporte para crearla.',
+          estadoBusqueda: 'Placa no registrada. Seleccione empresa.',
           colorEstado: '#0f4c81',
           infoAuditoria: ''
         }));
       }
-    } catch {
-      setNuevaPlaca(prev => ({
-        ...prev,
-        estadoBusqueda: 'Seleccione la empresa para guardar la placa.',
-        colorEstado: '#d97706'
-      }));
-    }
+    } catch {}
   };
 
   const handleGuardarPlacaModal = async (e) => {
     e.preventDefault();
     const placaLimpia = nuevaPlaca.nro_placa.replace(/[^A-Z0-9]/g, '').slice(0, 6);
     if (placaLimpia.length !== 6 || !nuevaPlaca.empresa_id) {
-      return mostrarAviso('warning', 'Campos obligatorios', 'La placa debe tener 6 caracteres y debe seleccionar a qué empresa pertenece.');
+      return mostrarAviso('warning', 'Campos obligatorios', 'Ingrese placa de 6 caracteres y empresa.');
     }
     setLoading(true);
     try {
@@ -479,53 +486,95 @@ export default function ModalPrestamo() {
       setFormData(prev => ({
         ...prev,
         nro_placa: res.placa.nro_placa,
-        empresa_transporte_id: String(res.placa.empresa_id || prev.empresa_transporte_id)
+        empresa_transporte_id: String(res.placa.empresa_id)
       }));
+      setEmpresaBloqueadaPorPlaca(true);
       setMostrarModalPlaca(false);
-      mostrarAviso(
-        'success',
-        res.accion === 'actualizada' ? 'Placa Actualizada' : 'Placa Creada',
-        `La placa ${res.placa.nro_placa} fue ${res.accion} exitosamente.`
-      );
+      mostrarAviso('success', 'Éxito', `Placa guardada correctamente.`);
     } catch (err) {
-      mostrarAviso('danger', 'Error al guardar placa', err.message);
+      mostrarAviso('danger', 'Error', err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // =========================================================================
-  // GUARDAR PRÉSTAMO
-  // =========================================================================
+  // Submit Préstamo
   const handleSubmitPrestamo = async (e) => {
     e.preventDefault();
-    if (!formData.area_proceso) return mostrarAviso('warning', 'Falta área', 'Seleccione el Área del proceso.');
-    if (!formData.empresa_transporte_id) return mostrarAviso('warning', 'Falta empresa', 'Seleccione la Empresa de transporte.');
-    if (!formData.dni_conductor) return mostrarAviso('warning', 'Falta conductor', 'Seleccione un conductor válido de la lista para que se cargue su DNI.');
-    if (!esInbound && !formData.cliente_nombre.trim()) return mostrarAviso('warning', 'Falta cliente', 'Indique el Cliente.');
-    if (!/^\d{1,2}$/.test(formData.nr_ruta.trim())) return mostrarAviso('warning', 'Ruta inválida', 'El N° de ruta debe tener 1 o 2 dígitos.');
-    if (formData.nro_placa.length !== 6) return mostrarAviso('warning', 'Placa inválida', 'La placa debe tener 6 caracteres.');
-    if (!placas.some(p => p.nro_placa === formData.nro_placa)) return mostrarAviso('danger', 'Placa no registrada', 'La placa ingresada no existe en la tabla placas. Seleccione una de la lista o regístrela en "+ Nueva Placa".');
-    if (!esInbound && !sinSalidaPallet && !formData.tipo_paleta_id) return mostrarAviso('warning', 'Falta tipo de paleta', 'Seleccione el tipo de paleta.');
-    if (sinSalidaPallet && !formData.observacion_salida.trim()) return mostrarAviso('warning', 'Falta observación', 'La observación de salida es obligatoria cuando no hay salida de pallet.');
-    if (!formData.firma_conductor_base64) return mostrarAviso('warning', 'Falta firma', 'Debe registrar la firma del conductor.');
+
+    if (!formData.area_proceso) {
+      return mostrarAviso('warning', 'Falta área', 'Seleccione el Área del proceso.');
+    }
+
+    if (formData.nro_placa.length !== 6) {
+      return mostrarAviso('warning', 'Placa inválida', 'La placa debe tener exactamente 6 caracteres.');
+    }
+
+    if (!esClienteRecoge) {
+      const existeEnCatalogo = placas.some(p => p.nro_placa === formData.nro_placa);
+      if (!existeEnCatalogo) {
+        return mostrarAviso(
+          'warning',
+          'Placa no registrada',
+          'La placa ingresada no existe en la base de datos. Regístrela primero con el botón "+ Placa".'
+        );
+      }
+
+      if (!formData.empresa_transporte_id) {
+        return mostrarAviso('warning', 'Falta empresa', 'Seleccione la Empresa de transporte.');
+      }
+      if (!formData.dni_conductor) {
+        return mostrarAviso('warning', 'Falta conductor', 'Seleccione un conductor válido de la lista.');
+      }
+      if (!/^\d{1,2}$/.test(formData.nr_ruta.trim())) {
+        return mostrarAviso('warning', 'Ruta inválida', 'El N° de ruta debe tener 1 o 2 dígitos.');
+      }
+    } else {
+      if (!formData.conductor_nombre.trim()) {
+        return mostrarAviso('warning', 'Falta nombre', 'Ingrese el nombre de la persona o chofer que recoge.');
+      }
+    }
+
+    if (esOutboundRetail && !formData.cliente_nombre.trim()) {
+      return mostrarAviso('warning', 'Falta cliente', 'Indique el Cliente.');
+    }
+    if (esOutboundPrincipal && clientesSeleccionados.length === 0) {
+      return mostrarAviso('warning', 'Falta cliente', 'Seleccione al menos un Cliente.');
+    }
+
+    // Solo exige tipo de paleta si es OUTBOUND RETAIL y hay paletas
+    if (esOutboundRetail && !sinSalidaPallet && !formData.tipo_paleta_id) {
+      return mostrarAviso('warning', 'Falta tipo de paleta', 'Seleccione el tipo de paleta.');
+    }
+
+    if (sinSalidaPallet && !formData.observacion_salida.trim()) {
+      return mostrarAviso('warning', 'Falta observación', 'La observación es obligatoria cuando no hay salida de pallet.');
+    }
+    if (!formData.firma_conductor_base64) {
+      return mostrarAviso('warning', 'Falta firma', 'Debe registrar la firma de quien retira.');
+    }
 
     setLoading(true);
     try {
-      const creado = await crearPrestamoPallet({
+      const payloadEnvio = {
         ...formData,
+        tipo_paleta_id: esOutboundRetail ? (formData.tipo_paleta_id || null) : null,
+        retorno: esClienteRecoge ? 'NO' : formData.retorno,
+        clientes_multiples: esOutboundPrincipal ? clientesSeleccionados : null,
         usuario_registra: nombreUsuarioActual,
         area_registrador: currentUser?.area || ''
-      });
+      };
+
+      const creado = await crearPrestamoPallet(payloadEnvio);
       mostrarAviso(
         'success',
         'Préstamo Registrado',
-        `El préstamo ${creado.id_prestamo} se guardó correctamente.`,
+        `El registro ${creado.id_prestamo} se guardó exitosamente.`,
         `Placa: ${creado.nro_placa} | Paletas: ${creado.nr_paletas}`,
         () => navigate('/prestamos/tracking')
       );
     } catch (err) {
-      mostrarAviso('danger', 'Error', err.message);
+      mostrarAviso('danger', 'Error al registrar', err.message);
     } finally {
       setLoading(false);
     }
@@ -548,13 +597,15 @@ export default function ModalPrestamo() {
       firma_conductor_base64: '',
       foto_salida_base64: ''
     });
+    setClientesSeleccionados([]);
+    setEmpresaBloqueadaPorPlaca(false);
   };
 
   return (
     <div className="registro-page-p">
       {loading && <Loading />}
 
-      {/* AVISO FLOTANTE MODERNO TIPO SWEETALERT / BOOTSTRAP */}
+      {/* AVISO FLOTANTE */}
       {avisoFlotante.visible && (
         <div className="tw-modal-backdrop" onClick={cerrarAviso}>
           <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
@@ -577,151 +628,74 @@ export default function ModalPrestamo() {
         </div>
       )}
 
-
       {/* TARJETA PRINCIPAL */}
-      <section className="card-p mb-4" style={{ maxWidth: '1200px', margin: '0 auto', borderRadius: '16px', padding: '30px' }}>
-        <div className="card-head-modern-p" style={{ marginBottom: '18px' }}>
+      <section className="card-p mb-4">
+        <div className="card-head-modern-p">
           <div className="card-head-left-p">
-            <h2><FaChartLine style={{ color: '#0f4c81', marginRight: '8px' }} /> Nuevo préstamo</h2>
+            <h2>
+              <FaFileSignature style={{ color: '#2563eb', marginRight: '8px' }} /> Nuevo préstamo
+            </h2>
+            <div className="despachador-subtext-p">
+              Despachador activo: <strong>{nombreUsuarioActual}</strong>
+            </div>
           </div>
-          
         </div>
 
         <form onSubmit={handleSubmitPrestamo} className="form-container-p">
           <div className="section-title-p">DATOS DE SALIDA</div>
 
-          {/* GRID FLUIDO DINÁMICO DE 4 COLUMNAS */}
-          <div className="form-grid-p cols-4" style={{ marginBottom: '16px' }}>
-            {/* 1. Fecha entrega */}
+          {/* GRID DE CAMPOS */}
+          <div className="form-grid-p cols-4">
+            
+            {/* 1. Fecha Entrega */}
             <div className="field-p field-auto-p">
-              <label>Fecha entrega</label>
+              <div className="label-head-p">
+                <label>Fecha entrega</label>
+                <span className="tag-pill opcional">AUTOMÁTICO</span>
+              </div>
               <input value={reloj} readOnly />
             </div>
 
-            {/* 2. Área del proceso */}
+            {/* 2. Área del Proceso */}
             <div className="field-p field-manual-p">
-              <label>Área del proceso</label>
+              <div className="label-head-p">
+                <label>Área del proceso</label>
+                <span className="tag-pill obligatorio">OBLIGATORIO</span>
+              </div>
               <select value={formData.area_proceso} onChange={handleAreaChange} required>
                 <option value="">Seleccione...</option>
                 <option value="OUTBOUND RETAIL">OUTBOUND RETAIL</option>
                 <option value="OUTBOUND PRINCIPAL">OUTBOUND PRINCIPAL</option>
-                <option value="INBOUND">INBOUND</option>
+                <option value="CLIENTE RECOGE">CLIENTE RECOGE</option>
               </select>
             </div>
 
-            {/* 3. Empresa transporte (Alfabético desde empresas_transporte) */}
+            {/* 3. Placa (Al seleccionar bloquea la Empresa) */}
             <div className="field-p field-manual-p">
-              <label>Empresa transporte</label>
-              <select
-                value={formData.empresa_transporte_id}
-                onChange={e => setFormData({ ...formData, empresa_transporte_id: e.target.value })}
-                required
-              >
-                <option value="">Seleccione...</option>
-                {empresas.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.nombre_empresa}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* 4. Conductor (Buscador desde conductores) */}
-            <div className="field-p field-manual-p">
-              <div className="label-with-link-p">
-                <label>Conductor</label>
-                {puedeGestionarMaestros && (
-                  <span
-                    className="link-action-p"
-                    onClick={() => {
-                      setNuevoCond({
-                        dni: '',
-                        nombre: '',
-                        empresa_id: formData.empresa_transporte_id || '',
-                        estadoBusqueda: 'Ingrese 8 dígitos para buscar o crear el conductor.',
-                        colorEstado: '#64748b',
-                        existe: false,
-                        infoAuditoria: ''
-                      });
-                      setMostrarModalConductor(true);
-                    }}
-                  >
-                    <FaUserPlus style={{ marginRight: '4px' }} /> Nuevo Conductor
-                  </span>
-                )}
-              </div>
-              <input
-                list="listaCond"
-                value={formData.conductor_nombre}
-                onChange={handleConductorChange}
-                placeholder="Buscar conductor..."
-                autoComplete="off"
-                required
-              />
-                <datalist id="listaCond">
-                    {conductores.map((c, index) => <option key={`${c.dni_conductor}-${index}`} value={c.nombre_conductor} />)}
-                </datalist>
-            </div>
-
-            {/* 5. DNI conductor (Se llena en automático) */}
-            <div className="field-p field-auto-p">
-              <label>DNI conductor</label>
-              <input value={formData.dni_conductor} placeholder="Automático" readOnly />
-            </div>
-
-            {/* 6. Cliente (Se oculta en INBOUND y fluye la grilla) */}
-            {!esInbound && (
-              <div className="field-p field-manual-p">
-                <label>Cliente</label>
-                <input
-                  list="listaCli"
-                  value={formData.cliente_nombre}
-                  onChange={e => setFormData({ ...formData, cliente_nombre: e.target.value.toUpperCase() })}
-                  placeholder="Buscar o escribir cliente..."
-                  autoComplete="off"
-                  required={!esInbound}
-                />
-                <datalist id="listaCli">
-                  {clientes.map(cli => (
-                    <option key={cli.id} value={cli.nombre_cliente} />
-                  ))}
-                </datalist>
-              </div>
-            )}
-
-            {/* 7. N° ruta */}
-            <div className="field-p field-manual-p">
-              <label>N° ruta</label>
-              <input
-                value={formData.nr_ruta}
-                onChange={e => setFormData({ ...formData, nr_ruta: e.target.value.replace(/\D/g, '').slice(0, 2) })}
-                maxLength={2}
-                inputMode="numeric"
-                required
-              />
-            </div>
-
-            {/* 8. Placa (Buscador desde placas) */}
-            <div className="field-p field-manual-p">
-              <div className="label-with-link-p">
-                <label>Placa</label>
-                {puedeGestionarMaestros && (
-                  <span
-                    className="link-action-p"
-                    onClick={() => {
-                      setNuevaPlaca({
-                        nro_placa: '',
-                        empresa_id: formData.empresa_transporte_id || '',
-                        volumen_m3: '',
-                        estadoBusqueda: 'Ingrese 6 caracteres para buscar o crear la placa.',
-                        colorEstado: '#64748b',
-                        existe: false,
-                        infoAuditoria: ''
-                      });
-                      setMostrarModalPlaca(true);
-                    }}
-                  >
-                    <FaTruck style={{ marginRight: '4px' }} /> Nueva Placa
-                  </span>
-                )}
+              <div className="label-head-p">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label>Placa</label>
+                  {puedeGestionarMaestros && (
+                    <span
+                      className="link-action-p"
+                      onClick={() => {
+                        setNuevaPlaca({
+                          nro_placa: '',
+                          empresa_id: formData.empresa_transporte_id || '',
+                          volumen_m3: '',
+                          estadoBusqueda: 'Ingrese 6 caracteres para buscar o crear la placa.',
+                          colorEstado: '#64748b',
+                          existe: false,
+                          infoAuditoria: ''
+                        });
+                        setMostrarModalPlaca(true);
+                      }}
+                    >
+                      <FaTruck style={{ marginRight: '3px' }} /> + Placa
+                    </span>
+                  )}
+                </div>
+                <span className="tag-pill obligatorio">OBLIGATORIO</span>
               </div>
               <input
                 list="listaPlac"
@@ -732,39 +706,203 @@ export default function ModalPrestamo() {
                 autoComplete="off"
                 required
               />
-            <datalist id="listaPlac">
+              <datalist id="listaPlac">
                 {placas.map((p, index) => <option key={`${p.nro_placa}-${index}`} value={p.nro_placa} />)}
-            </datalist>
+              </datalist>
             </div>
 
-            {/* 9. Despachador */}
-            <div className="field-p field-auto-p">
-              <label>Despachador</label>
-              <input value={formData.despachador} readOnly />
+            {/* 4. Empresa Transporte */}
+            <div className={`field-p ${empresaBloqueadaPorPlaca ? 'field-auto-p' : 'field-manual-p'}`}>
+              <div className="label-head-p">
+                <label>Empresa transporte</label>
+                <span className={`tag-pill ${esClienteRecoge ? 'opcional' : 'obligatorio'}`}>
+                  {esClienteRecoge ? 'OTHER' : 'OBLIGATORIO'}
+                </span>
+              </div>
+              <select
+                value={formData.empresa_transporte_id}
+                onChange={e => setFormData({ ...formData, empresa_transporte_id: e.target.value, conductor_nombre: '', dni_conductor: '' })}
+                disabled={empresaBloqueadaPorPlaca}
+                required={!esClienteRecoge}
+              >
+                <option value="">{esClienteRecoge ? 'OTHER / EXTERNO' : 'Seleccione...'}</option>
+                {empresas.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.nombre_empresa}</option>
+                ))}
+              </select>
             </div>
 
-            {/* 10. N° paletas */}
+            {/* 5. Conductor */}
             <div className="field-p field-manual-p">
-              <label>N° paletas</label>
+              <div className="label-head-p">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label>Conductor</label>
+                  {!esClienteRecoge && puedeGestionarMaestros && (
+                    <span
+                      className="link-action-p"
+                      onClick={() => {
+                        setNuevoCond({
+                          dni: '',
+                          nombre: '',
+                          empresa_id: formData.empresa_transporte_id || '',
+                          estadoBusqueda: 'Ingrese 8 dígitos para buscar o crear el conductor.',
+                          colorEstado: '#64748b',
+                          existe: false,
+                          infoAuditoria: ''
+                        });
+                        setMostrarModalConductor(true);
+                      }}
+                    >
+                      <FaUserPlus style={{ marginRight: '3px' }} /> + Conductor
+                    </span>
+                  )}
+                </div>
+                <span className="tag-pill obligatorio">OBLIGATORIO</span>
+              </div>
+              <input
+                list={esClienteRecoge ? undefined : "listaCond"}
+                value={formData.conductor_nombre}
+                onChange={handleConductorChange}
+                placeholder={esClienteRecoge ? "Nombre de quien recoge..." : "Buscar conductor activo..."}
+                autoComplete="off"
+                required
+              />
+              {!esClienteRecoge && (
+                <datalist id="listaCond">
+                  {conductoresFiltradosPorEmpresa.map((c, index) => (
+                    <option key={`${c.dni_conductor}-${index}`} value={c.nombre_conductor} />
+                  ))}
+                </datalist>
+              )}
+            </div>
+
+            {/* 6. DNI Conductor (Oculto en Cliente Recoge) */}
+            {!esClienteRecoge && (
+              <div className="field-p field-auto-p">
+                <div className="label-head-p">
+                  <label>DNI conductor</label>
+                  <span className="tag-pill opcional">AUTOMÁTICO</span>
+                </div>
+                <input value={formData.dni_conductor} placeholder="Automático" readOnly />
+              </div>
+            )}
+
+            {/* 7. N° Ruta (Oculto en Cliente Recoge) */}
+            {!esClienteRecoge && (
+              <div className="field-p field-manual-p">
+                <div className="label-head-p">
+                  <label>N° ruta</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                </div>
+                <input
+                  value={formData.nr_ruta}
+                  onChange={e => setFormData({ ...formData, nr_ruta: e.target.value.replace(/\D/g, '').slice(0, 2) })}
+                  maxLength={2}
+                  inputMode="numeric"
+                  placeholder="Ej: 01"
+                  required
+                />
+              </div>
+            )}
+
+            {/* 8. Clientes: OUTBOUND RETAIL (1 Cliente) */}
+            {esOutboundRetail && (
+              <div className="field-p field-manual-p">
+                <div className="label-head-p">
+                  <label>Cliente</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                </div>
+                <input
+                  list="listaCli"
+                  value={formData.cliente_nombre}
+                  onChange={e => setFormData({ ...formData, cliente_nombre: e.target.value.toUpperCase() })}
+                  placeholder="Buscar o escribir cliente..."
+                  autoComplete="off"
+                  required
+                />
+                <datalist id="listaCli">
+                  {clientes.map(cli => (
+                    <option key={cli.id} value={cli.nombre_cliente} />
+                  ))}
+                </datalist>
+              </div>
+            )}
+
+            {/* 9. N° Paletas */}
+            <div className="field-p field-manual-p">
+              <div className="label-head-p">
+                <label>N° paletas</label>
+                <span className="tag-pill obligatorio">OBLIGATORIO</span>
+              </div>
               <input
                 type="text"
                 inputMode="numeric"
                 value={formData.nr_paletas}
                 onChange={handlePaletasChange}
-                placeholder="0 o vacío = sin salida de pallet"
+                placeholder="0 = sin pallet"
               />
             </div>
 
-            {/* 11. Tipo de paleta (Visible siempre salvo en INBOUND; deshabilitado si nr_paletas es 0 o vacío) */}
-            {!esInbound && (
+            {/* 10. Clientes: OUTBOUND PRINCIPAL (Múltiples Clientes) */}
+            {esOutboundPrincipal && (
+              <div className="field-p field-manual-p" style={{ gridColumn: 'span 2' }}>
+                <div className="label-head-p">
+                  <label>Clientes (Múltiples)</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    list="listaCli"
+                    value={clienteInputTemporal}
+                    onChange={e => setClienteInputTemporal(e.target.value.toUpperCase())}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAgregarClienteChip(clienteInputTemporal);
+                      }
+                    }}
+                    placeholder="Escriba o seleccione y presione Añadir..."
+                  />
+                  <button
+                    type="button"
+                    className="btn-limpiar-p"
+                    style={{ height: '44px', padding: '0 16px' }}
+                    onClick={() => handleAgregarClienteChip(clienteInputTemporal)}
+                  >
+                    Añadir
+                  </button>
+                </div>
+                <datalist id="listaCli">
+                  {clientes.map(cli => <option key={cli.id} value={cli.nombre_cliente} />)}
+                </datalist>
+
+                <div className="clientes-chips-box">
+                  {clientesSeleccionados.map((cli, idx) => (
+                    <span key={idx} className="cliente-chip">
+                      {cli}
+                      <FaTimes className="chip-close" onClick={() => handleRemoverClienteChip(idx)} />
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+
+
+            {/* 11. Tipo de Paleta: SOLO EN OUTBOUND RETAIL */}
+            {esOutboundRetail && (
               <div className={`field-p ${sinSalidaPallet ? 'field-auto-p' : 'field-manual-p'}`}>
-                <label>Tipo de paleta</label>
+                <div className="label-head-p">
+                  <label>Tipo de paleta</label>
+                  <span className={`tag-pill ${sinSalidaPallet ? 'opcional' : 'obligatorio'}`}>
+                    {sinSalidaPallet ? 'NO APLICA' : 'OBLIGATORIO'}
+                  </span>
+                </div>
                 <select
                   value={formData.tipo_paleta_id}
                   onChange={e => setFormData({ ...formData, tipo_paleta_id: e.target.value })}
                   disabled={sinSalidaPallet}
-                  required={!esInbound && !sinSalidaPallet}
-                  style={sinSalidaPallet ? { background: '#f1f5f9', borderColor: '#cbd5e1', color: '#64748b' } : {}}
+                  required={!sinSalidaPallet}
                 >
                   <option value="">Seleccione...</option>
                   {tiposPaleta.map(tp => (
@@ -774,9 +912,12 @@ export default function ModalPrestamo() {
               </div>
             )}
 
-            {/* 12. Firma conductor */}
+            {/* 12. Firma Conductor */}
             <div className="field-p field-manual-p">
-              <label>Firma conductor</label>
+              <div className="label-head-p">
+                <label>Firma conductor</label>
+                <span className="tag-pill obligatorio">OBLIGATORIO</span>
+              </div>
               <div className="firma-input-group-p">
                 <button type="button" className="btn-firma-p" onClick={() => setMostrarModalFirma(true)}>
                   <FaPenNib /> Firmar
@@ -786,14 +927,13 @@ export default function ModalPrestamo() {
                 </span>
               </div>
             </div>
-          </div>
 
-          {/* FILA FOTO DE SALIDA */}
-          <div className="form-grid-p cols-1">
-            <div className="field-p field-manual-p" style={{ maxWidth: '480px' }}>
-              <label>Foto de salida</label>
-              
-              {/* INPUT LIMPIO SIN EL DIV ENVOLVENTE */}
+            {/* 13. Foto de Salida (Opcional) */}
+            <div className="field-p field-manual-p">
+              <div className="label-head-p">
+                <label>Foto de salida</label>
+                <span className="tag-pill opcional">OPCIONAL</span>
+              </div>
               <input
                 type="file"
                 accept="image/*"
@@ -801,8 +941,7 @@ export default function ModalPrestamo() {
                 onChange={handleFotoSalidaChange}
                 className="file-input-p"
               />
-
-              <div style={{ marginTop: '6px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ marginTop: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <span className={`badge-firma-p ${formData.foto_salida_base64 ? 'activa' : 'inactiva'}`}>
                   {formData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
                 </span>
@@ -817,31 +956,41 @@ export default function ModalPrestamo() {
                 )}
               </div>
             </div>
+
           </div>
 
-          {/* FILA RETORNA + OBSERVACIÓN DE SALIDA */}
+          {/* FILA: RETORNA + OBSERVACIÓN */}
           <div className="grid-retorna-obs">
-            <div className={`field-p ${sinSalidaPallet ? 'field-auto-p' : 'field-manual-p'}`}>
-              <label>¿Retorna?</label>
+            <div className={`field-p ${sinSalidaPallet || esClienteRecoge ? 'field-auto-p' : 'field-manual-p'}`}>
+              <div className="label-head-p">
+                <label>¿Retorna?</label>
+                <span className={`tag-pill ${sinSalidaPallet || esClienteRecoge ? 'opcional' : 'obligatorio'}`}>
+                  {esClienteRecoge ? 'NO RETORNA' : (sinSalidaPallet ? 'SIN PALLET' : 'OBLIGATORIO')}
+                </span>
+              </div>
               <select
-                value={formData.retorno}
+                value={esClienteRecoge ? 'NO' : formData.retorno}
                 onChange={e => setFormData({ ...formData, retorno: e.target.value })}
-                disabled={sinSalidaPallet}
-                style={sinSalidaPallet ? { background: '#f1f5f9', borderColor: '#cbd5e1', color: '#64748b' } : {}}
+                disabled={sinSalidaPallet || esClienteRecoge}
               >
                 <option value="NO">NO</option>
-                <option value="SI">SÍ</option>
+                {!esClienteRecoge && <option value="SI">SÍ</option>}
               </select>
             </div>
 
             <div className="field-p field-manual-p">
-              <label>Observación de salida</label>
+              <div className="label-head-p">
+                <label>Observación de salida</label>
+                <span className={`tag-pill ${sinSalidaPallet ? 'obligatorio' : 'recomendado'}`}>
+                  {sinSalidaPallet ? 'OBLIGATORIO' : 'RECOMENDADO'}
+                </span>
+              </div>
               <textarea
                 value={formData.observacion_salida}
                 onChange={e => setFormData({ ...formData, observacion_salida: e.target.value })}
                 maxLength={500}
                 rows={2}
-                placeholder={sinSalidaPallet ? 'Obligatorio cuando no hay salida de pallet' : ''}
+                placeholder={sinSalidaPallet ? 'Obligatorio cuando no hay salida de pallet' : 'Detalles adicionales...'}
                 required={sinSalidaPallet}
               />
               <div className="counter-p">{formData.observacion_salida.length}/500</div>
@@ -890,12 +1039,12 @@ export default function ModalPrestamo() {
         </div>
       )}
 
-      {/* MODAL BUSCADOR / CREADOR / EDITOR DE CONDUCTOR */}
+      {/* MODAL CONDUCTOR */}
       {mostrarModalConductor && (
         <div className="tw-modal-backdrop" onClick={() => setMostrarModalConductor(false)}>
           <div className="tw-modal-card" style={{ maxWidth: '460px', padding: '24px' }} onClick={e => e.stopPropagation()}>
             <h3 className="tw-modal-title" style={{ marginBottom: '14px' }}>
-              {nuevoCond.existe ? 'Editar Conductor Existente' : 'Buscar / Crear Nuevo Conductor'}
+              {nuevoCond.existe ? 'Editar Conductor' : 'Nuevo Conductor'}
             </h3>
             <form onSubmit={handleGuardarConductorModal}>
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
@@ -905,19 +1054,13 @@ export default function ModalPrestamo() {
                   onChange={e => handleBuscarDniModal(e.target.value)}
                   maxLength={8}
                   inputMode="numeric"
-                  placeholder="Ingrese 8 dígitos para buscar..."
+                  placeholder="Ingrese 8 dígitos..."
                   required
                 />
                 <small style={{ color: nuevoCond.colorEstado, fontWeight: 700, display: 'block', marginTop: '4px', fontSize: '11.5px' }}>
                   {nuevoCond.estadoBusqueda}
                 </small>
-                {nuevoCond.infoAuditoria && (
-                  <small style={{ color: '#64748b', display: 'block', marginTop: '2px', fontSize: '11px' }}>
-                    {nuevoCond.infoAuditoria}
-                  </small>
-                )}
               </div>
-
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>Nombre Completo (Mayúsculas) *</label>
                 <input
@@ -927,7 +1070,6 @@ export default function ModalPrestamo() {
                   required
                 />
               </div>
-
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>Empresa de Transporte *</label>
                 <select
@@ -941,27 +1083,10 @@ export default function ModalPrestamo() {
                   ))}
                 </select>
               </div>
-
-              <div className="field-p field-auto-p" style={{ marginBottom: '18px' }}>
-                <label>{nuevoCond.existe ? 'Usuario que actualiza' : 'Usuario que registra'}</label>
-                <input value={nombreUsuarioActual} readOnly />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  className="btn-limpiar-p"
-                  onClick={() => setMostrarModalConductor(false)}
-                  style={{ height: '38px', padding: '0 16px' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-guardar-p"
-                  style={{ height: '38px', padding: '0 20px' }}
-                >
-                  {nuevoCond.existe ? 'Actualizar Conductor' : 'Crear Conductor'}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <button type="button" className="btn-limpiar-p" onClick={() => setMostrarModalConductor(false)} style={{ height: '38px', padding: '0 16px' }}>Cancelar</button>
+                <button type="submit" className="btn-guardar-p" style={{ height: '38px', padding: '0 20px' }}>
+                  {nuevoCond.existe ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>
@@ -969,12 +1094,12 @@ export default function ModalPrestamo() {
         </div>
       )}
 
-      {/* MODAL BUSCADOR / CREADOR / EDITOR DE PLACA */}
+      {/* MODAL PLACA */}
       {mostrarModalPlaca && (
         <div className="tw-modal-backdrop" onClick={() => setMostrarModalPlaca(false)}>
           <div className="tw-modal-card" style={{ maxWidth: '440px', padding: '24px' }} onClick={e => e.stopPropagation()}>
             <h3 className="tw-modal-title" style={{ marginBottom: '14px' }}>
-              {nuevaPlaca.existe ? 'Editar Placa Existente' : 'Buscar / Crear Nueva Placa'}
+              {nuevaPlaca.existe ? 'Editar Placa' : 'Nueva Placa'}
             </h3>
             <form onSubmit={handleGuardarPlacaModal}>
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
@@ -989,14 +1114,7 @@ export default function ModalPrestamo() {
                 <small style={{ color: nuevaPlaca.colorEstado, fontWeight: 700, display: 'block', marginTop: '4px', fontSize: '11.5px' }}>
                   {nuevaPlaca.estadoBusqueda}
                 </small>
-                {nuevaPlaca.infoAuditoria && (
-                  <small style={{ color: '#64748b', display: 'block', marginTop: '2px', fontSize: '11px' }}>
-                    {nuevaPlaca.infoAuditoria}
-                  </small>
-                )}
               </div>
-
-                            {/* CAMPO EMPRESA DE TRANSPORTE (Ya lo tienes, pégalo debajo de este) */}
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>Empresa de Transporte *</label>
                 <select
@@ -1010,8 +1128,6 @@ export default function ModalPrestamo() {
                   ))}
                 </select>
               </div>
-
-              {/* === NUEVO CAMPO: VOLUMEN_M3 === */}
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>Volumen (m³) - Opcional</label>
                 <input
@@ -1022,28 +1138,10 @@ export default function ModalPrestamo() {
                   placeholder="Ej: 15.5"
                 />
               </div>
-              {/* =============================== */}
-
-              <div className="field-p field-auto-p" style={{ marginBottom: '18px' }}>
-                <label>{nuevaPlaca.existe ? 'Usuario que actualiza' : 'Usuario que registra'}</label>
-                <input value={nombreUsuarioActual} readOnly />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button
-                  type="button"
-                  className="btn-limpiar-p"
-                  onClick={() => setMostrarModalPlaca(false)}
-                  style={{ height: '38px', padding: '0 16px' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn-guardar-p"
-                  style={{ height: '38px', padding: '0 20px' }}
-                >
-                  {nuevaPlaca.existe ? 'Actualizar Placa' : 'Crear Placa'}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
+                <button type="button" className="btn-limpiar-p" onClick={() => setMostrarModalPlaca(false)} style={{ height: '38px', padding: '0 16px' }}>Cancelar</button>
+                <button type="submit" className="btn-guardar-p" style={{ height: '38px', padding: '0 20px' }}>
+                  {nuevaPlaca.existe ? 'Actualizar' : 'Crear'}
                 </button>
               </div>
             </form>

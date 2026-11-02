@@ -24,8 +24,17 @@ const ITEMS_POR_PAGINA = 50;
 
 const extraerIdDrive = (url) => {
   if (!url) return null;
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
+  const str = String(url).trim();
+  const match = str.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                str.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+                str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : (str.length > 20 && !str.includes('/') ? str : null);
+};
+
+const obtenerUrlDriveDirecta = (urlOId) => {
+  const id = extraerIdDrive(urlOId);
+  if (!id) return '';
+  return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
 };
 
 export default function TrackingPrestamos() {
@@ -413,7 +422,7 @@ export default function TrackingPrestamos() {
                 className="btn-action-primary" 
                 onClick={() => navigate('/conductores/tracking')}
             >
-                <FaIdCard /> <span>Ir a Conductores</span>
+                <FaIdCard /> <span>Conductores</span>
             </button>
             )}
           {!esExterno && (
@@ -432,6 +441,15 @@ export default function TrackingPrestamos() {
                 onClick={() => navigate('/clientes/tracking')}
             >
                 <FaUserTie /> <span>Clientes</span>
+            </button>
+            )}
+            {!esExterno && (
+            <button 
+                type="button" 
+                className="btn-action-primary" 
+                onClick={() => navigate('/empresas-transporte/tracking')}
+            >
+                <FaUserTie /> <span>Empresa</span>
             </button>
             )}
 
@@ -591,17 +609,31 @@ export default function TrackingPrestamos() {
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+              
+                    {/* FIRMA DE SALIDA */}
                     {prestamoSeleccionado.firma_conductor && (
-                      <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                    <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>Firma Salida</span>
-                        <img src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} alt="Firma" style={{ maxHeight: '50px', objectFit: 'contain' }} onError={e => { e.target.style.display = 'none'; }} />
-                      </div>
+                        <img 
+                        src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
+                        alt="Firma" 
+                        style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                        onError={e => { e.target.style.display = 'none'; }} 
+                        />
+                    </div>
                     )}
+
+                    {/* FOTO DE SALIDA */}
                     {prestamoSeleccionado.foto_salida && (
-                      <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                    <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>Foto Salida</span>
-                        <img src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} alt="Foto" style={{ maxHeight: '50px', objectFit: 'contain' }} onError={e => { e.target.style.display = 'none'; }} />
-                      </div>
+                        <img 
+                        src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
+                        alt="Foto" 
+                        style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                        onError={e => { e.target.style.display = 'none'; }} 
+                        />
+                    </div>
                     )}
                   </div>
                 </div>

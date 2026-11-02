@@ -6,6 +6,7 @@ const ModalPrestamo = lazy(() => import("../features/prestamos_pallet/modal-pres
 const TrackingConductores = lazy(() => import("../features/conductores/tracking_conductores"));
 const TrackingPlacas = lazy(() => import("../features/placas/tracking_placas"));
 const TrackingClientes = lazy(() => import("../features/clientes/tracking_clientes"));
+const TrackingEmpresasTransporte = lazy(() => import("../features/empresas_transporte/tracking_empresas_transporte"));
 
 export const prestamosRoutes = [
   { path: "prestamos/tracking", element: <LazyRoute><TrackingPrestamos /></LazyRoute> },
@@ -13,4 +14,5 @@ export const prestamosRoutes = [
   { path: "conductores/tracking", element: <LazyRoute><TrackingConductores /></LazyRoute> },
   { path: "placas/tracking", element: <LazyRoute><TrackingPlacas /></LazyRoute> },
   { path: "clientes/tracking", element: <LazyRoute><TrackingClientes /></LazyRoute> },
+  { path: "empresas-transporte/tracking", element: <LazyRoute><TrackingEmpresasTransporte /></LazyRoute> },
 ];

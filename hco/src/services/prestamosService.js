@@ -220,9 +220,9 @@ export const obtenerDatosMaestrosPrestamos = async () => {
   }
 };
 
-// =========================================================================
-// 2. CREAR PRÉSTAMO (SOPORTA FASE 1: ADMINISTRATIVO Y FASE COMPLETA RETAIL)
-// =========================================================================
+// =========================================
+// 2. CREAR PRÉSTAMO PALLET
+// =========================================
 export const crearPrestamoPallet = async (payload) => {
   const ahoraISO = obtenerFechaHoraPeruISO();
   const esClienteRecoge = payload.area_proceso === 'CLIENTE RECOGE';
@@ -231,7 +231,6 @@ export const crearPrestamoPallet = async (payload) => {
 
   const retornaBool = payload.retorno === 'SI' || payload.retorno === true;
 
-  // Estado inicial: Si es parcial queda 'Por despachar' para que auxiliar lo complete
   const estadoInicial = esRegistroParcial 
     ? 'Por despachar' 
     : (retornaBool ? 'Pendiente' : 'NO RETORNO');
@@ -242,19 +241,29 @@ export const crearPrestamoPallet = async (payload) => {
 
   let empresaIdFinal = payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null;
   let dniConductorFinal = payload.dni_conductor || null;
+  let nroPlacaFinal = String(payload.nro_placa || '').trim().toUpperCase();
   let observacionFinal = payload.observacion_salida || '';
 
+  // CASO ESPECIAL: CLIENTE RECOGE (No crea ni placa ni conductor en tablas maestras)
   if (esClienteRecoge) {
     if (!empresaIdFinal) {
       empresaIdFinal = await obtenerOcrearEmpresaOther(payload.usuario_registra);
     }
-    await asegurarPlacaExiste(payload.nro_placa, empresaIdFinal, payload.usuario_registra);
 
     dniConductorFinal = null;
-    const conductorTexto = payload.conductor_nombre ? `[CONDUCTOR RECOGE: ${payload.conductor_nombre.trim().toUpperCase()}]` : '';
+
+    // Guardar placa y chofer dentro de observación de salida para evitar foreign keys
+    const metaRecoge = [];
+    if (payload.conductor_nombre) metaRecoge.push(`[CONDUCTOR RECOGE: ${payload.conductor_nombre.trim().toUpperCase()}]`);
+    if (nroPlacaFinal) metaRecoge.push(`[PLACA RECOGE: ${nroPlacaFinal}]`);
+    
+    // nro_placa se manda null para no violar prestamos_nro_placa_fkey
+    nroPlacaFinal = null; 
+
+    const prefixRecoge = metaRecoge.join(' ');
     observacionFinal = observacionFinal 
-      ? `${conductorTexto} - ${observacionFinal}`
-      : conductorTexto;
+      ? `${prefixRecoge} - ${observacionFinal}`
+      : prefixRecoge;
   }
 
   if (Array.isArray(payload.clientes_multiples) && payload.clientes_multiples.length > 0) {
@@ -270,7 +279,7 @@ export const crearPrestamoPallet = async (payload) => {
     empresa_transporte_id: empresaIdFinal,
     dni_conductor: dniConductorFinal,
     nr_ruta: String(payload.nr_ruta || '').trim(),
-    nro_placa: String(payload.nro_placa || '').trim().toUpperCase(),
+    nro_placa: nroPlacaFinal,
     despachador: payload.despachador,
     nr_paletas: Number(payload.nr_paletas || 0),
     estado: estadoInicial,
@@ -298,7 +307,6 @@ export const crearPrestamoPallet = async (payload) => {
 
   const idPrestamo = prestamoCreado.id_prestamo;
 
-  // Subida de archivos solo si existen (en Retail)
   if (payload.firma_conductor_base64 || payload.foto_salida_base64) {
     const token = await obtenerAccessTokenGoogleDrive();
 
@@ -327,6 +335,62 @@ export const crearPrestamoPallet = async (payload) => {
   }
 
   return prestamoCreado;
+};
+
+// =========================================================================
+// 3. OBTENER TRACKING (EXTRAE CONDUCTOR Y PLACA DE CLIENTE RECOGE)
+// =========================================================================
+export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
+  const [resPrest, maestros] = await Promise.all([
+    supabase.from('prestamos').select('*').order('fecha_entrega', { ascending: false }),
+    maestrosPreCargados ? Promise.resolve(maestrosPreCargados) : obtenerDatosMaestrosPrestamos()
+  ]);
+
+  if (resPrest.error) throw new Error(`Error al cargar tracking: ${resPrest.error.message}`);
+
+  const empMap = Object.fromEntries((maestros.empresas || []).map(e => [String(e.id), e.nombre_empresa]));
+  const condMap = Object.fromEntries((maestros.conductores || []).map(c => [String(c.dni_conductor), c.nombre_conductor]));
+  const cliMap = Object.fromEntries((maestros.clientes || []).map(c => [String(c.id), c.nombre_cliente]));
+  const tipMap = Object.fromEntries((maestros.tipos_paleta || []).map(t => [String(t.id), t.nombre_tipo]));
+
+  const hoy = new Date();
+
+  const listaFormateada = (resPrest.data || []).map(row => {
+    const fRetorno = row.fecha_retorno ? new Date(row.fecha_retorno) : calcularFechaRetornoPeru(row.fecha_entrega, 7);
+    const fechaRetornoDate = fRetorno ? new Date(fRetorno) : null;
+    const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
+    const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
+    const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
+
+    // Extracción de Conductor si es CLIENTE RECOGE
+    let conductorFinal = condMap[String(row.dni_conductor)] || row.dni_conductor || '';
+    if (!conductorFinal && row.observacion_salida) {
+      const matchConductor = row.observacion_salida.match(/\[CONDUCTOR RECOGE:\s*([^\]]+)\]/i);
+      if (matchConductor) conductorFinal = matchConductor[1].trim();
+    }
+
+    // Extracción de Placa si es CLIENTE RECOGE
+    let placaFinal = row.nro_placa || '';
+    if (!placaFinal && row.observacion_salida) {
+      const matchPlaca = row.observacion_salida.match(/\[PLACA RECOGE:\s*([^\]]+)\]/i);
+      if (matchPlaca) placaFinal = matchPlaca[1].trim();
+    }
+
+    return {
+      ...row,
+      nro_placa: placaFinal || '-',
+      paletas_pendientes: paletasPendientesCalc,
+      empresa_transporte_nombre: empMap[String(row.empresa_transporte_id)] || (row.empresa_transporte_id === 0 ? 'OTHER' : ''),
+      conductor_nombre: conductorFinal || '-',
+      conductor_retorno_nombre: condMap[String(row.conductor_retorno)] || row.conductor_retorno || '',
+      cliente_nombre: cliMap[String(row.cliente_id)] || '',
+      tipo_paleta_nombre: tipMap[String(row.tipo_paleta_id)] || '',
+      fecha_retorno_calculada: fechaRetornoDate ? fechaRetornoDate.toISOString() : null,
+      atrasado
+    };
+  });
+
+  return listaFormateada;
 };
 
 // =========================================================================
@@ -378,53 +442,6 @@ export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
 
   if (error) throw new Error(`Error al completar despacho: ${error.message}`);
   return data;
-};
-
-// =========================================================================
-// 3. OBTENER TRACKING
-// =========================================================================
-export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
-  const [resPrest, maestros] = await Promise.all([
-    supabase.from('prestamos').select('*').order('fecha_entrega', { ascending: false }),
-    maestrosPreCargados ? Promise.resolve(maestrosPreCargados) : obtenerDatosMaestrosPrestamos()
-  ]);
-
-  if (resPrest.error) throw new Error(`Error al cargar tracking: ${resPrest.error.message}`);
-
-  const empMap = Object.fromEntries((maestros.empresas || []).map(e => [String(e.id), e.nombre_empresa]));
-  const condMap = Object.fromEntries((maestros.conductores || []).map(c => [String(c.dni_conductor), c.nombre_conductor]));
-  const cliMap = Object.fromEntries((maestros.clientes || []).map(c => [String(c.id), c.nombre_cliente]));
-  const tipMap = Object.fromEntries((maestros.tipos_paleta || []).map(t => [String(t.id), t.nombre_tipo]));
-
-  const hoy = new Date();
-
-  const listaFormateada = (resPrest.data || []).map(row => {
-    const fRetorno = row.fecha_retorno ? new Date(row.fecha_retorno) : calcularFechaRetornoPeru(row.fecha_entrega, 7);
-    const fechaRetornoDate = fRetorno ? new Date(fRetorno) : null;
-    const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
-    const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
-    const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
-
-    let conductorFinal = condMap[String(row.dni_conductor)] || row.dni_conductor || '';
-    if (!conductorFinal && row.observacion_salida) {
-      const matchConductor = row.observacion_salida.match(/\[CONDUCTOR RECOGE:\s*([^\]]+)\]/i);
-      if (matchConductor) conductorFinal = matchConductor[1].trim();
-    }
-
-    return {
-      ...row,
-      paletas_pendientes: paletasPendientesCalc,
-      empresa_transporte_nombre: empMap[String(row.empresa_transporte_id)] || (row.empresa_transporte_id === 0 ? 'OTHER' : ''),
-      conductor_nombre: conductorFinal || '-',
-      conductor_retorno_nombre: condMap[String(row.conductor_retorno)] || row.conductor_retorno || '',
-      cliente_nombre: cliMap[String(row.cliente_id)] || '',
-      tipo_paleta_nombre: tipMap[String(row.tipo_paleta_id)] || '',
-      fecha_retorno_calculada: fechaRetornoDate ? fechaRetornoDate.toISOString() : null,
-      atrasado
-    };
-  });
-
-  return listaFormateada;
 };
 
 export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {

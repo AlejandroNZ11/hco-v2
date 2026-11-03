@@ -371,28 +371,30 @@ export default function ModalPrestamo() {
       return mostrarAviso('warning', 'Falta área', 'Seleccione el Área del proceso.');
     }
 
+    // Validación de placa
     if (formData.nro_placa.length !== 6) {
-      return mostrarAviso('warning', 'Placa inválida', 'La placa debe tener exactamente 6 caracteres.');
+    return mostrarAviso('warning', 'Placa inválida', 'La placa debe tener exactamente 6 caracteres.');
     }
 
     if (!esClienteRecoge) {
-      const existeEnCatalogo = placas.some(p => p.nro_placa === formData.nro_placa);
-      if (!existeEnCatalogo) {
+    const existeEnCatalogo = placas.some(p => p.nro_placa === formData.nro_placa);
+    if (!existeEnCatalogo) {
         return mostrarAviso('warning', 'Placa no registrada', 'La placa ingresada no existe en el catálogo. Regístrela primero con "+ Placa".');
-      }
-      if (!formData.empresa_transporte_id) {
+    }
+    if (!formData.empresa_transporte_id) {
         return mostrarAviso('warning', 'Falta empresa', 'Seleccione la Empresa de transporte.');
-      }
-      if (!formData.dni_conductor) {
+    }
+    if (!formData.dni_conductor) {
         return mostrarAviso('warning', 'Falta conductor', 'Seleccione un conductor válido de la lista.');
-      }
-      if (!/^\d{1,2}$/.test(formData.nr_ruta.trim())) {
+    }
+    if (!/^\d{1,2}$/.test(formData.nr_ruta.trim())) {
         return mostrarAviso('warning', 'Ruta inválida', 'El N° de ruta debe tener 1 o 2 dígitos.');
-      }
+    }
     } else {
-      if (!formData.conductor_nombre.trim()) {
+    // CLIENTE RECOGE: no valida que la placa exista en BD
+    if (!formData.conductor_nombre.trim()) {
         return mostrarAviso('warning', 'Falta nombre', 'Ingrese el nombre de quien recoge.');
-      }
+    }
     }
 
     if (esOutboundRetail && !formData.cliente_nombre.trim()) {
@@ -505,65 +507,69 @@ export default function ModalPrestamo() {
               </select>
             </div>
 
-            {/* Placa */}
+            {/* 3. Placa */}
             <div className="field-p field-manual-p">
-              <div className="label-head-p">
+            <div className="label-head-p">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <label>Placa</label>
-                  {puedeGestionarMaestros && (
+                <label>Placa</label>
+                {/* Oculta '+ Placa' cuando es CLIENTE RECOGE */}
+                {!esClienteRecoge && puedeGestionarMaestros && (
                     <span
-                      className="link-action-p"
-                      onClick={() => {
+                    className="link-action-p"
+                    onClick={() => {
                         setNuevaPlaca({
-                          nro_placa: '',
-                          empresa_id: formData.empresa_transporte_id || '',
-                          volumen_m3: '',
-                          estadoBusqueda: 'Ingrese 6 caracteres...',
-                          colorEstado: '#64748b',
-                          existe: false
+                        nro_placa: '',
+                        empresa_id: formData.empresa_transporte_id || '',
+                        volumen_m3: '',
+                        estadoBusqueda: 'Ingrese 6 caracteres...',
+                        colorEstado: '#64748b',
+                        existe: false
                         });
                         setMostrarModalPlaca(true);
-                      }}
+                    }}
                     >
-                      <FaTruck style={{ marginRight: '3px' }} /> + Placa
+                    <FaTruck style={{ marginRight: '3px' }} /> + Placa
                     </span>
-                  )}
+                )}
                 </div>
                 <span className="tag-pill obligatorio">OBLIGATORIO</span>
-              </div>
-              <input
-                list="listaPlac"
+            </div>
+            <input
+                /* Si es CLIENTE RECOGE, desactiva el datalist por completo */
+                list={esClienteRecoge ? undefined : "listaPlac"}
                 value={formData.nro_placa}
                 onChange={handlePlacaInputForm}
-                placeholder="Ej: ABC123"
+                placeholder={esClienteRecoge ? "Placa externa (6 carac.)..." : "Ej: ABC123"}
                 maxLength={6}
                 autoComplete="off"
                 required
-              />
-              <datalist id="listaPlac">
+            />
+            {!esClienteRecoge && (
+                <datalist id="listaPlac">
                 {placas.map((p, index) => <option key={`${p.nro_placa}-${index}`} value={p.nro_placa} />)}
-              </datalist>
+                </datalist>
+            )}
             </div>
 
-            {/* Empresa Transporte */}
-            <div className={`field-p ${empresaBloqueadaPorPlaca ? 'field-auto-p' : 'field-manual-p'}`}>
-              <div className="label-head-p">
+            {/* 4. Empresa Transporte */}
+            <div className={`field-p ${empresaBloqueadaPorPlaca || esClienteRecoge ? 'field-auto-p' : 'field-manual-p'}`}>
+            <div className="label-head-p">
                 <label>Empresa transporte</label>
                 <span className={`tag-pill ${esClienteRecoge ? 'opcional' : 'obligatorio'}`}>
-                  {esClienteRecoge ? 'OTHER' : 'OBLIGATORIO'}
+                {esClienteRecoge ? 'OTHER' : 'OBLIGATORIO'}
                 </span>
-              </div>
-              <select
+            </div>
+            <select
                 value={formData.empresa_transporte_id}
                 onChange={e => setFormData({ ...formData, empresa_transporte_id: e.target.value, conductor_nombre: '', dni_conductor: '' })}
-                disabled={empresaBloqueadaPorPlaca}
+                disabled={empresaBloqueadaPorPlaca || esClienteRecoge}
                 required={!esClienteRecoge}
-              >
+            >
                 <option value="">{esClienteRecoge ? 'OTHER / EXTERNO' : 'Seleccione...'}</option>
                 {empresas.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.nombre_empresa}</option>
+                <option key={emp.id} value={emp.id}>{emp.nombre_empresa}</option>
                 ))}
-              </select>
+            </select>
             </div>
 
             {/* Conductor */}

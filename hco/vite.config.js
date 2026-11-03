@@ -50,7 +50,7 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: 'img/pwa-512x512.png', // <-- Agregado img/
+            src: 'img/logo.png', // <-- Agregado img/
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
@@ -58,7 +58,7 @@ export default defineConfig({
         ]
       }
 
-      
+
     })
   ]
 });

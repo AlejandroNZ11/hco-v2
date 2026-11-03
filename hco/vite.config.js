@@ -12,7 +12,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg', 'img/logo_b.png'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg', 'img/logo.png'],
       // En vite.config.js dentro de VitePWA -> workbox:
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt,woff,woff2}'],
@@ -50,10 +50,16 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: 'img/logo.png', // <-- Agregado img/
+            src: 'img/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any' // Tu logo original (para navegadores, escritorios o donde no se requiera máscara forzada)
+          },
+          {
+            src:'img/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable' // Una versión con fondo sólido y margen seguro exclusivo para Android moderno
           }
         ]
       }

@@ -196,39 +196,19 @@ export default function TrackingPrestamos() {
     setModalAuxVisible(true);
   };
 
-  const handleGuardarDespachoAuxiliar = async (e) => {
-    e.preventDefault();
-    if (!prestamoSeleccionado) return;
-
+  // Validación previa antes de abrir la firma: Cierra el primer modal para que no reaparezca
+  const handleAbrirFirmaSalida = () => {
     const cant = Number(auxData.nr_paletas);
-    if (isNaN(cant) || cant < 0) {
-      return mostrarAviso('warning', 'Cantidad requerida', 'Ingrese una cantidad válida de paletas.');
+    if (!auxData.nr_paletas.trim() || isNaN(cant) || cant <= 0) {
+      return mostrarAviso('warning', 'Cantidad obligatoria', 'Ingrese el número de paletas antes de firmar.');
     }
-
-    // Obligatorio en Outbound Principal
-    if (prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' && !auxData.foto_salida_base64) {
-      return mostrarAviso('warning', 'Foto obligatoria', 'En OUTBOUND PRINCIPAL la foto de salida es obligatoria.');
+    if (prestamoSeleccionado?.area_proceso === 'OUTBOUND PRINCIPAL' && !auxData.foto_salida_base64) {
+      return mostrarAviso('warning', 'Foto obligatoria', 'En OUTBOUND PRINCIPAL debe adjuntar la foto antes de firmar.');
     }
-
-    if (!auxData.firma_conductor_base64) {
-      return mostrarAviso('warning', 'Firma obligatoria', 'Debe registrar la firma de salida del conductor.');
-    }
-
-    setLoading(true);
-    try {
-      await completarDespachoAuxiliar(prestamoSeleccionado, {
-        ...auxData,
-        retorno: prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno,
-        usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Auxiliar'
-      });
-      setModalAuxVisible(false);
-      mostrarAviso('success', 'Despacho Completado', 'El registro se actualizó y ahora está activo en tracking.');
-      await cargarDatos();
-    } catch (err) {
-      mostrarAviso('danger', 'Error al despachar', err.message);
-    } finally {
-      setLoading(false);
-    }
+    // Cerramos el modal auxiliar para que no se quede atrás
+    setModalAuxVisible(false);
+    setFirmaTarget('auxiliar');
+    setModalFirmaVisible(true);
   };
 
   // Modal Devolución
@@ -289,23 +269,23 @@ export default function TrackingPrestamos() {
     }
   };
 
-    // En el useEffect de la firma (ajusta canvas.height a 210)
-    useEffect(() => {
+  // Canvas Firma
+  useEffect(() => {
     if (modalFirmaVisible && canvasRef.current) {
-        const canvas = canvasRef.current;
-        const contenedor = canvas.parentElement;
+      const canvas = canvasRef.current;
+      const contenedor = canvas.parentElement;
 
-        canvas.width = contenedor.clientWidth;
-        canvas.height = contenedor.clientHeight || 380;
+      canvas.width = contenedor.clientWidth;
+      canvas.height = contenedor.clientHeight || 380;
 
-        const ctx = canvas.getContext('2d');
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#0f172a';
-        tieneTrazoRef.current = false;
+      const ctx = canvas.getContext('2d');
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = '#0f172a';
+      tieneTrazoRef.current = false;
     }
-    }, [modalFirmaVisible]);
+  }, [modalFirmaVisible]);
 
   const iniciarTrazo = (e) => {
     if (!canvasRef.current) return;
@@ -330,41 +310,59 @@ export default function TrackingPrestamos() {
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     tieneTrazoRef.current = false;
   };
-  const confirmarFirma = () => {
+
+  // Guardar firma: Cierra y finaliza directo si viene de auxiliar
+  const confirmarFirma = async () => {
     if (!tieneTrazoRef.current) return mostrarAviso('warning', 'Firma vacía', 'Debe firmar antes de guardar.');
     const dataUrl = canvasRef.current.toDataURL('image/png');
+
     if (firmaTarget === 'auxiliar') {
-      setAuxData(prev => ({ ...prev, firma_conductor_base64: dataUrl }));
+      setModalFirmaVisible(false);
+      setLoading(true);
+      try {
+        await completarDespachoAuxiliar(prestamoSeleccionado, {
+          ...auxData,
+          firma_conductor_base64: dataUrl,
+          retorno: prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno,
+          usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Auxiliar'
+        });
+        // Se va directo al aviso de éxito sin reabrir el formulario
+        mostrarAviso('success', 'Despacho Completado', 'El registro se actualizó y ahora está activo en tracking.');
+        await cargarDatos();
+      } catch (err) {
+        mostrarAviso('danger', 'Error al despachar', err.message);
+      } finally {
+        setLoading(false);
+      }
     } else {
       setDevData(prev => ({ ...prev, firma_retorno_base64: dataUrl }));
+      setModalFirmaVisible(false);
     }
-    setModalFirmaVisible(false);
   };
 
-  // Función exacta de compresión idéntica a la que funcionaba en modal-prestamo
-const comprimirFotoSalida = (file, maxWidth = 1280) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/png'));
+  const comprimirFotoSalida = (file, maxWidth = 1280) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
       };
-      img.onerror = reject;
-      img.src = reader.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-};
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
-    const renderBadgeEstado = (estado) => {
+  const renderBadgeEstado = (estado) => {
     const e = String(estado || '').trim();
     if (e === 'Por despachar') return <span className="badge-estado por-despachar">Por despachar</span>;
     if (e === 'Devuelto') return <span className="badge-estado devuelto">Devuelto</span>;
@@ -372,40 +370,40 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
     if (e === 'NO RETORNO') return <span className="badge-estado no-retorno">NO RETORNO</span>;
     if (e === 'Cerrado mixto') return <span className="badge-estado cerrado-mixto">Cerrado mixto</span>;
     return <span className="badge-estado pendiente">Pendiente</span>;
-    };
+  };
 
   return (
     <div className="tracking-prestamos-page">
       {loading && <Loading />}
 
-        {/* AVISO FLOTANTE MODERNO COMPACTO */}
-        {avisoFlotante.visible && (
+      {/* AVISO FLOTANTE MODERNO COMPACTO */}
+      {avisoFlotante.visible && (
         <div className="tw-modal-backdrop" onClick={cerrarAviso}>
-            <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
+          <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
             <div className="tw-modal-header">
-                <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
+              <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
                 {avisoFlotante.tipo === 'danger' && <span>✖</span>}
                 {avisoFlotante.tipo === 'warning' && <span>⚠️</span>}
                 {avisoFlotante.tipo === 'success' && <span>✔</span>}
-                </div>
-                <div className="tw-modal-text">
+              </div>
+              <div className="tw-modal-text">
                 <h3 className="tw-modal-title">{avisoFlotante.titulo}</h3>
                 <p className="tw-modal-desc">{avisoFlotante.mensaje}</p>
                 {avisoFlotante.detalleExtra && (
-                    <div className="tw-modal-extra-box" style={{ marginTop: '8px' }}>
+                  <div className="tw-modal-extra-box" style={{ marginTop: '8px' }}>
                     {avisoFlotante.detalleExtra}
-                    </div>
+                  </div>
                 )}
-                </div>
+              </div>
             </div>
             <div className="tw-modal-footer">
-                <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>
+              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>
                 Entendido
-                </button>
+              </button>
             </div>
-            </div>
+          </div>
         </div>
-        )}
+      )}
 
       {/* TOP SUMMARY */}
       <div className="top-summary-grid">
@@ -501,7 +499,7 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
               </button>
               <button type="button" className="btn-action-primary" onClick={() => navigate('/empresas-transporte/tracking')}>
                 <FaBuilding /> <span>Empresa</span>
-             </button>
+              </button>
             </>
           )}
         </div>
@@ -603,7 +601,7 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
                             <button
                               type="button"
                               className="btn-tabla-aprobar"
-                              style={{ background: '#f59e0b', color: '#fff' }}
+                              style={{ background: '#ea580c', color: '#fff' }}
                               onClick={() => abrirModalAuxiliar(r)}
                               title="Completar Despacho (Auxiliar)"
                             >
@@ -634,136 +632,118 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
         </div>
       </section>
 
-        {/* MODAL FASE 2: AUXILIAR DE SALIDA ESTILIZADO */}
-        {modalAuxVisible && prestamoSeleccionado && (
+      {/* MODAL FASE 2: AUXILIAR DE SALIDA */}
+      {modalAuxVisible && prestamoSeleccionado && (
         <div className="tw-modal-backdrop" onClick={() => setModalAuxVisible(false)}>
-            <div className="tw-modal-card" style={{ maxWidth: '480px', padding: '22px' }} onClick={e => e.stopPropagation()}>
+          <div className="tw-modal-card" style={{ maxWidth: '480px', padding: '22px' }} onClick={e => e.stopPropagation()}>
             <div className="card-head-modern" style={{ padding: 0, marginBottom: '16px' }}>
-                <div>
+              <div>
                 <span className="module-pill">DESPACHO AUXILIAR</span>
                 <h3 style={{ margin: '4px 0 0', fontSize: '18px', fontWeight: 800 }}>
-                    Completar Salida ({prestamoSeleccionado.id_prestamo})
+                  Completar Salida ({prestamoSeleccionado.id_prestamo})
                 </h3>
                 <small style={{ color: '#64748b' }}>
-                    Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> | Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong>
+                  Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> | Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong>
                 </small>
-                </div>
-                <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>✕</button>
+              </div>
+              <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>✕</button>
             </div>
 
-            <form onSubmit={handleGuardarDespachoAuxiliar}>
-                {/* N° Paletas */}
-                <div className="field-aux">
+            <div>
+              {/* N° Paletas */}
+              <div className="field-aux">
                 <div className="label-head-aux">
-                    <label>N° paletas prestadas</label>
-                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
+                  <label>N° paletas prestadas</label>
+                  <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
                 </div>
                 <input
-                    type="text"
-                    inputMode="numeric"
-                    value={auxData.nr_paletas}
-                    onChange={e => setAuxData({ ...auxData, nr_paletas: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                    placeholder="Ej: 15"
-                    required
-                    autoFocus
+                  type="text"
+                  inputMode="numeric"
+                  value={auxData.nr_paletas}
+                  onChange={e => setAuxData({ ...auxData, nr_paletas: e.target.value.replace(/\D/g, '').slice(0, 3) })}
+                  placeholder="Ej: 15"
+                  required
+                  autoFocus
                 />
-                </div>
+              </div>
 
-                {/* ¿Retorna? */}
-                <div className="field-aux">
+              {/* ¿Retorna? */}
+              <div className="field-aux">
                 <div className="label-head-aux">
-                    <label>¿Retorna?</label>
-                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
+                  <label>¿Retorna?</label>
+                  <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
                 </div>
                 <select
-                    value={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno}
-                    onChange={e => setAuxData({ ...auxData, retorno: e.target.value })}
-                    disabled={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE'}
+                  value={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno}
+                  onChange={e => setAuxData({ ...auxData, retorno: e.target.value })}
+                  disabled={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE'}
                 >
-                    <option value="SI">SÍ</option>
-                    <option value="NO">NO</option>
+                  <option value="SI">SÍ</option>
+                  <option value="NO">NO</option>
                 </select>
-                </div>
+              </div>
 
-            
-                {/* Foto de Salida */}
-                <div className="field-aux">
+              {/* Foto de Salida */}
+              <div className="field-aux">
                 <div className="label-head-aux">
-                    <label>Foto de salida</label>
-                    <span className={`tag-pill-aux ${prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'obligatorio' : 'opcional'}`}>
+                  <label>Foto de salida</label>
+                  <span className={`tag-pill-aux ${prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'obligatorio' : 'opcional'}`}>
                     {prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'OBLIGATORIO' : 'OPCIONAL'}
-                    </span>
+                  </span>
                 </div>
                 <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="file-input-aux"
-                    onChange={async (e) => {
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="file-input-aux"
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     try {
-                        const base64 = await comprimirFotoSalida(file, 1280);
-                        setAuxData(prev => ({ ...prev, foto_salida_base64: base64 }));
+                      const base64 = await comprimirFotoSalida(file, 1280);
+                      setAuxData(prev => ({ ...prev, foto_salida_base64: base64 }));
                     } catch (err) {
-                        console.error("Error al comprimir foto auxiliar:", err);
-                        mostrarAviso('danger', 'Error de imagen', 'No se pudo procesar la fotografía.');
+                      console.error("Error al comprimir foto auxiliar:", err);
+                      mostrarAviso('danger', 'Error de imagen', 'No se pudo procesar la fotografía.');
                     }
-                    }}
+                  }}
                 />
                 <div style={{ marginTop: '6px' }}>
-                    <span className={`badge-status-aux ${auxData.foto_salida_base64 ? 'activa' : 'inactiva'}`}>
+                  <span className={`badge-status-aux ${auxData.foto_salida_base64 ? 'activa' : 'inactiva'}`}>
                     {auxData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
-                    </span>
+                  </span>
                 </div>
-                </div>
+              </div>
 
-                {/* Observación */}
-                <div className="field-aux" style={{ marginBottom: '18px' }}>
+              {/* Observación */}
+              <div className="field-aux" style={{ marginBottom: '18px' }}>
                 <div className="label-head-aux">
-                    <label>Observación de salida</label>
-                    <span className="tag-pill-aux opcional">OPCIONAL</span>
+                  <label>Observación de salida</label>
+                  <span className="tag-pill-aux opcional">OPCIONAL</span>
                 </div>
                 <textarea
-                    value={auxData.observacion_salida}
-                    onChange={e => setAuxData({ ...auxData, observacion_salida: e.target.value })}
-                    rows={2}
-                    placeholder="Detalles del despacho físico..."
+                  value={auxData.observacion_salida}
+                  onChange={e => setAuxData({ ...auxData, observacion_salida: e.target.value })}
+                  rows={2}
+                  placeholder="Detalles del despacho físico..."
                 />
-                </div>
+              </div>
 
-                {/* Firma Conductor */}
-                <div className="field-aux">
-                <div className="label-head-aux">
-                    <label>Firma del conductor</label>
-                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
-                </div>
-                <div className="firma-group-aux">
-                    <button
-                    type="button"
-                    className="btn-firma-aux"
-                    onClick={() => { setFirmaTarget('auxiliar'); setModalFirmaVisible(true); }}
-                    >
-                    <FaPenNib /> Firmar Salida
-                    </button>
-                    <span className={`badge-status-aux ${auxData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
-                    {auxData.firma_conductor_base64 ? 'Firma lista' : 'Sin firma'}
-                    </span>
-                </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>
-                    Cancelar
+              {/* Botón único de firma que finaliza todo */}
+              <div style={{ marginTop: '20px' }}>
+                <button
+                  type="button"
+                  className="btn-action-primary"
+                  style={{ width: '100%', height: '46px', justifyContent: 'center', fontSize: '14px', borderRadius: '12px' }}
+                  onClick={handleAbrirFirmaSalida}
+                >
+                  <FaPenNib /> Firmar y Finalizar Despacho
                 </button>
-                <button type="submit" className="btn-action-primary" disabled={loading}>
-                    <FaSave /> Finalizar Despacho
-                </button>
-                </div>
-            </form>
+              </div>
             </div>
+          </div>
         </div>
-        )}
+      )}
 
       {/* MODAL DEVOLUCIÓN */}
       {modalDevVisible && prestamoSeleccionado && (
@@ -783,39 +763,73 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
               <div className="split-layout" style={{ gap: '20px', display: 'flex' }}>
                 <div style={{ flex: 1, background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
                   <div className="section-title" style={{ marginTop: 0, marginBottom: '12px', fontSize: '12px', fontWeight: 800, color: '#0f4c81', textTransform: 'uppercase' }}>Datos de Salida</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-                        {/* FIRMA DE SALIDA */}
-                        {prestamoSeleccionado.firma_conductor && (
-                            <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>
-                                Firma Salida
-                            </span>
-                            <img 
-                                src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
-                                alt="Firma" 
-                                style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
-                                onError={e => { e.target.style.display = 'none'; }} 
-                            />
-                            </div>
-                        )}
-
-                        {/* FOTO DE SALIDA */}
-                        {prestamoSeleccionado.foto_salida && (
-                            <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>
-                                Foto Salida
-                            </span>
-                            <img 
-                                src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
-                                alt="Foto" 
-                                style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
-                                onError={e => { e.target.style.display = 'none'; }} 
-                            />
-                            </div>
-                        )}
-                        </div>
-                 
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px', textAlign: 'center' }}>
+                    <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }}>
+                      <div style={{ fontSize: '18px', fontWeight: 800 }}>{prestamoSeleccionado.nr_paletas}</div>
+                      <small style={{ color: '#64748b', fontWeight: 700, fontSize: '10px' }}>PRESTADAS</small>
                     </div>
+                    <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }}>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f4c81' }}>{prestamoSeleccionado.nr_paletas_devueltas}</div>
+                      <small style={{ color: '#64748b', fontWeight: 700, fontSize: '10px' }}>DEVUELTAS</small>
+                    </div>
+                    <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }}>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: Number(prestamoSeleccionado.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>
+                        {prestamoSeleccionado.paletas_pendientes}
+                      </div>
+                      <small style={{ color: '#64748b', fontWeight: 700, fontSize: '10px' }}>PENDIENTES</small>
+                    </div>
+                  </div>
+
+                  <div className="filter-group" style={{ marginBottom: '10px' }}>
+                    <label>Placa (Salida)</label>
+                    <input value={devData.placa_editada} onChange={e => setDevData({ ...devData, placa_editada: e.target.value.toUpperCase() })} readOnly={modoLectura || !esAdmin} />
+                  </div>
+                  <div className="filter-group" style={{ marginBottom: '10px' }}>
+                    <label>Despachador</label>
+                    <input value={prestamoSeleccionado.despachador} readOnly />
+                  </div>
+                  <div className="filter-group" style={{ marginBottom: '10px' }}>
+                    <label>Observación de salida</label>
+                    <textarea value={prestamoSeleccionado.observacion_salida || 'Sin observaciones'} rows={2} readOnly />
+                  </div>
+
+                  {/* FOTOS Y FIRMAS CON CONTENEDOR SEGURO QUE NO SE AUTO-OCULTA */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                    <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1', minHeight: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                        Firma Salida
+                      </span>
+                      {prestamoSeleccionado.firma_conductor ? (
+                        <a href={prestamoSeleccionado.firma_conductor} target="_blank" rel="noopener noreferrer">
+                          <img 
+                            src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
+                            alt="Firma" 
+                            style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                          />
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>Sin firma</span>
+                      )}
+                    </div>
+
+                    <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1', minHeight: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                        Foto Salida
+                      </span>
+                      {prestamoSeleccionado.foto_salida ? (
+                        <a href={prestamoSeleccionado.foto_salida} target="_blank" rel="noopener noreferrer">
+                          <img 
+                            src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
+                            alt="Foto" 
+                            style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                          />
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>Sin foto</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 <div style={{ flex: 1, padding: '4px' }}>
                   <div className="section-title" style={{ marginTop: 0, marginBottom: '12px', fontSize: '12px', fontWeight: 800, color: '#0f4c81', textTransform: 'uppercase' }}>Datos para la Devolución</div>
@@ -874,62 +888,63 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
         </div>
       )}
 
-                {/* MODAL CANVAS FIRMA (DISEÑO EXACTO IMAGEN 2) */}
-        {modalFirmaVisible && (
-        <div className="tw-modal-backdrop" onClick={() => setModalFirmaVisible(false)}>
-            <div className="firma-modal-card" onClick={e => e.stopPropagation()}>
-            
-            {/* Cabecera limpia centrada */}
+      {/* MODAL CANVAS FIRMA (DISEÑO EXACTO IMAGEN 2) */}
+      {modalFirmaVisible && (
+        <div className="tw-modal-backdrop" onClick={() => {
+          setModalFirmaVisible(false);
+          if (firmaTarget === 'auxiliar') setModalAuxVisible(true);
+        }}>
+          <div className="firma-modal-card" onClick={e => e.stopPropagation()}>
             <div className="firma-modal-header">
-                <h3>Firma del conductor</h3>
+              <h3>Firma del conductor</h3>
             </div>
 
-            {/* Recuadro de firma amplio */}
             <div className="firma-modal-body">
-                <div className="canvas-container-firma">
+              <div className="canvas-container-firma">
                 {!tieneTrazoRef.current && (
-                    <span className="canvas-hint-text">Dibuje su firma aquí</span>
+                  <span className="canvas-hint-text">Dibuje su firma aquí</span>
                 )}
                 <canvas
-                    ref={canvasRef}
-                    id="firmaCanvas"
-                    onPointerDown={iniciarTrazo}
-                    onPointerMove={moverTrazo}
-                    onPointerUp={finalizarTrazo}
+                  ref={canvasRef}
+                  id="firmaCanvas"
+                  onPointerDown={iniciarTrazo}
+                  onPointerMove={moverTrazo}
+                  onPointerUp={finalizarTrazo}
                 />
-                </div>
+              </div>
             </div>
 
-            {/* Botones apilados con ícono y texto en una sola línea */}
             <div className="firma-modal-footer">
-                <button 
+              <button 
                 type="button" 
                 className="btn-firma-full btn-firma-outline" 
                 onClick={limpiarCanvasFirma}
-                >
-                <FaEraser /> Limpiar
-                </button>
+              >
+                <FaEraser /> <span>Limpiar</span>
+              </button>
 
-                <button 
+              <button 
                 type="button" 
                 className="btn-firma-full btn-firma-outline" 
-                onClick={() => setModalFirmaVisible(false)}
-                >
-                Cancelar
-                </button>
+                onClick={() => {
+                  setModalFirmaVisible(false);
+                  if (firmaTarget === 'auxiliar') setModalAuxVisible(true);
+                }}
+              >
+                <span>Cancelar</span>
+              </button>
 
-                <button 
+              <button 
                 type="button" 
                 className="btn-firma-full btn-firma-primary" 
                 onClick={confirmarFirma}
-                >
-                <FaSave /> Guardar firma
-                </button>
+              >
+                <FaSave /> <span>Guardar firma</span>
+              </button>
             </div>
-
-            </div>
+          </div>
         </div>
-        )}
+      )}
     </div>
   );
 }

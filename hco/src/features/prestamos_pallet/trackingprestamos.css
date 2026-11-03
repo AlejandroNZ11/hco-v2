@@ -9,9 +9,8 @@
   background-color: #f4f7fb;
   min-height: calc(100vh - 110px);
   font-family: "Segoe UI", Arial, sans-serif;
+}
 
-
-  
 /* =========================================
    1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS KPI PASTEL
    ========================================= */
@@ -103,7 +102,6 @@
   font-weight: 800;
 }
 
-/* Colores específicos de las tarjetas */
 .card-pendientes { background: #fffaf0; border-color: #fce4b5; }
 .card-pendientes span { color: #b45309; }
 .card-pendientes strong { color: #92400e; }
@@ -119,7 +117,6 @@
 .card-paletas { background: #fef2f2; border-color: #fecaca; }
 .card-paletas span { color: #dc2626; }
 .card-paletas strong { color: #b91c1c; }
-
 
 /* =========================================
    2. SECCIÓN DE FILTROS Y BOTONES
@@ -209,14 +206,8 @@
   transition: background 0.2s;
 }
 
-.btn-action-primary:hover:not(:disabled) {
-  background: #145d9b;
-}
-
-.btn-action-primary:disabled {
-  background: #cbd5e1;
-  cursor: not-allowed;
-}
+.btn-action-primary:hover:not(:disabled) { background: #145d9b; }
+.btn-action-primary:disabled { background: #cbd5e1; cursor: not-allowed; }
 
 .btn-action-secondary {
   background: #eef2f7;
@@ -234,9 +225,7 @@
   transition: background 0.2s;
 }
 
-.btn-action-secondary:hover:not(:disabled) {
-  background: #e2e8f0;
-}
+.btn-action-secondary:hover:not(:disabled) { background: #e2e8f0; }
 
 /* =========================================
    3. SECCIÓN DE TABLA Y PAGINACIÓN
@@ -311,13 +300,8 @@
   -ms-overflow-style: none;
 }
 
-.table-container::-webkit-scrollbar {
-  display: none;
-}
-
-.table-container.dragging {
-  cursor: grabbing;
-}
+.table-container::-webkit-scrollbar { display: none; }
+.table-container.dragging { cursor: grabbing; }
 
 .table-container table {
   width: 100%;
@@ -348,13 +332,8 @@
   color: #1e293b;
 }
 
-.table-container tbody tr:hover td {
-  background-color: #f8fafc;
-}
-
-.table-danger td {
-  background-color: #fef2f2 !important;
-}
+.table-container tbody tr:hover td { background-color: #f8fafc; }
+.table-danger td { background-color: #fef2f2 !important; }
 
 /* =========================================
    BADGES ESTADO - MISMO TAMAÑO Y TONOS SUAVES
@@ -363,8 +342,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 105px;          /* <- MISMO ANCHO PARA TODAS LAS CÁPSULAS */
-  height: 22px;         /* <- MISMA ALTURA */
+  width: 105px;
+  height: 22px;
   border-radius: 999px;
   font-size: 9px;
   font-weight: 800;
@@ -374,49 +353,43 @@
   white-space: nowrap;
 }
 
-/* 1. POR DESPACHAR: TONO VIVO / FUERTE */
 .badge-estado.por-despachar {
   background: #ea580c !important;
   color: #ffffff !important;
   box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
 }
 
-/* 2. PENDIENTE: AMARILLO PASTEL SUAVE */
 .badge-estado.pendiente {
   background: #fef3c7 !important;
   color: #92400e !important;
   border: 1px solid #fde68a;
 }
 
-/* 3. PARCIAL: CELESTE PASTEL */
 .badge-estado.parcial {
   background: #e0f2fe !important;
   color: #0369a1 !important;
   border: 1px solid #bae6fd;
 }
 
-/* 4. DEVUELTO: VERDE PASTEL */
 .badge-estado.devuelto {
   background: #dcfce7 !important;
   color: #15803d !important;
   border: 1px solid #bbf7d0;
 }
 
-/* 5. NO RETORNO: GRIS SUAVE / NEUTRO */
 .badge-estado.no-retorno {
   background: #f1f5f9 !important;
   color: #334155 !important;
   border: 1px solid #cbd5e1;
 }
 
-/* 6. CERRADO MIXTO */
 .badge-estado.cerrado-mixto {
   background: #fee2e2 !important;
   color: #991b1b !important;
   border: 1px solid #fecaca;
 }
 
-/* BOTONES DE ACCIÓN EN FILA (SOLO ICONOS) */
+/* BOTONES DE ACCIÓN EN FILA */
 .acciones-cell {
   display: inline-flex;
   gap: 4px;
@@ -443,7 +416,6 @@
   background: #ffffff;
   color: #1e3a6d;
 }
-
 .btn-tabla-editar:hover { background: #f1f5f9; }
 
 .btn-tabla-aprobar {
@@ -451,7 +423,6 @@
   background: #0f4c81;
   color: #ffffff;
 }
-
 .btn-tabla-aprobar:hover:not(:disabled) { background: #145d9b; }
 
 /* =========================================
@@ -480,69 +451,95 @@
   overflow-y: auto;
 }
 
-.tw-modal-danger { border-top: 5px solid #dc2626; }
-.tw-modal-warning { border-top: 5px solid #d97706; }
-.tw-modal-success { border-top: 5px solid #16a34a; }
-
-.tw-modal-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 22px 22px 16px;
+.tw-modal-card-alert {
+  background: #ffffff !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 35px -5px rgba(15, 23, 42, 0.2) !important;
+  width: 90% !important;
+  max-width: 380px !important;
+  margin: auto !important;
+  text-align: center !important;
+  overflow: hidden !important;
+  animation: twFadeIn 0.2s ease-out !important;
+  border: none !important;
+  padding: 8px !important;
 }
 
-.tw-modal-icon-circle {
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
+.tw-modal-card-alert .tw-modal-header {
+  padding: 24px 20px 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  gap: 14px !important;
+}
+
+.tw-modal-card-alert .tw-modal-icon-circle {
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  font-size: 26px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .tw-modal-icon-circle.danger { background-color: #fee2e2; color: #dc2626; }
 .tw-modal-icon-circle.warning { background-color: #fef3c7; color: #d97706; }
 .tw-modal-icon-circle.success { background-color: #dcfce7; color: #16a34a; }
 
-.tw-modal-title {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 800;
-  color: #0f172a;
+.tw-modal-card-alert .tw-modal-icon-circle.success {
+  background-color: #dcfce7 !important;
+  color: #16a34a !important;
 }
 
-.tw-modal-desc {
-  margin: 0;
-  font-size: 13.5px;
-  color: #475569;
+.tw-modal-card-alert .tw-modal-title {
+  margin: 0 !important;
+  font-size: 19px !important;
+  font-weight: 800 !important;
+  color: #0b1f3a !important;
 }
 
-.tw-modal-footer {
-  background-color: #f8fafc;
-  border-top: 1px solid #f1f5f9;
-  padding: 12px 22px;
-  display: flex;
-  justify-content: flex-end;
+.tw-modal-card-alert .tw-modal-desc {
+  margin: 4px 0 0 !important;
+  font-size: 13.5px !important;
+  color: #475569 !important;
+  line-height: 1.4 !important;
 }
 
-.tw-modal-btn {
-  height: 38px;
-  padding: 0 20px;
-  border-radius: 8px;
-  border: none;
-  font-size: 13px;
-  font-weight: 700;
-  color: #ffffff;
-  cursor: pointer;
+.tw-modal-card-alert .tw-modal-footer {
+  padding: 14px 20px 20px !important;
+  background: transparent !important;
+  border-top: none !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+/* Botón 'Entendido' limpio sin borde negro */
+.tw-modal-card-alert .tw-modal-btn.success {
+  width: 100% !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  background-color: #16a34a !important;
+  border: none !important;
+  outline: none !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.tw-modal-card-alert .tw-modal-btn.success:hover {
+  background-color: #15803d !important;
 }
 
 .tw-modal-btn.danger { background-color: #dc2626; }
 .tw-modal-btn.warning { background-color: #d97706; }
 .tw-modal-btn.success { background-color: #16a34a; }
 
-/* Header interno de modales de Devolución */
 .card-head-modern {
   display: flex;
   justify-content: space-between;
@@ -550,42 +547,7 @@
 }
 
 /* =========================================
-   5. CANVAS FIRMA
-   ========================================= */
-.firma-box {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  width: 100%;
-  max-width: 600px;
-  text-align: center;
-}
-
-.firma-box h3 {
-  margin-top: 0;
-  font-size: 18px;
-  font-weight: 800;
-  color: #0f172a;
-  margin-bottom: 16px;
-}
-
-#firmaCanvas {
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
-  background: #f8fafc;
-  cursor: crosshair;
-  touch-action: none;
-  margin-bottom: 16px;
-}
-
-.firma-actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-/* =========================================
-   ESTILOS FORMULARIO MODAL DESPACHO AUXILIAR
+   5. ESTILOS FORMULARIO MODAL DESPACHO AUXILIAR
    ========================================= */
 .tw-modal-card .field-aux {
   display: flex;
@@ -617,15 +579,8 @@
   display: inline-block;
 }
 
-.tw-modal-card .tag-pill-aux.obligatorio {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.tw-modal-card .tag-pill-aux.opcional {
-  background: #e2e8f0;
-  color: #475569;
-}
+.tw-modal-card .tag-pill-aux.obligatorio { background: #fef3c7; color: #d97706; }
+.tw-modal-card .tag-pill-aux.opcional { background: #e2e8f0; color: #475569; }
 
 .tw-modal-card .field-aux input[type="text"],
 .tw-modal-card .field-aux select {
@@ -663,7 +618,6 @@
   box-sizing: border-box;
 }
 
-/* GRUPO DE FIRMA */
 .tw-modal-card .firma-group-aux {
   display: flex;
   align-items: center;
@@ -671,23 +625,24 @@
 }
 
 .tw-modal-card .btn-firma-aux {
-  background: #ffffff;
-  border: 1.5px solid #0f4c81;
-  color: #0f4c81;
-  height: 40px;
-  padding: 0 16px;
+  background: #0d4b82;
+  border: none;
+  color: #ffffff;
+  height: 42px;
+  padding: 0 20px;
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  box-shadow: 0 4px 10px rgba(13, 75, 130, 0.25);
   transition: all 0.2s;
 }
 
 .tw-modal-card .btn-firma-aux:hover {
-  background: #f0f7fc;
+  background: #093963;
 }
 
 .tw-modal-card .badge-status-aux {
@@ -697,17 +652,9 @@
   font-weight: 800;
 }
 
-.tw-modal-card .badge-status-aux.activa {
-  background: #16a34a;
-  color: #ffffff;
-}
+.tw-modal-card .badge-status-aux.activa { background: #16a34a; color: #ffffff; }
+.tw-modal-card .badge-status-aux.inactiva { background: #e2e8f0; color: #64748b; }
 
-.tw-modal-card .badge-status-aux.inactiva {
-  background: #e2e8f0;
-  color: #64748b;
-}
-
-/* INPUT FILE MODERNO */
 .tw-modal-card .file-input-aux {
   display: block !important;
   width: 100% !important;
@@ -737,71 +684,8 @@
   cursor: pointer !important;
 }
 
-.tw-modal-card-alert {
-  background: #ffffff !important;
-  border-radius: 16px !important;
-  box-shadow: 0 20px 35px -5px rgba(15, 23, 42, 0.25) !important;
-  width: 100% !important;
-  max-width: 420px !important; /* Limita el ancho para que no sea un rectángulo gigante */
-  margin: auto !important;
-  text-align: center !important;
-  overflow: hidden !important;
-  animation: twFadeIn 0.2s ease-out !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.tw-modal-card-alert .tw-modal-header {
-  padding: 24px 20px 14px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  text-align: center !important;
-  gap: 12px !important;
-}
-
-.tw-modal-card-alert .tw-modal-icon-circle {
-  width: 54px !important;
-  height: 54px !important;
-  min-width: 54px !important;
-  font-size: 24px !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.tw-modal-card-alert .tw-modal-title {
-  margin: 0 !important;
-  font-size: 18px !important;
-  font-weight: 800 !important;
-  color: #0f172a !important;
-}
-
-.tw-modal-card-alert .tw-modal-desc {
-  margin: 4px 0 0 !important;
-  font-size: 13.5px !important;
-  color: #475569 !important;
-  line-height: 1.4 !important;
-}
-
-.tw-modal-card-alert .tw-modal-footer {
-  padding: 10px 20px 20px !important;
-  background: transparent !important;
-  border-top: none !important;
-  display: flex !important;
-  justify-content: center !important;
-}
-
-.tw-modal-card-alert .tw-modal-btn {
-  width: 100% !important;
-  height: 38px !important;
-  border-radius: 10px !important;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-}
-
 /* =========================================
-   CANVAS DE FIRMA (UNA SOLA LÍNEA LIMPIA)
+   6. MODAL DE FIRMA
    ========================================= */
 .firma-modal-card {
   background: #ffffff;
@@ -818,7 +702,7 @@
 .firma-modal-header {
   padding: 24px 20px 10px;
   display: flex;
-  justify-content: center; /* Título 100% centrado como imagen 2 */
+  justify-content: center;
   align-items: center;
   border-bottom: none;
 }
@@ -838,7 +722,7 @@
 .canvas-container-firma {
   position: relative;
   width: 100%;
-  height: 380px; /* Tamaño amplio vertical para firmar con comodidad */
+  height: 380px;
   background: #ffffff;
   border: 1.5px dashed #cbd5e1;
   border-radius: 16px;
@@ -879,22 +763,21 @@
   border-top: none;
 }
 
-/* BOTONES APILADOS EN UNA SOLA LÍNEA (ÍCONO + TEXTO) */
 .btn-firma-full {
   width: 100%;
   height: 46px;
   border-radius: 12px;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
-  display: inline-flex !important;
-  flex-direction: row !important; /* Fuerza ícono y texto horizontal */
+  display: flex !important;
+  flex-direction: row !important;
   align-items: center !important;
   justify-content: center !important;
   gap: 8px !important;
-  white-space: nowrap !important; /* Evita que el texto caiga a otra línea */
+  white-space: nowrap !important;
   cursor: pointer;
   box-sizing: border-box;
-  transition: all 0.2s ease;
+  text-align: center;
 }
 
 .btn-firma-outline {
@@ -902,10 +785,7 @@
   border: 1.5px solid #cbd5e1;
   color: #0f172a;
 }
-.btn-firma-outline:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
-}
+.btn-firma-outline:hover { background: #f8fafc; border-color: #94a3b8; }
 
 .btn-firma-primary {
   background: #0d4b82;
@@ -913,12 +793,10 @@
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(13, 75, 130, 0.25);
 }
-.btn-firma-primary:hover {
-  background: #093963;
-}
+.btn-firma-primary:hover { background: #093963; }
 
 /* =========================================
-   RESPONSIVE MÓVIL (CIERRES DE LLAVE VERIFICADOS)
+   7. RESPONSIVE MÓVIL
    ========================================= */
 @media (max-width: 1150px) {
   .top-summary-grid { grid-template-columns: 1fr; }
@@ -949,35 +827,15 @@
   .filter-group.filter-buscar { grid-column: span 1; }
   .filters-actions-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .filters-actions-row button { width: 100%; justify-content: center; padding: 0 4px; font-size: 11.5px; }
-  
+
   .tw-modal-backdrop { padding: 8px !important; }
-
   .tw-modal-card { width: 98% !important; max-width: 98% !important; border-radius: 12px !important; padding: 14px 12px !important; }
-  .firma-modal-card {
-    width: 98% !important;
-    max-width: 98% !important;
-    border-radius: 20px !important;
-  }
-
-  .canvas-container-firma {
-    height: 380px !important; /* Mantiene el recuadro vertical amplio */
-  }
-
-  .firma-modal-body {
-    padding: 6px 10px !important;
-  }
-
-  .firma-modal-footer {
-    padding: 15px 14px 40px !important;
-    gap: 8px !important;
-  }
-
-  .btn-firma-full {
-    height: 48px !important;
-  }
-}
-
-
+  .firma-modal-card { width: 96% !important; max-width: 96% !important; border-radius: 20px !important; }
+  .canvas-container-firma { height: 380px !important; }
+  .firma-modal-body { padding: 6px 14px !important; }
+  .firma-modal-footer { padding: 12px 14px 20px !important; gap: 8px !important; }
+  .btn-firma-full { height: 48px !important; font-size: 14px !important; }
+  .tw-modal-card-alert { max-width: 94% !important; }
 }
 
 @keyframes twFadeIn {

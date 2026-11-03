@@ -122,17 +122,22 @@ export const subirImagenADrive = async (dataUrlBase64, nombreArchivo, tokenPrevi
 
   const fileData = await res.json();
   if (!res.ok || !fileData.id) {
-    throw new Error(fileData?.error?.message || 'Error al subir imagen');
+    throw new Error(fileData?.error?.message || 'Error al subir imagen a Google Drive.');
   }
 
-  fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ role: 'reader', type: 'anyone' })
-  }).catch(e => console.warn("Permiso diferido:", e));
+  // Esperar a que el archivo sea público antes de devolver la URL
+  try {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ role: 'reader', type: 'anyone' })
+    });
+  } catch (e) {
+    console.warn("Error asignando permiso:", e);
+  }
 
   return `https://drive.google.com/file/d/${fileData.id}/view`;
 };

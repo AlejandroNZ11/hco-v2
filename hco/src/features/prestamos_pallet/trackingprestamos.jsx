@@ -336,6 +336,29 @@ export default function TrackingPrestamos() {
     setModalFirmaVisible(false);
   };
 
+  // Función exacta de compresión idéntica a la que funcionaba en modal-prestamo
+const comprimirFotoSalida = (file, maxWidth = 1280) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
     const renderBadgeEstado = (estado) => {
     const e = String(estado || '').trim();
     if (e === 'Por despachar') return <span className="badge-estado por-despachar">Por despachar</span>;
@@ -599,133 +622,135 @@ export default function TrackingPrestamos() {
         </div>
       </section>
 
-      {/* MODAL FASE 2: AUXILIAR DE SALIDA */}
-      {modalAuxVisible && prestamoSeleccionado && (
+        {/* MODAL FASE 2: AUXILIAR DE SALIDA ESTILIZADO */}
+        {modalAuxVisible && prestamoSeleccionado && (
         <div className="tw-modal-backdrop" onClick={() => setModalAuxVisible(false)}>
-          <div className="tw-modal-card" style={{ maxWidth: '540px', padding: '24px' }} onClick={e => e.stopPropagation()}>
+            <div className="tw-modal-card" style={{ maxWidth: '480px', padding: '22px' }} onClick={e => e.stopPropagation()}>
             <div className="card-head-modern" style={{ padding: 0, marginBottom: '16px' }}>
-              <div>
+                <div>
                 <span className="module-pill">DESPACHO AUXILIAR</span>
                 <h3 style={{ margin: '4px 0 0', fontSize: '18px', fontWeight: 800 }}>
-                  Completar Salida ({prestamoSeleccionado.id_prestamo})
+                    Completar Salida ({prestamoSeleccionado.id_prestamo})
                 </h3>
-                <small style={{ color: '#64748b' }}>Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> | Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong></small>
-              </div>
-              <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>✕</button>
+                <small style={{ color: '#64748b' }}>
+                    Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> | Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong>
+                </small>
+                </div>
+                <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>✕</button>
             </div>
 
             <form onSubmit={handleGuardarDespachoAuxiliar}>
-              {/* N° Paletas */}
-              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
-                <div className="label-head-p">
-                  <label>N° paletas prestadas</label>
-                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                {/* N° Paletas */}
+                <div className="field-aux">
+                <div className="label-head-aux">
+                    <label>N° paletas prestadas</label>
+                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
                 </div>
                 <input
-                  type="text"
-                  inputMode="numeric"
-                  value={auxData.nr_paletas}
-                  onChange={e => setAuxData({ ...auxData, nr_paletas: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                  placeholder="Ej: 15"
-                  required
-                  autoFocus
+                    type="text"
+                    inputMode="numeric"
+                    value={auxData.nr_paletas}
+                    onChange={e => setAuxData({ ...auxData, nr_paletas: e.target.value.replace(/\D/g, '').slice(0, 3) })}
+                    placeholder="Ej: 15"
+                    required
+                    autoFocus
                 />
-              </div>
+                </div>
 
-              {/* ¿Retorna? */}
-              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
-                <div className="label-head-p">
-                  <label>¿Retorna?</label>
-                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                {/* ¿Retorna? */}
+                <div className="field-aux">
+                <div className="label-head-aux">
+                    <label>¿Retorna?</label>
+                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
                 </div>
                 <select
-                  value={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno}
-                  onChange={e => setAuxData({ ...auxData, retorno: e.target.value })}
-                  disabled={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE'}
+                    value={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno}
+                    onChange={e => setAuxData({ ...auxData, retorno: e.target.value })}
+                    disabled={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE'}
                 >
-                  <option value="SI">SÍ</option>
-                  <option value="NO">NO</option>
+                    <option value="SI">SÍ</option>
+                    <option value="NO">NO</option>
                 </select>
-              </div>
-
-              {/* Firma Conductor */}
-              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
-                <div className="label-head-p">
-                  <label>Firma del conductor</label>
-                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
                 </div>
-                <div className="firma-input-group-p">
-                  <button type="button" className="btn-firma-p" onClick={() => { setFirmaTarget('auxiliar'); setModalFirmaVisible(true); }}>
+
+                {/* Firma Conductor */}
+                <div className="field-aux">
+                <div className="label-head-aux">
+                    <label>Firma del conductor</label>
+                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
+                </div>
+                <div className="firma-group-aux">
+                    <button
+                    type="button"
+                    className="btn-firma-aux"
+                    onClick={() => { setFirmaTarget('auxiliar'); setModalFirmaVisible(true); }}
+                    >
                     <FaPenNib /> Firmar Salida
-                  </button>
-                  <span className={`badge-firma-p ${auxData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
+                    </button>
+                    <span className={`badge-status-aux ${auxData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
                     {auxData.firma_conductor_base64 ? 'Firma lista' : 'Sin firma'}
-                  </span>
+                    </span>
                 </div>
-              </div>
+                </div>
 
-              {/* Foto de Salida (Obligatorio en Outbound Principal) */}
-              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
-                <div className="label-head-p">
-                  <label>Foto de salida</label>
-                  <span className={`tag-pill ${prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'obligatorio' : 'opcional'}`}>
+                {/* Foto de Salida */}
+                <div className="field-aux">
+                <div className="label-head-aux">
+                    <label>Foto de salida</label>
+                    <span className={`tag-pill-aux ${prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'obligatorio' : 'opcional'}`}>
                     {prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'OBLIGATORIO' : 'OPCIONAL'}
-                  </span>
+                    </span>
                 </div>
                 <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="file-input-p"
-                  onChange={async (e) => {
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="file-input-aux"
+                    onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      const img = new Image();
-                      img.onload = () => {
-                        const scale = Math.min(1, 1280 / img.width);
-                        const canvas = document.createElement('canvas');
-                        canvas.width = Math.round(img.width * scale);
-                        canvas.height = Math.round(img.height * scale);
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        setAuxData(prev => ({ ...prev, foto_salida_base64: canvas.toDataURL('image/png') }));
-                      };
-                      img.src = reader.result;
-                    };
-                    reader.readAsDataURL(file);
-                  }}
+                    try {
+                        const base64 = await comprimirFotoSalida(file, 1280);
+                        setAuxData(prev => ({ ...prev, foto_salida_base64: base64 }));
+                    } catch (err) {
+                        console.error("Error al comprimir foto auxiliar:", err);
+                        mostrarAviso('danger', 'Error de imagen', 'No se pudo procesar la fotografía.');
+                    }
+                    }}
                 />
-                <span className={`badge-firma-p ${auxData.foto_salida_base64 ? 'activa' : 'inactiva'}`} style={{ marginTop: '4px' }}>
-                  {auxData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
-                </span>
-              </div>
+                <div style={{ marginTop: '6px' }}>
+                    <span className={`badge-status-aux ${auxData.foto_salida_base64 ? 'activa' : 'inactiva'}`}>
+                    {auxData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
+                    </span>
+                </div>
+                </div>
 
-              {/* Observación */}
-              <div className="field-p field-manual-p" style={{ marginBottom: '16px' }}>
-                <div className="label-head-p">
-                  <label>Observación de salida</label>
-                  <span className="tag-pill opcional">OPCIONAL</span>
+                {/* Observación */}
+                <div className="field-aux" style={{ marginBottom: '18px' }}>
+                <div className="label-head-aux">
+                    <label>Observación de salida</label>
+                    <span className="tag-pill-aux opcional">OPCIONAL</span>
                 </div>
                 <textarea
-                  value={auxData.observacion_salida}
-                  onChange={e => setAuxData({ ...auxData, observacion_salida: e.target.value })}
-                  rows={2}
-                  placeholder="Detalles del despacho físico..."
+                    value={auxData.observacion_salida}
+                    onChange={e => setAuxData({ ...auxData, observacion_salida: e.target.value })}
+                    rows={2}
+                    placeholder="Detalles del despacho físico..."
                 />
-              </div>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>Cancelar</button>
-                <button type="submit" className="btn-action-primary" disabled={loading}>
-                  <FaSave /> Finalizar Despacho
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>
+                    Cancelar
                 </button>
-              </div>
+                <button type="submit" className="btn-action-primary" disabled={loading}>
+                    <FaSave /> Finalizar Despacho
+                </button>
+                </div>
             </form>
-          </div>
+            </div>
         </div>
-      )}
+        )}
 
       {/* MODAL DEVOLUCIÓN */}
       {modalDevVisible && prestamoSeleccionado && (
@@ -745,61 +770,39 @@ export default function TrackingPrestamos() {
               <div className="split-layout" style={{ gap: '20px', display: 'flex' }}>
                 <div style={{ flex: 1, background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
                   <div className="section-title" style={{ marginTop: 0, marginBottom: '12px', fontSize: '12px', fontWeight: 800, color: '#0f4c81', textTransform: 'uppercase' }}>Datos de Salida</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px', textAlign: 'center' }}>
-                    <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }}>
-                      <div style={{ fontSize: '18px', fontWeight: 800 }}>{prestamoSeleccionado.nr_paletas}</div>
-                      <small style={{ color: '#64748b', fontWeight: 700, fontSize: '10px' }}>PRESTADAS</small>
-                    </div>
-                    <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }}>
-                      <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f4c81' }}>{prestamoSeleccionado.nr_paletas_devueltas}</div>
-                      <small style={{ color: '#64748b', fontWeight: 700, fontSize: '10px' }}>DEVUELTAS</small>
-                    </div>
-                    <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }}>
-                      <div style={{ fontSize: '18px', fontWeight: 800, color: Number(prestamoSeleccionado.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>
-                        {prestamoSeleccionado.paletas_pendientes}
-                      </div>
-                      <small style={{ color: '#64748b', fontWeight: 700, fontSize: '10px' }}>PENDIENTES</small>
-                    </div>
-                  </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
+                        {/* FIRMA DE SALIDA */}
+                        {prestamoSeleccionado.firma_conductor && (
+                            <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                Firma Salida
+                            </span>
+                            <img 
+                                src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
+                                alt="Firma" 
+                                style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                                onError={e => { e.target.style.display = 'none'; }} 
+                            />
+                            </div>
+                        )}
 
-                  <div className="filter-group" style={{ marginBottom: '10px' }}>
-                    <label>Placa (Salida)</label>
-                    <input value={devData.placa_editada} onChange={e => setDevData({ ...devData, placa_editada: e.target.value.toUpperCase() })} readOnly={modoLectura || !esAdmin} />
-                  </div>
-                  <div className="filter-group" style={{ marginBottom: '10px' }}>
-                    <label>Despachador</label>
-                    <input value={prestamoSeleccionado.despachador} readOnly />
-                  </div>
-                  <div className="filter-group" style={{ marginBottom: '10px' }}>
-                    <label>Observación de salida</label>
-                    <textarea value={prestamoSeleccionado.observacion_salida || 'Sin observaciones'} rows={2} readOnly />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-                    {prestamoSeleccionado.firma_conductor && (
-                      <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>Firma Salida</span>
-                        <img 
-                          src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
-                          alt="Firma" 
-                          style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
-                          onError={e => { e.target.style.display = 'none'; }} 
-                        />
-                      </div>
-                    )}
-                    {prestamoSeleccionado.foto_salida && (
-                      <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>Foto Salida</span>
-                        <img 
-                          src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
-                          alt="Foto" 
-                          style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
-                          onError={e => { e.target.style.display = 'none'; }} 
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
+                        {/* FOTO DE SALIDA */}
+                        {prestamoSeleccionado.foto_salida && (
+                            <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                            <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>
+                                Foto Salida
+                            </span>
+                            <img 
+                                src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
+                                alt="Foto" 
+                                style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                                onError={e => { e.target.style.display = 'none'; }} 
+                            />
+                            </div>
+                        )}
+                        </div>
+                 
+                    </div>
 
                 <div style={{ flex: 1, padding: '4px' }}>
                   <div className="section-title" style={{ marginTop: 0, marginBottom: '12px', fontSize: '12px', fontWeight: 800, color: '#0f4c81', textTransform: 'uppercase' }}>Datos para la Devolución</div>

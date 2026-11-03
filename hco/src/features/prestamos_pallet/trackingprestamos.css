@@ -585,6 +585,159 @@
 }
 
 /* =========================================
+   ESTILOS FORMULARIO MODAL DESPACHO AUXILIAR
+   ========================================= */
+.tw-modal-card .field-aux {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+.tw-modal-card .label-head-aux {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tw-modal-card .label-head-aux label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  margin: 0;
+}
+
+.tw-modal-card .tag-pill-aux {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  display: inline-block;
+}
+
+.tw-modal-card .tag-pill-aux.obligatorio {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.tw-modal-card .tag-pill-aux.opcional {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.tw-modal-card .field-aux input[type="text"],
+.tw-modal-card .field-aux select {
+  width: 100%;
+  height: 42px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  padding: 0 12px;
+  outline: none;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.tw-modal-card .field-aux input[type="text"]:focus,
+.tw-modal-card .field-aux select:focus,
+.tw-modal-card .field-aux textarea:focus {
+  border-color: #0f4c81;
+  box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+}
+
+.tw-modal-card .field-aux textarea {
+  width: 100%;
+  border-radius: 10px;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  outline: none;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+/* GRUPO DE FIRMA */
+.tw-modal-card .firma-group-aux {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tw-modal-card .btn-firma-aux {
+  background: #ffffff;
+  border: 1.5px solid #0f4c81;
+  color: #0f4c81;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.tw-modal-card .btn-firma-aux:hover {
+  background: #f0f7fc;
+}
+
+.tw-modal-card .badge-status-aux {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tw-modal-card .badge-status-aux.activa {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.tw-modal-card .badge-status-aux.inactiva {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+/* INPUT FILE MODERNO */
+.tw-modal-card .file-input-aux {
+  display: block !important;
+  width: 100% !important;
+  height: 42px !important;
+  padding: 3px 12px !important;
+  box-sizing: border-box !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+}
+
+.tw-modal-card .file-input-aux::-webkit-file-upload-button,
+.tw-modal-card .file-input-aux::file-selector-button {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  margin: 0 10px 0 0 !important;
+  height: 100% !important;
+  padding: 0 14px !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  color: #0f172a !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+}
+
+/* =========================================
    6. RESPONSIVE MÓVIL (HASTA 1150px y 600px)
    ========================================= */
 @media (max-width: 1150px) {

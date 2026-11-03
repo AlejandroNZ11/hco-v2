@@ -10,7 +10,9 @@ import {
   FaCheck,
   FaTimes,
   FaSave,
-  FaClipboardList
+  FaClipboardList,
+  FaImage,
+  FaSearchPlus
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './tracking_lup.css';
@@ -26,9 +28,7 @@ import {
 } from '../../services/lupService';
 
 const ITEMS_POR_PAGINA = 50;
-
 const TIPOS_LUP = ['MEJORA', 'PROBLEMA', 'CONDICION BASICA'];
-
 const IMPACTOS_LUP = [
   'CALIDAD',
   'PRODUCTIVIDAD',
@@ -43,16 +43,18 @@ const IMPACTOS_LUP = [
 function getStoredAuthUser() {
   const raw = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
   if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(raw); } catch { return null; }
 }
 
-/**
- * Calcula el número de semana ISO (1 - 53) a partir de una fecha YYYY-MM-DD
- */
+const extraerIdDrive = (url) => {
+  if (!url) return null;
+  const str = String(url).trim();
+  const match = str.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+                str.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+                str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : (str.length > 20 && !str.includes('/') ? str : null);
+};
+
 function calcularSemanaDesdeFecha(fechaStr) {
   if (!fechaStr) return '';
   const partes = String(fechaStr).split('-');
@@ -63,13 +65,9 @@ function calcularSemanaDesdeFecha(fechaStr) {
   const diaSemana = fecha.getUTCDay() || 7;
   fecha.setUTCDate(fecha.getUTCDate() + 4 - diaSemana);
   const inicioAnio = new Date(Date.UTC(fecha.getUTCFullYear(), 0, 1));
-  const numeroSemana = Math.ceil((((fecha - inicioAnio) / 86400000) + 1) / 7);
-  return numeroSemana;
+  return Math.ceil((((fecha - inicioAnio) / 86400000) + 1) / 7);
 }
 
-/**
- * Obtiene la fecha actual en zona horaria de Lima en formato YYYY-MM-DD
- */
 function obtenerFechaHoyLima() {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Lima',
@@ -79,9 +77,6 @@ function obtenerFechaHoyLima() {
   }).format(new Date());
 }
 
-/**
- * Formatea un timestamp ISO mostrando siempre la fecha y hora de Lima (UTC-5)
- */
 function formatearFechaHoraLima(fechaIso) {
   if (!fechaIso) return '-';
   try {
@@ -137,12 +132,11 @@ export default function TrackingLup() {
   const puedeGestionar =
     rolUsuario === 'superadmin' || rolUsuario === 'supervisor' || rolUsuario === 'admin' || !rolUsuario;
 
-  // Referencias para arrastrar tabla con el mouse
   const tableContainerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragData = useRef({ startX: 0, scrollLeft: 0 });
 
-  // Estados de Filtros
+  // Filtros
   const [filtrosForm, setFiltrosForm] = useState({
     buscar: '',
     tipoLup: 'Todos',
@@ -165,12 +159,15 @@ export default function TrackingLup() {
 
   const [paginaActual, setPaginaActual] = useState(1);
 
-  // Estados del Modal (Crear / Editar)
+  // Estados del Modal Principal
   const [modalOpen, setModalOpen] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [registroSeleccionado, setRegistroSeleccionado] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [errorModal, setErrorModal] = useState('');
+
+  // Estado para el Zoom de la Foto
+  const [zoomFotoUrl, setZoomFotoUrl] = useState(null);
 
   const estadoInicialFormulario = {
     numero_lup: '',
@@ -194,7 +191,9 @@ export default function TrackingLup() {
     realizo_kaizen: 'NO',
     cod_kaizen: '',
     operatividad: 'ACTIVO',
-    impacto_co2: ''
+    impacto_co2: '',
+    foto_lup: '',
+    foto_lup_base64: ''
   };
 
   const [formData, setFormData] = useState(estadoInicialFormulario);
@@ -221,7 +220,6 @@ export default function TrackingLup() {
     }
   };
 
-  // Mapas rápidos para cruce de Empleados, Jefes y Áreas
   const mapaEmpleadosPorId = useMemo(() => {
     const mapa = {};
     empleados.forEach((emp) => {
@@ -240,7 +238,6 @@ export default function TrackingLup() {
     return mapa;
   }, [areas]);
 
-  // Sugeridor de correlativo N° LUP (Ej: LUP-0001)
   const generarSiguienteNumeroLup = () => {
     if (lups.length === 0) return 'LUP-0001';
     const numeros = lups
@@ -253,73 +250,45 @@ export default function TrackingLup() {
     return `LUP-${String(maxNum + 1).padStart(4, '0')}`;
   };
 
-  // Normaliza operatividad
   const esLupActiva = (reg) => {
     if (!reg.operatividad) return true;
     return String(reg.operatividad).toUpperCase().trim() === 'ACTIVO';
   };
 
-  // Arrastre de tabla con el mouse
   const handleMouseDown = (e) => {
     if (e.target.closest('button')) return;
     const container = tableContainerRef.current;
     if (!container) return;
-
     setIsDragging(true);
     dragData.current.startX = e.pageX - container.offsetLeft;
     dragData.current.scrollLeft = container.scrollLeft;
   };
 
-  const handleMouseUpOrLeave = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUpOrLeave = () => { setIsDragging(false); };
 
   const handleMouseMove = (e) => {
     if (!isDragging) return;
     e.preventDefault();
     const container = tableContainerRef.current;
     if (!container) return;
-
     const x = e.pageX - container.offsetLeft;
     const walk = (x - dragData.current.startX) * 1.4;
     container.scrollLeft = dragData.current.scrollLeft - walk;
   };
 
-  // Contadores KPI
   const totalLupCount = lups.length;
+  const entrenadosCount = useMemo(() => lups.filter((l) => String(l.entrenamiento).toUpperCase() === 'ENTRENADO').length, [lups]);
+  const activosCount = useMemo(() => lups.filter((l) => esLupActiva(l)).length, [lups]);
+  const inactivosCount = useMemo(() => lups.filter((l) => !esLupActiva(l)).length, [lups]);
 
-  const entrenadosCount = useMemo(() => {
-    return lups.filter((l) => String(l.entrenamiento).toUpperCase() === 'ENTRENADO').length;
-  }, [lups]);
-
-  const activosCount = useMemo(() => {
-    return lups.filter((l) => esLupActiva(l)).length;
-  }, [lups]);
-
-  const inactivosCount = useMemo(() => {
-    return lups.filter((l) => !esLupActiva(l)).length;
-  }, [lups]);
-
-  // Filtrado de registros
   const registrosFiltrados = useMemo(() => {
     return lups.filter((reg) => {
       const operatividadTexto = esLupActiva(reg) ? 'ACTIVO' : 'INACTIVO';
 
-      if (filtrosActivos.tipoLup !== 'Todos' && reg.tipo_lup !== filtrosActivos.tipoLup) {
-        return false;
-      }
-
-      if (filtrosActivos.impacto !== 'Todos' && reg.impacto !== filtrosActivos.impacto) {
-        return false;
-      }
-
-      if (filtrosActivos.entrenamiento !== 'Todos' && reg.entrenamiento !== filtrosActivos.entrenamiento) {
-        return false;
-      }
-
-      if (filtrosActivos.operatividad !== 'Todos' && operatividadTexto !== filtrosActivos.operatividad) {
-        return false;
-      }
+      if (filtrosActivos.tipoLup !== 'Todos' && reg.tipo_lup !== filtrosActivos.tipoLup) return false;
+      if (filtrosActivos.impacto !== 'Todos' && reg.impacto !== filtrosActivos.impacto) return false;
+      if (filtrosActivos.entrenamiento !== 'Todos' && reg.entrenamiento !== filtrosActivos.entrenamiento) return false;
+      if (filtrosActivos.operatividad !== 'Todos' && operatividadTexto !== filtrosActivos.operatividad) return false;
 
       if (filtrosActivos.fechaIni && reg.fecha_lup) {
         const fechaIso = String(reg.fecha_lup).slice(0, 10);
@@ -338,15 +307,12 @@ export default function TrackingLup() {
           reg.colaborador,
           reg.area,
           reg.jefe,
-          reg.rol,
           reg.tipo_lup,
           reg.impacto,
           reg.area_impacto,
           reg.titulo,
           reg.cod_kaizen,
-          reg.impacto_co2,
-          reg.usuario_registra,
-          reg.usuario_actualiza
+          reg.impacto_co2
         ]
           .filter(Boolean)
           .join(' ')
@@ -359,13 +325,9 @@ export default function TrackingLup() {
     });
   }, [lups, filtrosActivos]);
 
-  // Paginación
   const totalPaginas = Math.max(1, Math.ceil(registrosFiltrados.length / ITEMS_POR_PAGINA));
   const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA;
-  const registrosPaginados = registrosFiltrados.slice(
-    indiceInicio,
-    indiceInicio + ITEMS_POR_PAGINA
-  );
+  const registrosPaginados = registrosFiltrados.slice(indiceInicio, indiceInicio + ITEMS_POR_PAGINA);
 
   const handleAplicarFiltros = () => {
     setFiltrosActivos({ ...filtrosForm });
@@ -387,9 +349,6 @@ export default function TrackingLup() {
     setPaginaActual(1);
   };
 
-  // =========================================
-  // HANDLERS DE AUTOCOMPLETADO EN EL MODAL
-  // =========================================
   const handleChangeFechaLup = (nuevaFecha) => {
     const semanaCalculada = calcularSemanaDesdeFecha(nuevaFecha);
     setFormData((prev) => ({
@@ -441,9 +400,42 @@ export default function TrackingLup() {
     }));
   };
 
-  // =========================================
-  // LÓGICA DEL MODAL (CREAR Y EDITAR)
-  // =========================================
+  const comprimirImagenAPng = (file, maxWidth = 1280) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFotoLupChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      return setErrorModal('Seleccione un archivo de imagen válido.');
+    }
+    try {
+      const dataUrlPng = await comprimirImagenAPng(file, 1280);
+      setFormData((prev) => ({ ...prev, foto_lup_base64: dataUrlPng }));
+    } catch {
+      setErrorModal('No se pudo procesar la imagen.');
+    }
+  };
+
   const handleAbrirModalCrear = () => {
     const hoyLima = obtenerFechaHoyLima();
     setModoEdicion(false);
@@ -486,7 +478,9 @@ export default function TrackingLup() {
       realizo_kaizen: reg.realizo_kaizen || 'NO',
       cod_kaizen: reg.cod_kaizen || '',
       operatividad: reg.operatividad || 'ACTIVO',
-      impacto_co2: reg.impacto_co2 || ''
+      impacto_co2: reg.impacto_co2 || '',
+      foto_lup: reg.foto_lup || '',
+      foto_lup_base64: ''
     });
     setModalOpen(true);
   };
@@ -507,21 +501,11 @@ export default function TrackingLup() {
     const codKaizenLimpio = String(formData.cod_kaizen || '').trim().toUpperCase();
     const impactoCo2Limpio = String(formData.impacto_co2 || '').trim();
 
-    if (!numLupLimpio) {
-      return setErrorModal('El N° de LUP es obligatorio.');
-    }
-    if (!formData.fecha_lup) {
-      return setErrorModal('Debe seleccionar la fecha de la LUP.');
-    }
-    if (!formData.colaborador) {
-      return setErrorModal('Debe seleccionar un colaborador.');
-    }
-    if (!formData.area_impacto) {
-      return setErrorModal('Debe seleccionar el área de impacto.');
-    }
-    if (!tituloLimpio) {
-      return setErrorModal('El título de la LUP es obligatorio.');
-    }
+    if (!numLupLimpio) return setErrorModal('El N° de LUP es obligatorio.');
+    if (!formData.fecha_lup) return setErrorModal('Debe seleccionar la fecha de la LUP.');
+    if (!formData.colaborador) return setErrorModal('Debe seleccionar un colaborador.');
+    if (!formData.area_impacto) return setErrorModal('Debe seleccionar el área de impacto.');
+    if (!tituloLimpio) return setErrorModal('El título de la LUP es obligatorio.');
     if (formData.entrenamiento === 'ENTRENADO' && !formData.fecha_entrenamiento) {
       return setErrorModal('La fecha de entrenamiento es obligatoria cuando el estado es ENTRENADO.');
     }
@@ -555,7 +539,9 @@ export default function TrackingLup() {
       realizo_kaizen: formData.realizo_kaizen,
       cod_kaizen: formData.realizo_kaizen === 'SI' ? codKaizenLimpio : null,
       operatividad: formData.operatividad || 'ACTIVO',
-      impacto_co2: impactoCo2Limpio || null
+      impacto_co2: impactoCo2Limpio || null,
+      foto_lup: formData.foto_lup,
+      foto_lup_base64: formData.foto_lup_base64
     };
 
     try {
@@ -587,21 +573,14 @@ export default function TrackingLup() {
     }
   };
 
-  // =========================================
-  // ACTIVAR / DESACTIVAR OPERATIVIDAD LUP
-  // =========================================
   const handleToggleOperatividad = async (reg) => {
-    if (!puedeGestionar) {
-      return alert('No tienes permisos para cambiar la operatividad de la LUP.');
-    }
+    if (!puedeGestionar) return alert('No tienes permisos para cambiar la operatividad de la LUP.');
 
     const actualmenteActivo = esLupActiva(reg);
     const nuevaOperatividad = actualmenteActivo ? 'INACTIVO' : 'ACTIVO';
     const accionTexto = actualmenteActivo ? 'inactivar' : 'activar';
 
-    const confirmar = window.confirm(
-      `¿Está seguro que desea ${accionTexto} la LUP "${reg.numero_lup}" (${reg.titulo})?`
-    );
+    const confirmar = window.confirm(`¿Está seguro que desea ${accionTexto} la LUP "${reg.numero_lup}" (${reg.titulo})?`);
     if (!confirmar) return;
 
     const ahoraIso = new Date().toISOString();
@@ -622,28 +601,18 @@ export default function TrackingLup() {
     }
   };
 
-  // =========================================
-  // EXPORTAR A EXCEL
-  // =========================================
   const handleExportarExcel = () => {
-    if (!puedeExportar) {
-      return alert('No tienes permisos para exportar.');
-    }
-
-    if (registrosFiltrados.length === 0) {
-      return alert('No hay registros para exportar.');
-    }
+    if (!puedeExportar) return alert('No tienes permisos para exportar.');
+    if (registrosFiltrados.length === 0) return alert('No hay registros para exportar.');
 
     const datosExcel = registrosFiltrados.map((reg, idx) => ({
       'Item': idx + 1,
       'N° LUP': reg.numero_lup || '-',
-      'Fecha Registro (Lima)': formatearFechaHoraLima(reg.fecha_registro),
       'Fecha LUP': formatearSoloFecha(reg.fecha_lup),
       'Semana': reg.semana ?? '-',
       'Colaborador': reg.colaborador || '-',
       'Área Colaborador': reg.area || '-',
       'Jefe Directo': reg.jefe || '-',
-      'Rol': reg.rol || '-',
       'Tipo LUP': reg.tipo_lup || '-',
       'Impacto': reg.impacto || '-',
       'Área Impacto': reg.area_impacto || '-',
@@ -654,43 +623,42 @@ export default function TrackingLup() {
       'Realizó Kaizen': reg.realizo_kaizen || 'NO',
       'Cód. Kaizen': reg.cod_kaizen || '-',
       'Operatividad': reg.operatividad || 'ACTIVO',
-      'Impacto CO2': reg.impacto_co2 || '-',
-      'Usuario Actualiza': reg.usuario_actualiza || '-',
-      'Fecha Actualiza': formatearFechaHoraLima(reg.fecha_actualiza)
+      'Impacto CO2': reg.impacto_co2 || '-'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(datosExcel);
     worksheet['!cols'] = [
-      { wch: 6 },  // Item
-      { wch: 14 }, // N° LUP
-      { wch: 18 }, // Fecha Registro
-      { wch: 12 }, // Fecha LUP
-      { wch: 9 },  // Semana
-      { wch: 32 }, // Colaborador
-      { wch: 20 }, // Área
-      { wch: 30 }, // Jefe
-      { wch: 16 }, // Rol
-      { wch: 18 }, // Tipo LUP
-      { wch: 18 }, // Impacto
-      { wch: 20 }, // Área Impacto
-      { wch: 42 }, // Título
-      { wch: 14 }, // Estado
-      { wch: 16 }, // Entrenamiento
-      { wch: 16 }, // Fecha Entrenamiento
-      { wch: 14 }, // Realizó Kaizen
-      { wch: 16 }, // Cód. Kaizen
-      { wch: 14 }, // Operatividad
-      { wch: 22 }, // Impacto CO2
-      { wch: 22 }, // Usuario Actualiza
-      { wch: 18 }  // Fecha Actualiza
+      { wch: 6 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 9 },
+      { wch: 32 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 42 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 22 }
     ];
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Tracking_LUP');
-
-    const fechaHoy = obtenerFechaHoyLima();
-    XLSX.writeFile(workbook, `Tracking_LUP_${fechaHoy}.xlsx`);
+    XLSX.writeFile(workbook, `Tracking_LUP_${obtenerFechaHoyLima()}.xlsx`);
   };
+
+  // URL resuelta para renderizar en el contenedor del modal
+  const urlFotoRender = useMemo(() => {
+    if (formData.foto_lup_base64) return formData.foto_lup_base64;
+    const driveId = extraerIdDrive(formData.foto_lup);
+    return driveId ? `https://lh3.googleusercontent.com/d/${driveId}` : null;
+  }, [formData.foto_lup, formData.foto_lup_base64]);
 
   return (
     <div className="tracking-lup-page">
@@ -726,7 +694,7 @@ export default function TrackingLup() {
         </section>
       </div>
 
-      {/* 2. SECCIÓN MEDIA: FILTROS Y BOTONES */}
+      {/* 2. FILTROS Y BOTONES */}
       <section className="filters-card">
         <div className="filters-grid">
           <div className="filter-group filter-buscar">
@@ -839,7 +807,7 @@ export default function TrackingLup() {
         </div>
       </section>
 
-      {/* 3. SECCIÓN INFERIOR: TABLA Y PAGINACIÓN */}
+      {/* 3. TABLA (COLUMNA FOTO RETIRADA) */}
       <section className="table-section-card">
         <div className="table-topbar">
           <span className="records-counter">
@@ -896,13 +864,11 @@ export default function TrackingLup() {
             <thead>
               <tr>
                 <th>N° LUP</th>
-                <th>Fecha Registro</th>
                 <th>Fecha LUP</th>
                 <th>Sem.</th>
                 <th>Colaborador</th>
                 <th>Área</th>
                 <th>Jefe</th>
-                <th>Rol</th>
                 <th>Tipo LUP</th>
                 <th>Impacto</th>
                 <th>Área Impacto</th>
@@ -914,15 +880,13 @@ export default function TrackingLup() {
                 <th>Cód. Kaizen</th>
                 <th>Operatividad</th>
                 <th>Impacto CO2</th>
-                <th>Usuario Actualiza</th>
-                <th>Fecha Actualiza</th>
                 <th style={{ textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {registrosPaginados.length === 0 ? (
                 <tr>
-                  <td colSpan="22" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
+                  <td colSpan="18" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
                     No se encontraron registros de LUP con los filtros seleccionados.
                   </td>
                 </tr>
@@ -934,7 +898,6 @@ export default function TrackingLup() {
                   return (
                     <tr key={reg.id || reg.numero_lup || index}>
                       <td style={{ fontWeight: '800', color: '#0f4c81' }}>{reg.numero_lup || '-'}</td>
-                      <td>{formatearFechaHoraLima(reg.fecha_registro)}</td>
                       <td style={{ fontWeight: '700' }}>{formatearSoloFecha(reg.fecha_lup)}</td>
                       <td>
                         <span className="semana-pill">S{reg.semana ?? '-'}</span>
@@ -944,7 +907,6 @@ export default function TrackingLup() {
                         <span className="empresa-tag">{reg.area || '-'}</span>
                       </td>
                       <td style={{ textAlign: 'left' }}>{reg.jefe || '-'}</td>
-                      <td>{reg.rol || '-'}</td>
                       <td>
                         <span className={`badge-tipo-lup tipo-${String(reg.tipo_lup || '').toLowerCase().replace(/\s+/g, '-')}`}>
                           {reg.tipo_lup || '-'}
@@ -954,7 +916,7 @@ export default function TrackingLup() {
                         <span className="empresa-tag">{reg.impacto || '-'}</span>
                       </td>
                       <td>{reg.area_impacto || '-'}</td>
-                      <td style={{ textAlign: 'left', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={reg.titulo}>
+                      <td style={{ textAlign: 'left', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={reg.titulo}>
                         <strong>{reg.titulo || '-'}</strong>
                       </td>
                       <td>
@@ -974,17 +936,13 @@ export default function TrackingLup() {
                         </span>
                       </td>
                       <td>{reg.impacto_co2 || '-'}</td>
-                      <td>{reg.usuario_actualiza || '-'}</td>
-                      <td>{formatearFechaHoraLima(reg.fecha_actualiza)}</td>
                       <td style={{ textAlign: 'center' }}>
                         <div className="acciones-cell">
                           <button
                             type="button"
                             className={`btn-tabla-editar ${!puedeGestionar ? 'disabled-by-role' : ''}`}
                             onClick={() => {
-                              if (!puedeGestionar) {
-                                return alert('No tienes permisos para editar LUPs.');
-                              }
+                              if (!puedeGestionar) return alert('No tienes permisos para editar.');
                               handleAbrirModalEditar(reg);
                             }}
                             title="Editar LUP"
@@ -1014,7 +972,7 @@ export default function TrackingLup() {
         </div>
       </section>
 
-      {/* 4. MODAL DE REGISTRO Y EDICIÓN DE LUP */}
+      {/* 4. MODAL ORGANIZADO EN 4 COLUMNAS */}
       {modalOpen && (
         <div className="tc-modal-overlay" onClick={handleCerrarModal}>
           <div className="tc-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -1028,7 +986,7 @@ export default function TrackingLup() {
                   <p>
                     {modoEdicion
                       ? `Actualizando datos de la ${registroSeleccionado?.numero_lup || ''}`
-                      : 'Complete los datos de la Lección de Un Punto. Los campos del colaborador se autocompletan.'}
+                      : 'Complete los datos de la Lección de Un Punto en el formulario.'}
                   </p>
                 </div>
               </div>
@@ -1050,8 +1008,8 @@ export default function TrackingLup() {
                   </div>
                 )}
 
-                <div className="lup-form-grid">
-                  {/* N° LUP */}
+                <div className="lup-form-grid-4cols">
+                  {/* FILA 1: N° LUP - Fecha LUP - Semana - Rol */}
                   <div className="tc-form-group">
                     <label>N° LUP <span className="req">*</span></label>
                     <input
@@ -1063,7 +1021,6 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* Fecha LUP */}
                   <div className="tc-form-group">
                     <label>Fecha LUP <span className="req">*</span></label>
                     <input
@@ -1074,7 +1031,6 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* Semana (Automático desde fecha_lup) */}
                   <div className="tc-form-group">
                     <label>Semana (Automático)</label>
                     <input
@@ -1085,7 +1041,18 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* Colaborador (Select desde tabla empleados) */}
+                  <div className="tc-form-group">
+                    <label>Rol (empleados.tipo)</label>
+                    <input
+                      type="text"
+                      value={formData.rol}
+                      placeholder="Automático"
+                      readOnly
+                      className="input-readonly"
+                    />
+                  </div>
+
+                  {/* FILA 2: Colaborador - Jefe Directo */}
                   <div className="tc-form-group span-2">
                     <label>Colaborador <span className="req">*</span></label>
                     <select
@@ -1102,43 +1069,29 @@ export default function TrackingLup() {
                     </select>
                   </div>
 
-                  {/* Rol del Colaborador (Automático desde empleados.tipo) */}
-                  <div className="tc-form-group">
-                    <label>Rol (empleados.tipo)</label>
-                    <input
-                      type="text"
-                      value={formData.rol}
-                      placeholder="Se jala del colaborador"
-                      readOnly
-                      className="input-readonly"
-                    />
-                  </div>
-
-                  {/* Área del Colaborador (Automático desde areas.nombre) */}
-                  <div className="tc-form-group">
-                    <label>Área del Colaborador</label>
-                    <input
-                      type="text"
-                      value={formData.area}
-                      placeholder="Se jala del colaborador"
-                      readOnly
-                      className="input-readonly"
-                    />
-                  </div>
-
-                  {/* Jefe Directo (Automático desde empleados.jefe_directo_id) */}
                   <div className="tc-form-group span-2">
                     <label>Jefe Directo</label>
                     <input
                       type="text"
                       value={formData.jefe}
-                      placeholder="Se jala automáticamente según el colaborador"
+                      placeholder="Automático según colaborador"
                       readOnly
                       className="input-readonly"
                     />
                   </div>
 
-                  {/* Tipo de LUP */}
+                  {/* FILA 3: Área Colaborador - Tipo LUP - Impacto - Área de Impacto */}
+                  <div className="tc-form-group">
+                    <label>Área del Colaborador</label>
+                    <input
+                      type="text"
+                      value={formData.area}
+                      placeholder="Automático"
+                      readOnly
+                      className="input-readonly"
+                    />
+                  </div>
+
                   <div className="tc-form-group">
                     <label>Tipo LUP <span className="req">*</span></label>
                     <select
@@ -1152,7 +1105,6 @@ export default function TrackingLup() {
                     </select>
                   </div>
 
-                  {/* Impacto */}
                   <div className="tc-form-group">
                     <label>Impacto <span className="req">*</span></label>
                     <select
@@ -1166,7 +1118,6 @@ export default function TrackingLup() {
                     </select>
                   </div>
 
-                  {/* Área de Impacto */}
                   <div className="tc-form-group">
                     <label>Área de Impacto <span className="req">*</span></label>
                     <select
@@ -1176,15 +1127,13 @@ export default function TrackingLup() {
                     >
                       <option value="">-- Seleccione área --</option>
                       {areas.map((ar) => (
-                        <option key={ar.id} value={ar.nombre}>
-                          {ar.nombre}
-                        </option>
+                        <option key={ar.id} value={ar.nombre}>{ar.nombre}</option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Título de la LUP */}
-                  <div className="tc-form-group span-3">
+                  {/* FILA 4: Título de la LUP */}
+                  <div className="tc-form-group span-4">
                     <label>Título de la LUP <span className="req">*</span></label>
                     <input
                       type="text"
@@ -1195,7 +1144,7 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* Estado (Automático CONCLUIDO) */}
+                  {/* FILA 5: Estado - Entrenamiento - Fecha Entrenamiento */}
                   <div className="tc-form-group">
                     <label>Estado (Automático)</label>
                     <input
@@ -1206,7 +1155,6 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* Entrenamiento */}
                   <div className="tc-form-group">
                     <label>Entrenamiento <span className="req">*</span></label>
                     <select
@@ -1225,7 +1173,6 @@ export default function TrackingLup() {
                     </select>
                   </div>
 
-                  {/* Fecha Entrenamiento (Obligatoria si es ENTRENADO) */}
                   <div className="tc-form-group">
                     <label>
                       Fecha Entrenamiento{' '}
@@ -1240,7 +1187,54 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* ¿Realizó Kaizen? */}
+                  {/* FOTO LUP (ROWSPAN 2: FILA 5 Y 6, COLUMNA 4) */}
+                  <div className="tc-form-group foto-box-rowspan">
+                    <label><FaImage style={{ marginRight: '4px' }} /> Foto LUP (Opcional)</label>
+                    <div className="foto-lup-container">
+                      {urlFotoRender ? (
+                        <div className="foto-preview-wrapper">
+                          <img
+                            src={urlFotoRender}
+                            alt="Foto LUP"
+                            className="foto-preview-img"
+                          />
+                          <div className="foto-actions-overlay">
+                            {/* Botón de Zoom con Lupa */}
+                            <button
+                              type="button"
+                              className="btn-zoom-foto"
+                              onClick={() => setZoomFotoUrl(urlFotoRender)}
+                              title="Ampliar foto"
+                            >
+                              <FaSearchPlus />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-quitar-foto"
+                              onClick={() => setFormData({ ...formData, foto_lup: '', foto_lup_base64: '' })}
+                            >
+                              Quitar foto
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleFotoLupChange}
+                            className="file-input-lup"
+                          />
+                          <small style={{ color: '#94a3b8', fontSize: '9.5px', marginTop: '4px' }}>
+                            Subir foto PNG o JPG
+                          </small>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* FILA 6: ¿Realizó Kaizen? - Código Kaizen - Operatividad */}
                   <div className="tc-form-group">
                     <label>¿Realizó Kaizen? <span className="req">*</span></label>
                     <select
@@ -1259,7 +1253,6 @@ export default function TrackingLup() {
                     </select>
                   </div>
 
-                  {/* Código Kaizen (Obligatorio si realizó Kaizen = SI) */}
                   <div className="tc-form-group">
                     <label>
                       Código Kaizen{' '}
@@ -1275,7 +1268,6 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* Operatividad */}
                   <div className="tc-form-group">
                     <label>Operatividad <span className="req">*</span></label>
                     <select
@@ -1287,8 +1279,8 @@ export default function TrackingLup() {
                     </select>
                   </div>
 
-                  {/* Impacto CO2 */}
-                  <div className="tc-form-group span-3">
+                  {/* FILA 7: Impacto CO2 */}
+                  <div className="tc-form-group span-4">
                     <label>Impacto CO2</label>
                     <input
                       type="text"
@@ -1299,22 +1291,30 @@ export default function TrackingLup() {
                   </div>
                 </div>
 
-                {/* Resumen de Auditoría Automática (Hora Lima) */}
+                {/* AUDITORÍA COMPLETA (Fecha Registro, Usuario Actualiza y Fecha Actualiza) */}
                 <div className="tc-audit-info">
                   {modoEdicion ? (
                     <>
                       <div>
-                        <span>Fecha Registro (Hora Lima):</span>{' '}
+                        <span>Fecha Registro:</span>{' '}
                         <strong>{formatearFechaHoraLima(registroSeleccionado?.fecha_registro)}</strong>
                       </div>
                       <div>
-                        <span>Se actualizará por:</span>{' '}
+                        <span>Última Actualización:</span>{' '}
+                        <strong>{formatearFechaHoraLima(registroSeleccionado?.fecha_actualiza)}</strong>
+                      </div>
+                      <div>
+                        <span>Actualizado por:</span>{' '}
+                        <strong>{registroSeleccionado?.usuario_actualiza || '-'}</strong>
+                      </div>
+                      <div>
+                        <span>Se modificará por:</span>{' '}
                         <strong>{nombreUsuarioSesion}</strong>
                       </div>
                     </>
                   ) : (
                     <div>
-                      <span>Usuario que registra (Hora Lima):</span>{' '}
+                      <span>Usuario que registra:</span>{' '}
                       <strong>{nombreUsuarioSesion}</strong>
                     </div>
                   )}
@@ -1340,6 +1340,23 @@ export default function TrackingLup() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LIGHTBOX PARA ZOOM DE FOTO CASI AL TAMAÑO DE LA PANTALLA */}
+      {zoomFotoUrl && (
+        <div className="tc-modal-overlay tc-zoom-overlay" onClick={() => setZoomFotoUrl(null)}>
+          <div className="tc-zoom-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="tc-zoom-close-btn"
+              onClick={() => setZoomFotoUrl(null)}
+              title="Cerrar vista ampliada"
+            >
+              <FaTimes />
+            </button>
+            <img src={zoomFotoUrl} alt="Vista Ampliada LUP" className="tc-zoom-image" />
           </div>
         </div>
       )}

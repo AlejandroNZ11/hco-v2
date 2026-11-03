@@ -289,18 +289,23 @@ export default function TrackingPrestamos() {
     }
   };
 
-  // Canvas Firma
-  useEffect(() => {
+    // En el useEffect de la firma (ajusta canvas.height a 210)
+    useEffect(() => {
     if (modalFirmaVisible && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const rect = canvas.parentElement.getBoundingClientRect();
-      canvas.width = Math.floor(rect.width) - 24;
-      canvas.height = 260;
-      const ctx = canvas.getContext('2d');
-      ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.strokeStyle = '#102033';
-      tieneTrazoRef.current = false;
+        const canvas = canvasRef.current;
+        const contenedor = canvas.parentElement;
+
+        canvas.width = contenedor.clientWidth;
+        canvas.height = contenedor.clientHeight || 380;
+
+        const ctx = canvas.getContext('2d');
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#0f172a';
+        tieneTrazoRef.current = false;
     }
-  }, [modalFirmaVisible]);
+    }, [modalFirmaVisible]);
 
   const iniciarTrazo = (e) => {
     if (!canvasRef.current) return;
@@ -373,27 +378,34 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
     <div className="tracking-prestamos-page">
       {loading && <Loading />}
 
-      {avisoFlotante.visible && (
+        {/* AVISO FLOTANTE MODERNO COMPACTO */}
+        {avisoFlotante.visible && (
         <div className="tw-modal-backdrop" onClick={cerrarAviso}>
-          <div className={`tw-modal-card tw-modal-${avisoFlotante.tipo}`} onClick={e => e.stopPropagation()}>
+            <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
             <div className="tw-modal-header">
-              <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
+                <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
                 {avisoFlotante.tipo === 'danger' && <span>✖</span>}
                 {avisoFlotante.tipo === 'warning' && <span>⚠️</span>}
                 {avisoFlotante.tipo === 'success' && <span>✔</span>}
-              </div>
-              <div className="tw-modal-text">
+                </div>
+                <div className="tw-modal-text">
                 <h3 className="tw-modal-title">{avisoFlotante.titulo}</h3>
                 <p className="tw-modal-desc">{avisoFlotante.mensaje}</p>
-                {avisoFlotante.detalleExtra && <div className="tw-modal-extra-box">{avisoFlotante.detalleExtra}</div>}
-              </div>
+                {avisoFlotante.detalleExtra && (
+                    <div className="tw-modal-extra-box" style={{ marginTop: '8px' }}>
+                    {avisoFlotante.detalleExtra}
+                    </div>
+                )}
+                </div>
             </div>
             <div className="tw-modal-footer">
-              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>Entendido</button>
+                <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>
+                Entendido
+                </button>
             </div>
-          </div>
+            </div>
         </div>
-      )}
+        )}
 
       {/* TOP SUMMARY */}
       <div className="top-summary-grid">
@@ -861,20 +873,62 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
         </div>
       )}
 
-      {/* MODAL CANVAS FIRMA */}
-      {modalFirmaVisible && (
+                {/* MODAL CANVAS FIRMA (DISEÑO EXACTO IMAGEN 2) */}
+        {modalFirmaVisible && (
         <div className="tw-modal-backdrop" onClick={() => setModalFirmaVisible(false)}>
-          <div className="firma-box" onClick={e => e.stopPropagation()}>
-            <h3>Firma del Conductor ({firmaTarget === 'auxiliar' ? 'Salida' : 'Regreso'})</h3>
-            <canvas ref={canvasRef} id="firmaCanvas" onPointerDown={iniciarTrazo} onPointerMove={moverTrazo} onPointerUp={finalizarTrazo} />
-            <div className="firma-actions">
-              <button type="button" className="btn-action-secondary" onClick={limpiarCanvasFirma}>Limpiar</button>
-              <button type="button" className="btn-action-secondary" onClick={() => setModalFirmaVisible(false)}>Cancelar</button>
-              <button type="button" className="btn-action-primary" onClick={confirmarFirma}>Guardar firma</button>
+            <div className="firma-modal-card" onClick={e => e.stopPropagation()}>
+            
+            {/* Cabecera limpia centrada */}
+            <div className="firma-modal-header">
+                <h3>Firma del conductor</h3>
             </div>
-          </div>
+
+            {/* Recuadro de firma amplio */}
+            <div className="firma-modal-body">
+                <div className="canvas-container-firma">
+                {!tieneTrazoRef.current && (
+                    <span className="canvas-hint-text">Dibuje su firma aquí</span>
+                )}
+                <canvas
+                    ref={canvasRef}
+                    id="firmaCanvas"
+                    onPointerDown={iniciarTrazo}
+                    onPointerMove={moverTrazo}
+                    onPointerUp={finalizarTrazo}
+                />
+                </div>
+            </div>
+
+            {/* Botones apilados con ícono y texto en una sola línea */}
+            <div className="firma-modal-footer">
+                <button 
+                type="button" 
+                className="btn-firma-full btn-firma-outline" 
+                onClick={limpiarCanvasFirma}
+                >
+                <FaEraser /> Limpiar
+                </button>
+
+                <button 
+                type="button" 
+                className="btn-firma-full btn-firma-outline" 
+                onClick={() => setModalFirmaVisible(false)}
+                >
+                Cancelar
+                </button>
+
+                <button 
+                type="button" 
+                className="btn-firma-full btn-firma-primary" 
+                onClick={confirmarFirma}
+                >
+                <FaSave /> Guardar firma
+                </button>
+            </div>
+
+            </div>
         </div>
-      )}
+        )}
     </div>
   );
 }

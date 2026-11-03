@@ -11,7 +11,7 @@
   color: #102033;
   background: #f4f7fa;
   box-sizing: border-box;
-}
+
 
 .card-p {
   background: #ffffff;
@@ -468,11 +468,6 @@
   box-sizing: border-box;
 }
 
-@keyframes modalFadeIn {
-  from { opacity: 0; transform: translateY(-20px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
 /* RESPONSIVE MÓVIL EXACTO */
 @media (max-width: 992px) {
   .form-grid-p.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -536,4 +531,13 @@
     max-width: 98% !important;
     padding: 14px 10px !important;
   }
+}
+
+}
+
+
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translateY(-20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }

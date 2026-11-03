@@ -43,7 +43,6 @@ export const calcularFechaRetornoPeru = (fechaInicioInput, diasHabiles = 7) => {
   return f.toISOString();
 };
 
-// CACHÉ DE TOKEN EN MEMORIA PARA MÁXIMA VELOCIDAD
 let tokenGoogleCache = { token: null, expira: 0 };
 
 const obtenerAccessTokenGoogleDrive = async () => {
@@ -76,7 +75,6 @@ const obtenerAccessTokenGoogleDrive = async () => {
     throw new Error(data.error_description || 'Error obteniendo token Drive');
   }
 
-  // Guardar por 50 minutos
   tokenGoogleCache = {
     token: data.access_token,
     expira: Date.now() + 50 * 60 * 1000
@@ -127,7 +125,6 @@ export const subirImagenADrive = async (dataUrlBase64, nombreArchivo, tokenPrevi
     throw new Error(fileData?.error?.message || 'Error al subir imagen');
   }
 
-  // Permiso público rápido
   fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
     method: 'POST',
     headers: {
@@ -146,9 +143,6 @@ const esRegistroActivo = (item) => {
   return true;
 };
 
-// =========================================================================
-// 1. OBTENER CATÁLOGOS MAESTROS (OPTIMIZADO CON DICCIONARIOS)
-// =========================================================================
 export const obtenerDatosMaestrosPrestamos = async () => {
   try {
     const [resEmp, resCond, resPlac, resCli, resTip] = await Promise.all([
@@ -173,7 +167,6 @@ export const obtenerDatosMaestrosPrestamos = async () => {
       String(a.nombre_empresa || '').localeCompare(String(b.nombre_empresa || ''), 'es', { sensitivity: 'base' })
     );
 
-    // Diccionario rápido id -> nombre_empresa
     const empresasMap = {};
     for (let i = 0; i < empresas.length; i++) {
       empresasMap[empresas[i].id] = empresas[i].nombre_empresa;
@@ -223,14 +216,24 @@ export const obtenerDatosMaestrosPrestamos = async () => {
 };
 
 // =========================================================================
-// 2. CREAR PRÉSTAMO PALLET (SUBIDA PARALELA Y RÁPIDA)
+// 2. CREAR PRÉSTAMO (SOPORTA FASE 1: ADMINISTRATIVO Y FASE COMPLETA RETAIL)
 // =========================================================================
 export const crearPrestamoPallet = async (payload) => {
   const ahoraISO = obtenerFechaHoraPeruISO();
   const esClienteRecoge = payload.area_proceso === 'CLIENTE RECOGE';
+  const esOutboundPrincipal = payload.area_proceso === 'OUTBOUND PRINCIPAL';
+  const esRegistroParcial = esClienteRecoge || esOutboundPrincipal;
+
   const retornaBool = payload.retorno === 'SI' || payload.retorno === true;
-  const estadoInicial = retornaBool ? 'Pendiente' : 'NO RETORNO';
-  const fechaRetornoISO = retornaBool ? calcularFechaRetornoPeru(ahoraISO, 7) : null;
+
+  // Estado inicial: Si es parcial queda 'Por despachar' para que auxiliar lo complete
+  const estadoInicial = esRegistroParcial 
+    ? 'Por despachar' 
+    : (retornaBool ? 'Pendiente' : 'NO RETORNO');
+
+  const fechaRetornoISO = (!esRegistroParcial && retornaBool) 
+    ? calcularFechaRetornoPeru(ahoraISO, 7) 
+    : null;
 
   let empresaIdFinal = payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null;
   let dniConductorFinal = payload.dni_conductor || null;
@@ -267,7 +270,7 @@ export const crearPrestamoPallet = async (payload) => {
     nr_paletas: Number(payload.nr_paletas || 0),
     estado: estadoInicial,
     nr_paletas_devueltas: 0,
-    fecha_devolucion: retornaBool ? null : ahoraISO,
+    fecha_devolucion: (!esRegistroParcial && !retornaBool) ? ahoraISO : null,
     observacion_salida: observacionFinal,
     cliente_id: payload.cliente_id || null,
     tipo_paleta_id: payload.tipo_paleta_id ? Number(payload.tipo_paleta_id) : null,
@@ -290,7 +293,7 @@ export const crearPrestamoPallet = async (payload) => {
 
   const idPrestamo = prestamoCreado.id_prestamo;
 
-  // SUBIDAS EN PARALELO CON TOKEN COMPARTIDO (MUCHO MÁS RÁPIDO)
+  // Subida de archivos solo si existen (en Retail)
   if (payload.firma_conductor_base64 || payload.foto_salida_base64) {
     const token = await obtenerAccessTokenGoogleDrive();
 
@@ -322,7 +325,58 @@ export const crearPrestamoPallet = async (payload) => {
 };
 
 // =========================================================================
-// 3. OBTENER TRACKING (CON EXTRAER CONDUCTOR EN CLIENTE RECOGE)
+// 2.1 COMPLETAR DESPACHO AUXILIAR (FASE 2)
+// =========================================================================
+export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
+  const ahoraISO = obtenerFechaHoraPeruISO();
+  const idPrestamo = prestamoActual.id_prestamo;
+  const retornaBool = payload.retorno === 'SI' || payload.retorno === true;
+  const estadoFinal = retornaBool ? 'Pendiente' : 'NO RETORNO';
+  const fechaRetornoISO = retornaBool ? calcularFechaRetornoPeru(ahoraISO, 7) : null;
+
+  const token = await obtenerAccessTokenGoogleDrive();
+
+  const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
+    payload.firma_conductor_base64 
+      ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`, token)
+      : Promise.resolve(prestamoActual.firma_conductor || ''),
+    payload.foto_salida_base64 
+      ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`, token)
+      : Promise.resolve(prestamoActual.foto_salida || '')
+  ]);
+
+  const obsPrevia = String(prestamoActual.observacion_salida || '').trim();
+  const obsNueva = String(payload.observacion_salida || '').trim();
+  const obsFinal = obsPrevia && obsNueva && !obsPrevia.includes(obsNueva)
+    ? `${obsPrevia} | ${obsNueva}`
+    : (obsNueva || obsPrevia);
+
+  const camposActualizar = {
+    nr_paletas: Number(payload.nr_paletas || 0),
+    retorno: retornaBool,
+    estado: estadoFinal,
+    fecha_retorno: fechaRetornoISO,
+    fecha_devolucion: retornaBool ? null : ahoraISO,
+    observacion_salida: obsFinal,
+    firma_conductor: urlFirmaSalida || null,
+    foto_salida: urlFotoSalida || null,
+    usuario_actualiza: payload.usuario_actualiza,
+    fecha_actualiza: ahoraISO
+  };
+
+  const { data, error } = await supabase
+    .from('prestamos')
+    .update(camposActualizar)
+    .eq('uuid', prestamoActual.uuid)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Error al completar despacho: ${error.message}`);
+  return data;
+};
+
+// =========================================================================
+// 3. OBTENER TRACKING
 // =========================================================================
 export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
   const [resPrest, maestros] = await Promise.all([
@@ -332,7 +386,6 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
 
   if (resPrest.error) throw new Error(`Error al cargar tracking: ${resPrest.error.message}`);
 
-  // Diccionarios en memoria (O(1) lookups)
   const empMap = Object.fromEntries((maestros.empresas || []).map(e => [String(e.id), e.nombre_empresa]));
   const condMap = Object.fromEntries((maestros.conductores || []).map(c => [String(c.dni_conductor), c.nombre_conductor]));
   const cliMap = Object.fromEntries((maestros.clientes || []).map(c => [String(c.id), c.nombre_cliente]));
@@ -343,11 +396,10 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
   const listaFormateada = (resPrest.data || []).map(row => {
     const fRetorno = row.fecha_retorno ? new Date(row.fecha_retorno) : calcularFechaRetornoPeru(row.fecha_entrega, 7);
     const fechaRetornoDate = fRetorno ? new Date(fRetorno) : null;
-    const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto'].includes(row.estado);
+    const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
     const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
     const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
 
-    // Si es CLIENTE RECOGE y no hay DNI, extraemos el conductor guardado en la observación
     let conductorFinal = condMap[String(row.dni_conductor)] || row.dni_conductor || '';
     if (!conductorFinal && row.observacion_salida) {
       const matchConductor = row.observacion_salida.match(/\[CONDUCTOR RECOGE:\s*([^\]]+)\]/i);

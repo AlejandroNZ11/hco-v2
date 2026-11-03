@@ -462,6 +462,12 @@
   cursor: pointer !important;
 }
 
+.multicliente-box {
+  grid-column: span 2;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 @keyframes modalFadeIn {
   from { opacity: 0; transform: translateY(-20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -498,4 +504,36 @@
   .footer-actions-p { flex-direction: column; }
   .footer-actions-p button { width: 100%; justify-content: center; }
   .firma-actions-p { flex-direction: column; }
+
+  .multicliente-box {
+    grid-column: span 1 !important;
+    width: 100% !important;
+  }
+
+  .clientes-input-row {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .clientes-input-row input {
+    flex: 1 1 auto;
+    min-width: 0 !important;
+    width: auto !important;
+  }
+
+  .clientes-input-row button {
+    flex: 0 0 auto;
+    padding: 0 12px !important;
+  }
+  .tw-modal-backdrop {
+    padding: 6px !important;
+  }
+  .tw-modal-card,
+  .firma-box-p {
+    width: 98% !important;
+    max-width: 98% !important;
+    padding: 14px 10px !important;
+  }
 }

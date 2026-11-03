@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight,  FaIdCard, FaTruck, FaUserTie,
-  FaEdit, FaEye, FaCheck 
+  FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight, FaIdCard, FaTruck, FaUserTie,
+  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
-import './trackingprestamos.css'; // <-- Tu CSS exclusivo para este módulo
+import './trackingprestamos.css';
 
 import {
   obtenerTrackingPrestamos,
   registrarDevolucionPrestamo,
-  obtenerDatosMaestrosPrestamos
+  obtenerDatosMaestrosPrestamos,
+  completarDespachoAuxiliar
 } from '../../services/prestamosService';
 
 function getStoredAuthUser() {
@@ -31,34 +32,16 @@ const extraerIdDrive = (url) => {
   return match ? match[1] : (str.length > 20 && !str.includes('/') ? str : null);
 };
 
-const obtenerUrlDriveDirecta = (urlOId) => {
-  const id = extraerIdDrive(urlOId);
-  if (!id) return '';
-  return `https://drive.google.com/thumbnail?id=${id}&sz=w1000`;
-};
-
 export default function TrackingPrestamos() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(false);
 
-  // Datos principales
   const [prestamos, setPrestamos] = useState([]);
   const [conductores, setConductores] = useState([]);
 
-  // Filtros
-  const [filtrosForm, setFiltrosForm] = useState({
-    estado: 'Todos',
-    fechaEntrega: '',
-    buscar: ''
-  });
-
-  const [filtrosActivos, setFiltrosActivos] = useState({
-    estado: 'Todos',
-    fechaEntrega: '',
-    buscar: ''
-  });
-
+  const [filtrosForm, setFiltrosForm] = useState({ estado: 'Todos', fechaEntrega: '', buscar: '' });
+  const [filtrosActivos, setFiltrosActivos] = useState({ estado: 'Todos', fechaEntrega: '', buscar: '' });
   const [paginaActual, setPaginaActual] = useState(1);
 
   // Modal Devolución
@@ -78,18 +61,27 @@ export default function TrackingPrestamos() {
     firma_retorno_base64: ''
   });
 
-  // Modal Firma
+  // Modal Auxiliar (Completar Despacho FASE 2)
+  const [modalAuxVisible, setModalAuxVisible] = useState(false);
+  const [auxData, setAuxData] = useState({
+    nr_paletas: '',
+    retorno: 'SI',
+    observacion_salida: '',
+    firma_conductor_base64: '',
+    foto_salida_base64: ''
+  });
+
+  // Canvas Firma (Compartido para Devolución y Despacho)
   const [modalFirmaVisible, setModalFirmaVisible] = useState(false);
+  const [firmaTarget, setFirmaTarget] = useState('devolucion'); // 'devolucion' | 'auxiliar'
   const canvasRef = useRef(null);
   const dibujandoRef = useRef(false);
   const tieneTrazoRef = useRef(false);
 
-  // Arrastre de tabla (manito)
   const tableContainerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragData = useRef({ startX: 0, scrollLeft: 0 });
 
-  // Alerta Flotante (Tailwind modal style)
   const [avisoFlotante, setAvisoFlotante] = useState({
     visible: false, tipo: 'danger', titulo: '', mensaje: '', detalleExtra: '', onCloseCallback: null
   });
@@ -127,8 +119,6 @@ export default function TrackingPrestamos() {
     }
   };
 
-
-  // Lógica Arrastre Tabla
   const handleMouseDown = (e) => {
     if (e.target.closest('button')) return;
     const container = tableContainerRef.current;
@@ -137,7 +127,7 @@ export default function TrackingPrestamos() {
     dragData.current.startX = e.pageX - container.offsetLeft;
     dragData.current.scrollLeft = container.scrollLeft;
   };
-  const handleMouseUpOrLeave = () => { setIsDragging(false); };
+  const handleMouseUpOrLeave = () => setIsDragging(false);
   const handleMouseMove = (e) => {
     if (!isDragging) return;
     e.preventDefault();
@@ -154,7 +144,6 @@ export default function TrackingPrestamos() {
     setFiltrosForm(inicial); setFiltrosActivos(inicial); setPaginaActual(1);
   };
 
-  // KPIs
   const resumen = useMemo(() => {
     let pendientes = 0, parciales = 0, devueltos = 0, paletasPendientes = 0;
     prestamos.forEach(r => {
@@ -170,7 +159,7 @@ export default function TrackingPrestamos() {
     const texto = filtrosActivos.buscar.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return prestamos.filter(row => {
       if (filtrosActivos.estado === 'Atrasado') {
-        const cerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto'].includes(row.estado);
+        const cerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
         if (cerrado || !row.atrasado) return false;
       } else if (filtrosActivos.estado !== 'Todos' && filtrosActivos.estado !== '') {
         if (row.estado !== filtrosActivos.estado) return false;
@@ -194,7 +183,55 @@ export default function TrackingPrestamos() {
   const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA;
   const prestamosPaginados = prestamosFiltrados.slice(indiceInicio, indiceInicio + ITEMS_POR_PAGINA);
 
-  // Devolución
+  // Abrir Modal Auxiliar
+  const abrirModalAuxiliar = (item) => {
+    setPrestamoSeleccionado(item);
+    setAuxData({
+      nr_paletas: '',
+      retorno: item.area_proceso === 'CLIENTE RECOGE' ? 'NO' : 'SI',
+      observacion_salida: '',
+      firma_conductor_base64: '',
+      foto_salida_base64: ''
+    });
+    setModalAuxVisible(true);
+  };
+
+  const handleGuardarDespachoAuxiliar = async (e) => {
+    e.preventDefault();
+    if (!prestamoSeleccionado) return;
+
+    const cant = Number(auxData.nr_paletas);
+    if (isNaN(cant) || cant < 0) {
+      return mostrarAviso('warning', 'Cantidad requerida', 'Ingrese una cantidad válida de paletas.');
+    }
+
+    // Obligatorio en Outbound Principal
+    if (prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' && !auxData.foto_salida_base64) {
+      return mostrarAviso('warning', 'Foto obligatoria', 'En OUTBOUND PRINCIPAL la foto de salida es obligatoria.');
+    }
+
+    if (!auxData.firma_conductor_base64) {
+      return mostrarAviso('warning', 'Firma obligatoria', 'Debe registrar la firma de salida del conductor.');
+    }
+
+    setLoading(true);
+    try {
+      await completarDespachoAuxiliar(prestamoSeleccionado, {
+        ...auxData,
+        retorno: prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno,
+        usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Auxiliar'
+      });
+      setModalAuxVisible(false);
+      mostrarAviso('success', 'Despacho Completado', 'El registro se actualizó y ahora está activo en tracking.');
+      await cargarDatos();
+    } catch (err) {
+      mostrarAviso('danger', 'Error al despachar', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Modal Devolución
   const abrirModalDevolucion = (item, soloLectura = false) => {
     setPrestamoSeleccionado(item);
     setModoLectura(soloLectura);
@@ -227,7 +264,7 @@ export default function TrackingPrestamos() {
       return mostrarAviso('warning', 'Cantidad requerida', 'Ingrese una cantidad válida mayor a 0.');
     }
     if ((devData.tipo_accion === 'no_retorno' || devData.tipo_accion === 'cerrado_mixto') && !devData.observacion_regreso.trim()) {
-      return mostrarAviso('warning', 'Observación obligatoria', 'La observación de regreso es obligatoria para este tipo de cierre.');
+      return mostrarAviso('warning', 'Observación obligatoria', 'La observación es obligatoria para este tipo de cierre.');
     }
 
     setLoading(true);
@@ -243,7 +280,7 @@ export default function TrackingPrestamos() {
         placa_editada: esAdmin ? devData.placa_editada : undefined
       });
       setModalDevVisible(false);
-      mostrarAviso('success', 'Devolución Registrada', 'El préstamo se actualizó correctamente en Supabase.');
+      mostrarAviso('success', 'Devolución Registrada', 'El préstamo se actualizó correctamente.');
       await cargarDatos();
     } catch (err) {
       mostrarAviso('danger', 'Error', err.message);
@@ -266,52 +303,53 @@ export default function TrackingPrestamos() {
   }, [modalFirmaVisible]);
 
   const iniciarTrazo = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvasRef.current) return;
     dibujandoRef.current = true;
     tieneTrazoRef.current = true;
-    const rect = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext('2d');
+    const rect = canvasRef.current.getBoundingClientRect();
+    const ctx = canvasRef.current.getContext('2d');
     ctx.beginPath();
     ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
   };
   const moverTrazo = (e) => {
     if (!dibujandoRef.current || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const ctx = canvas.getContext('2d');
+    const rect = canvasRef.current.getBoundingClientRect();
+    const ctx = canvasRef.current.getContext('2d');
     ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
     ctx.stroke();
   };
   const finalizarTrazo = () => { dibujandoRef.current = false; };
   const limpiarCanvasFirma = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     tieneTrazoRef.current = false;
   };
-  const confirmarFirmaRegreso = () => {
+  const confirmarFirma = () => {
     if (!tieneTrazoRef.current) return mostrarAviso('warning', 'Firma vacía', 'Debe firmar antes de guardar.');
     const dataUrl = canvasRef.current.toDataURL('image/png');
-    setDevData(prev => ({ ...prev, firma_retorno_base64: dataUrl }));
+    if (firmaTarget === 'auxiliar') {
+      setAuxData(prev => ({ ...prev, firma_conductor_base64: dataUrl }));
+    } else {
+      setDevData(prev => ({ ...prev, firma_retorno_base64: dataUrl }));
+    }
     setModalFirmaVisible(false);
   };
 
-  const renderBadgeEstado = (estado) => {
+    const renderBadgeEstado = (estado) => {
     const e = String(estado || '').trim();
-    if (e === 'Devuelto') return <span className="badge-estado operativo">Devuelto</span>;
-    if (e === 'Devolución Parcial') return <span className="badge-estado observado" style={{ background: '#e8f3ff', color: '#0f4c81' }}>Parcial</span>;
-    if (e === 'NO RETORNO') return <span className="badge-estado inoperativo" style={{ background: '#0f172a' }}>NO RETORNO</span>;
-    if (e === 'Cerrado mixto') return <span className="badge-estado inoperativo">Cerrado mixto</span>;
-    return <span className="badge-estado observado">Pendiente</span>;
-  };
+    if (e === 'Por despachar') return <span className="badge-estado por-despachar">Por despachar</span>;
+    if (e === 'Devuelto') return <span className="badge-estado devuelto">Devuelto</span>;
+    if (e === 'Devolución Parcial') return <span className="badge-estado parcial">Parcial</span>;
+    if (e === 'NO RETORNO') return <span className="badge-estado no-retorno">NO RETORNO</span>;
+    if (e === 'Cerrado mixto') return <span className="badge-estado cerrado-mixto">Cerrado mixto</span>;
+    return <span className="badge-estado pendiente">Pendiente</span>;
+    };
 
   return (
     <div className="tracking-prestamos-page">
       {loading && <Loading />}
 
-      {/* AVISO FLOTANTE MODERNO */}
       {avisoFlotante.visible && (
         <div className="tw-modal-backdrop" onClick={cerrarAviso}>
           <div className={`tw-modal-card tw-modal-${avisoFlotante.tipo}`} onClick={e => e.stopPropagation()}>
@@ -334,7 +372,7 @@ export default function TrackingPrestamos() {
         </div>
       )}
 
-      {/* 1. CABECERA + TARJETAS KPI (DISEÑO PASTEL) */}
+      {/* TOP SUMMARY */}
       <div className="top-summary-grid">
         <section className="hero-card">
           <span className="module-pill">MÓDULO LOGÍSTICA</span>
@@ -366,8 +404,7 @@ export default function TrackingPrestamos() {
         )}
       </div>
 
-
-      {/* 2. FILTROS Y BOTONES */}
+      {/* FILTROS */}
       <section className="filters-card">
         <div className="filters-grid" style={{ gridTemplateColumns: '2.5fr 1fr 1fr' }}>
           <div className="filter-group filter-buscar">
@@ -385,6 +422,7 @@ export default function TrackingPrestamos() {
             <label>Estado</label>
             <select value={filtrosForm.estado} onChange={e => setFiltrosForm({ ...filtrosForm, estado: e.target.value })}>
               <option value="Todos">Todos</option>
+              <option value="Por despachar">Por despachar</option>
               <option value="Pendiente">Pendiente</option>
               <option value="Devolución Parcial">Devolución Parcial</option>
               <option value="Devuelto">Devuelto</option>
@@ -415,48 +453,26 @@ export default function TrackingPrestamos() {
           <button type="button" className="btn-action-secondary" onClick={handleLimpiarFiltros}>
             <FaUndo /> <span>Limpiar</span>
           </button>
-
           {!esExterno && (
-            <button 
-                type="button" 
-                className="btn-action-primary" 
-                onClick={() => navigate('/conductores/tracking')}
-            >
+            <>
+              <button type="button" className="btn-action-primary" onClick={() => navigate('/conductores/tracking')}>
                 <FaIdCard /> <span>Conductores</span>
-            </button>
-            )}
-          {!esExterno && (
-            <button 
-                type="button" 
-                className="btn-action-primary" 
-                onClick={() => navigate('/placas/tracking')}
-            >
+              </button>
+              <button type="button" className="btn-action-primary" onClick={() => navigate('/placas/tracking')}>
                 <FaTruck /> <span>Placas</span>
-            </button>
-            )}
-          {!esExterno && (
-            <button 
-                type="button" 
-                className="btn-action-primary" 
-                onClick={() => navigate('/clientes/tracking')}
-            >
+              </button>
+              <button type="button" className="btn-action-primary" onClick={() => navigate('/clientes/tracking')}>
                 <FaUserTie /> <span>Clientes</span>
-            </button>
-            )}
-            {!esExterno && (
-            <button 
-                type="button" 
-                className="btn-action-primary" 
-                onClick={() => navigate('/empresas-transporte/tracking')}
-            >
-                <FaUserTie /> <span>Empresa</span>
-            </button>
-            )}
-
+              </button>
+              <button type="button" className="btn-action-primary" onClick={() => navigate('/empresas-transporte/tracking')}>
+                <FaBuilding /> <span>Empresa</span>
+             </button>
+            </>
+          )}
         </div>
       </section>
 
-      {/* 3. TABLA CON PAGINACIÓN */}
+      {/* TABLA */}
       <section className="table-section-card">
         <div className="table-topbar">
           <div className="pagination-bar">
@@ -482,104 +498,236 @@ export default function TrackingPrestamos() {
           onMouseUp={handleMouseUpOrLeave}
           onMouseMove={handleMouseMove}
         >
-      <table>
-        <thead>
-            <tr>
-            <th style={{ textAlign: 'center', width: '40px' }}>N°</th>
-            <th>ID Préstamo</th>
-            <th style={{ textAlign: 'left' }}>Área proceso</th>
-            <th>Fecha entrega</th>
-            <th>Fecha retorno</th>
-            <th>Empresa</th>
-            <th style={{ textAlign: 'left' }}>Conductor</th>
-            <th>Ruta</th>
-            <th>Placa</th>
-            <th>Paletas</th>
-            <th>Devueltas</th>
-            <th>Pendientes</th>
-            <th>Estado</th>
-            <th>Fecha devolución</th>
-            <th style={{ textAlign: 'center' }}>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {prestamosPaginados.length === 0 ? (
-            <tr>
-                <td colSpan="15" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
-                No se encontraron registros de préstamos.
-                </td>
-            </tr>
-            ) : (
-            prestamosPaginados.map((r, index) => {
-                const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto'].includes(r.estado);
-                const numFila = indiceInicio + index + 1;
-                const fEntrega = r.fecha_entrega ? new Date(r.fecha_entrega).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
-                const fRetorno = r.fecha_retorno_calculada ? new Date(r.fecha_retorno_calculada).toLocaleDateString('es-PE') : '-';
-                const fDev = r.fecha_devolucion ? new Date(r.fecha_devolucion).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
-
-                return (
-                <tr key={r.uuid} className={r.atrasado ? 'table-danger' : ''}>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>{numFila}</td>
-                    <td style={{ fontWeight: '800', color: '#0f4c81' }}>{r.id_prestamo}</td>
-                    
-                    {/* 1. Área del proceso: Alineada a la izquierda */}
-                    <td style={{ textAlign: 'left' }}>
-                    <span style={{
-                        fontSize: '10px',
-                        fontWeight: '700',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: r.area_proceso === 'CLIENTE RECOGE' ? '#f3e8ff' : '#e0f2fe',
-                        color: r.area_proceso === 'CLIENTE RECOGE' ? '#6b21a8' : '#0369a1'
-                    }}>
-                        {r.area_proceso || '-'}
-                    </span>
-                    </td>
-
-                    <td>{fEntrega}</td>
-                    <td style={{ fontWeight: 700, color: r.atrasado ? '#dc2626' : '#16a34a' }}>{fRetorno}</td>
-                    <td style={{ fontWeight: 600 }}>{r.empresa_transporte_nombre}</td>
-                    
-                    {/* 2. Conductor: Alineado a la izquierda y SIN negrita */}
-                    <td style={{ textAlign: 'left', fontWeight: 'normal', color: '#1e293b' }}>
-                    {r.conductor_nombre}
-                    </td>
-
-                    <td>{r.nr_ruta || '-'}</td>
-                    <td style={{ fontWeight: 800 }}>{r.nro_placa}</td>
-                    <td>{r.nr_paletas}</td>
-                    <td style={{ fontWeight: 700, color: '#0f4c81' }}>{r.nr_paletas_devueltas}</td>
-                    <td style={{ fontWeight: 700, color: Number(r.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>{r.paletas_pendientes}</td>
-                    <td>{renderBadgeEstado(r.estado)}</td>
-                    <td>{fDev}</td>
-                    <td style={{ textAlign: 'center' }}>
-                    <div className="acciones-cell">
-                        {estaCerrado && !esAdmin ? (
-                        <button type="button" className="btn-tabla-editar" onClick={() => abrirModalDevolucion(r, true)} title="Ver detalle (Solo lectura)">
-                            <FaEye />
-                        </button>
-                        ) : (
-                        <button 
-                            type="button" 
-                            className={`btn-tabla-aprobar ${estaCerrado ? 'is-approved' : ''}`} 
-                            onClick={() => abrirModalDevolucion(r, false)} 
-                            title={estaCerrado ? 'Modificar Registro (Admin)' : 'Registrar Devolución'}
-                        >
-                            <FaEdit />
-                        </button>
-                        )}
-                    </div>
-                    </td>
+          <table>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'center', width: '40px' }}>N°</th>
+                <th>ID Préstamo</th>
+                <th style={{ textAlign: 'left' }}>Área proceso</th>
+                <th>Fecha entrega</th>
+                <th>Fecha retorno</th>
+                <th>Empresa</th>
+                <th style={{ textAlign: 'left' }}>Conductor</th>
+                <th>Ruta</th>
+                <th>Placa</th>
+                <th>Paletas</th>
+                <th>Devueltas</th>
+                <th>Pendientes</th>
+                <th>Estado</th>
+                <th>Fecha devolución</th>
+                <th style={{ textAlign: 'center' }}>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prestamosPaginados.length === 0 ? (
+                <tr>
+                  <td colSpan="15" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
+                    No se encontraron registros de préstamos.
+                  </td>
                 </tr>
-                );
-            })
-            )}
-        </tbody>
-        </table>
+              ) : (
+                prestamosPaginados.map((r, index) => {
+                  const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto'].includes(r.estado);
+                  const esPorDespachar = r.estado === 'Por despachar';
+                  const numFila = indiceInicio + index + 1;
+                  const fEntrega = r.fecha_entrega ? new Date(r.fecha_entrega).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+                  const fRetorno = r.fecha_retorno_calculada ? new Date(r.fecha_retorno_calculada).toLocaleDateString('es-PE') : '-';
+                  const fDev = r.fecha_devolucion ? new Date(r.fecha_devolucion).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+
+                  return (
+                    <tr key={r.uuid} className={r.atrasado ? 'table-danger' : ''}>
+                      <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>{numFila}</td>
+                      <td style={{ fontWeight: '800', color: '#0f4c81' }}>{r.id_prestamo}</td>
+                      <td style={{ textAlign: 'left' }}>
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: r.area_proceso === 'CLIENTE RECOGE' ? '#f3e8ff' : '#e0f2fe',
+                          color: r.area_proceso === 'CLIENTE RECOGE' ? '#6b21a8' : '#0369a1'
+                        }}>
+                          {r.area_proceso || '-'}
+                        </span>
+                      </td>
+                      <td>{fEntrega}</td>
+                      <td style={{ fontWeight: 700, color: r.atrasado ? '#dc2626' : '#16a34a' }}>{fRetorno}</td>
+                      <td style={{ fontWeight: 600 }}>{r.empresa_transporte_nombre}</td>
+                      <td style={{ textAlign: 'left', fontWeight: 'normal', color: '#1e293b' }}>{r.conductor_nombre}</td>
+                      <td>{r.nr_ruta || '-'}</td>
+                      <td style={{ fontWeight: 800 }}>{r.nro_placa}</td>
+                      <td>{r.nr_paletas}</td>
+                      <td style={{ fontWeight: 700, color: '#0f4c81' }}>{r.nr_paletas_devueltas}</td>
+                      <td style={{ fontWeight: 700, color: Number(r.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>{r.paletas_pendientes}</td>
+                      <td>{renderBadgeEstado(r.estado)}</td>
+                      <td>{fDev}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div className="acciones-cell">
+                          {/* BOTÓN FASE 2: DESPACHAR AUXILIAR */}
+                          {esPorDespachar ? (
+                            <button
+                              type="button"
+                              className="btn-tabla-aprobar"
+                              style={{ background: '#f59e0b', color: '#fff' }}
+                              onClick={() => abrirModalAuxiliar(r)}
+                              title="Completar Despacho (Auxiliar)"
+                            >
+                              <FaDolly />
+                            </button>
+                          ) : estaCerrado && !esAdmin ? (
+                            <button type="button" className="btn-tabla-editar" onClick={() => abrirModalDevolucion(r, true)} title="Ver detalle (Solo lectura)">
+                              <FaEye />
+                            </button>
+                          ) : (
+                            <button 
+                              type="button" 
+                              className={`btn-tabla-aprobar ${estaCerrado ? 'is-approved' : ''}`} 
+                              onClick={() => abrirModalDevolucion(r, false)} 
+                              title={estaCerrado ? 'Modificar Registro (Admin)' : 'Registrar Devolución'}
+                            >
+                              <FaEdit />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </section>
 
-      {/* MODAL DEVOLUCIÓN (2 COLUMNAS) */}
+      {/* MODAL FASE 2: AUXILIAR DE SALIDA */}
+      {modalAuxVisible && prestamoSeleccionado && (
+        <div className="tw-modal-backdrop" onClick={() => setModalAuxVisible(false)}>
+          <div className="tw-modal-card" style={{ maxWidth: '540px', padding: '24px' }} onClick={e => e.stopPropagation()}>
+            <div className="card-head-modern" style={{ padding: 0, marginBottom: '16px' }}>
+              <div>
+                <span className="module-pill">DESPACHO AUXILIAR</span>
+                <h3 style={{ margin: '4px 0 0', fontSize: '18px', fontWeight: 800 }}>
+                  Completar Salida ({prestamoSeleccionado.id_prestamo})
+                </h3>
+                <small style={{ color: '#64748b' }}>Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> | Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong></small>
+              </div>
+              <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>✕</button>
+            </div>
+
+            <form onSubmit={handleGuardarDespachoAuxiliar}>
+              {/* N° Paletas */}
+              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
+                <div className="label-head-p">
+                  <label>N° paletas prestadas</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={auxData.nr_paletas}
+                  onChange={e => setAuxData({ ...auxData, nr_paletas: e.target.value.replace(/\D/g, '').slice(0, 3) })}
+                  placeholder="Ej: 15"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {/* ¿Retorna? */}
+              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
+                <div className="label-head-p">
+                  <label>¿Retorna?</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                </div>
+                <select
+                  value={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno}
+                  onChange={e => setAuxData({ ...auxData, retorno: e.target.value })}
+                  disabled={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE'}
+                >
+                  <option value="SI">SÍ</option>
+                  <option value="NO">NO</option>
+                </select>
+              </div>
+
+              {/* Firma Conductor */}
+              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
+                <div className="label-head-p">
+                  <label>Firma del conductor</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                </div>
+                <div className="firma-input-group-p">
+                  <button type="button" className="btn-firma-p" onClick={() => { setFirmaTarget('auxiliar'); setModalFirmaVisible(true); }}>
+                    <FaPenNib /> Firmar Salida
+                  </button>
+                  <span className={`badge-firma-p ${auxData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
+                    {auxData.firma_conductor_base64 ? 'Firma lista' : 'Sin firma'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Foto de Salida (Obligatorio en Outbound Principal) */}
+              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
+                <div className="label-head-p">
+                  <label>Foto de salida</label>
+                  <span className={`tag-pill ${prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'obligatorio' : 'opcional'}`}>
+                    {prestamoSeleccionado.area_proceso === 'OUTBOUND PRINCIPAL' ? 'OBLIGATORIO' : 'OPCIONAL'}
+                  </span>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="file-input-p"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const img = new Image();
+                      img.onload = () => {
+                        const scale = Math.min(1, 1280 / img.width);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(img.width * scale);
+                        canvas.height = Math.round(img.height * scale);
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        setAuxData(prev => ({ ...prev, foto_salida_base64: canvas.toDataURL('image/png') }));
+                      };
+                      img.src = reader.result;
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                <span className={`badge-firma-p ${auxData.foto_salida_base64 ? 'activa' : 'inactiva'}`} style={{ marginTop: '4px' }}>
+                  {auxData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
+                </span>
+              </div>
+
+              {/* Observación */}
+              <div className="field-p field-manual-p" style={{ marginBottom: '16px' }}>
+                <div className="label-head-p">
+                  <label>Observación de salida</label>
+                  <span className="tag-pill opcional">OPCIONAL</span>
+                </div>
+                <textarea
+                  value={auxData.observacion_salida}
+                  onChange={e => setAuxData({ ...auxData, observacion_salida: e.target.value })}
+                  rows={2}
+                  placeholder="Detalles del despacho físico..."
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" className="btn-action-secondary" onClick={() => setModalAuxVisible(false)}>Cancelar</button>
+                <button type="submit" className="btn-action-primary" disabled={loading}>
+                  <FaSave /> Finalizar Despacho
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DEVOLUCIÓN */}
       {modalDevVisible && prestamoSeleccionado && (
         <div className="tw-modal-backdrop" onClick={() => setModalDevVisible(false)}>
           <div className="tw-modal-card" style={{ maxWidth: '960px', padding: '24px' }} onClick={e => e.stopPropagation()}>
@@ -595,10 +743,8 @@ export default function TrackingPrestamos() {
 
             <form onSubmit={handleGuardarDevolucion}>
               <div className="split-layout" style={{ gap: '20px', display: 'flex' }}>
-                {/* COLUMNA IZQUIERDA: DATOS DE SALIDA */}
                 <div style={{ flex: 1, background: '#f8fafc', padding: '16px', borderRadius: '12px' }}>
                   <div className="section-title" style={{ marginTop: 0, marginBottom: '12px', fontSize: '12px', fontWeight: 800, color: '#0f4c81', textTransform: 'uppercase' }}>Datos de Salida</div>
-                  
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px', textAlign: 'center' }}>
                     <div style={{ background: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px' }}>
                       <div style={{ fontSize: '18px', fontWeight: 800 }}>{prestamoSeleccionado.nr_paletas}</div>
@@ -630,36 +776,31 @@ export default function TrackingPrestamos() {
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px' }}>
-              
-                    {/* FIRMA DE SALIDA */}
                     {prestamoSeleccionado.firma_conductor && (
-                    <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>Firma Salida</span>
                         <img 
-                        src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
-                        alt="Firma" 
-                        style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
-                        onError={e => { e.target.style.display = 'none'; }} 
+                          src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
+                          alt="Firma" 
+                          style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                          onError={e => { e.target.style.display = 'none'; }} 
                         />
-                    </div>
+                      </div>
                     )}
-
-                    {/* FOTO DE SALIDA */}
                     {prestamoSeleccionado.foto_salida && (
-                    <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
+                      <div style={{ textAlign: 'center', background: '#fff', padding: '6px', borderRadius: '8px', border: '1px solid #cbd5e1' }}>
                         <span style={{ fontSize: '10px', fontWeight: 800, color: '#64748b', display: 'block', marginBottom: '4px' }}>Foto Salida</span>
                         <img 
-                        src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
-                        alt="Foto" 
-                        style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
-                        onError={e => { e.target.style.display = 'none'; }} 
+                          src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
+                          alt="Foto" 
+                          style={{ maxHeight: '60px', maxWidth: '100%', objectFit: 'contain' }} 
+                          onError={e => { e.target.style.display = 'none'; }} 
                         />
-                    </div>
+                      </div>
                     )}
                   </div>
                 </div>
 
-                {/* COLUMNA DERECHA: DATOS DE DEVOLUCIÓN */}
                 <div style={{ flex: 1, padding: '4px' }}>
                   <div className="section-title" style={{ marginTop: 0, marginBottom: '12px', fontSize: '12px', fontWeight: 800, color: '#0f4c81', textTransform: 'uppercase' }}>Datos para la Devolución</div>
 
@@ -690,7 +831,7 @@ export default function TrackingPrestamos() {
                   <div className="filter-group" style={{ marginBottom: '12px' }}>
                     <label>Firma de regreso</label>
                     {!modoLectura && (
-                      <button type="button" className="btn-action-secondary" style={{ width: '100%', marginBottom: '6px', justifyContent: 'center' }} onClick={() => setModalFirmaVisible(true)}>
+                      <button type="button" className="btn-action-secondary" style={{ width: '100%', marginBottom: '6px', justifyContent: 'center' }} onClick={() => { setFirmaTarget('devolucion'); setModalFirmaVisible(true); }}>
                         <FaEdit /> Firmar Regreso
                       </button>
                     )}
@@ -717,16 +858,16 @@ export default function TrackingPrestamos() {
         </div>
       )}
 
-      {/* MODAL FIRMA */}
+      {/* MODAL CANVAS FIRMA */}
       {modalFirmaVisible && (
         <div className="tw-modal-backdrop" onClick={() => setModalFirmaVisible(false)}>
           <div className="firma-box" onClick={e => e.stopPropagation()}>
-            <h3>Firma del Conductor (Regreso)</h3>
+            <h3>Firma del Conductor ({firmaTarget === 'auxiliar' ? 'Salida' : 'Regreso'})</h3>
             <canvas ref={canvasRef} id="firmaCanvas" onPointerDown={iniciarTrazo} onPointerMove={moverTrazo} onPointerUp={finalizarTrazo} />
             <div className="firma-actions">
               <button type="button" className="btn-action-secondary" onClick={limpiarCanvasFirma}>Limpiar</button>
               <button type="button" className="btn-action-secondary" onClick={() => setModalFirmaVisible(false)}>Cancelar</button>
-              <button type="button" className="btn-action-primary" onClick={confirmarFirmaRegreso}>Guardar firma</button>
+              <button type="button" className="btn-action-primary" onClick={confirmarFirma}>Guardar firma</button>
             </div>
           </div>
         </div>

@@ -356,20 +356,65 @@
   background-color: #fef2f2 !important;
 }
 
-/* BADGES ESTILO PÍLDORA SÓLIDA */
+/* =========================================
+   BADGES ESTADO - MISMO TAMAÑO Y TONOS SUAVES
+   ========================================= */
 .badge-estado {
-  display: inline-block;
-  padding: 3px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 105px;          /* <- MISMO ANCHO PARA TODAS LAS CÁPSULAS */
+  height: 22px;         /* <- MISMA ALTURA */
   border-radius: 999px;
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
   text-transform: uppercase;
+  box-sizing: border-box;
+  white-space: nowrap;
 }
 
-.badge-estado.operativo { background: #0a8f3b; color: #ffffff; }
-.badge-estado.observado { background: #e6b112; color: #1e293b; }
-.badge-estado.inoperativo { background: #db2323e5; color: #ffffff; }
+/* 1. POR DESPACHAR: TONO VIVO / FUERTE */
+.badge-estado.por-despachar {
+  background: #ea580c !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 6px rgba(234, 88, 12, 0.25);
+}
+
+/* 2. PENDIENTE: AMARILLO PASTEL SUAVE */
+.badge-estado.pendiente {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+  border: 1px solid #fde68a;
+}
+
+/* 3. PARCIAL: CELESTE PASTEL */
+.badge-estado.parcial {
+  background: #e0f2fe !important;
+  color: #0369a1 !important;
+  border: 1px solid #bae6fd;
+}
+
+/* 4. DEVUELTO: VERDE PASTEL */
+.badge-estado.devuelto {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border: 1px solid #bbf7d0;
+}
+
+/* 5. NO RETORNO: GRIS SUAVE / NEUTRO */
+.badge-estado.no-retorno {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1;
+}
+
+/* 6. CERRADO MIXTO */
+.badge-estado.cerrado-mixto {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+  border: 1px solid #fecaca;
+}
 
 /* BOTONES DE ACCIÓN EN FILA (SOLO ICONOS) */
 .acciones-cell {
@@ -624,6 +669,16 @@
   }
   .firma-actions button {
     width: 100%;
+  }
+  .tw-modal-backdrop {
+    padding: 6px !important; /* Más pegado a los bordes de la pantalla */
+  }
+
+  .tw-modal-card {
+    width: 98% !important;
+    max-width: 98% !important;
+    border-radius: 12px !important;
+    padding: 14px 12px !important; /* Más espacio aprovechable adentro */
   }
 }
 

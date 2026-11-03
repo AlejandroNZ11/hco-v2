@@ -27,17 +27,13 @@ export default function ModalPrestamo() {
   const [loading, setLoading] = useState(false);
   const [reloj, setReloj] = useState('');
 
-  // Catálogos Maestros
   const [empresas, setEmpresas] = useState([]);
   const [conductores, setConductores] = useState([]);
   const [placas, setPlacas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [tiposPaleta, setTiposPaleta] = useState([]);
 
-  // Estado si la empresa fue bloqueada por selección de placa
   const [empresaBloqueadaPorPlaca, setEmpresaBloqueadaPorPlaca] = useState(false);
-
-  // Múltiples clientes para OUTBOUND PRINCIPAL
   const [clientesSeleccionados, setClientesSeleccionados] = useState([]);
   const [clienteInputTemporal, setClienteInputTemporal] = useState('');
 
@@ -60,34 +56,31 @@ export default function ModalPrestamo() {
     foto_salida_base64: ''
   });
 
-  const [mostrarModalFirma, setMostrarModalFirma] = useState(false);
   const [mostrarModalConductor, setMostrarModalConductor] = useState(false);
   const [mostrarModalPlaca, setMostrarModalPlaca] = useState(false);
+  const [mostrarModalFirma, setMostrarModalFirma] = useState(false);
 
+  // Canvas para firma (Retail)
   const canvasRef = useRef(null);
   const dibujandoRef = useRef(false);
   const tieneTrazoRef = useRef(false);
 
-  // Modal Conductor
   const [nuevoCond, setNuevoCond] = useState({
     dni: '',
     nombre: '',
     empresa_id: '',
     estadoBusqueda: 'Ingrese 8 dígitos para buscar o crear el conductor.',
     colorEstado: '#64748b',
-    existe: false,
-    infoAuditoria: ''
+    existe: false
   });
 
-  // Modal Placa
   const [nuevaPlaca, setNuevaPlaca] = useState({
     nro_placa: '',
     empresa_id: '',
     volumen_m3: '',
     estadoBusqueda: 'Ingrese 6 caracteres para buscar o crear la placa.',
     colorEstado: '#64748b',
-    existe: false,
-    infoAuditoria: ''
+    existe: false
   });
 
   const [avisoFlotante, setAvisoFlotante] = useState({
@@ -142,7 +135,6 @@ export default function ModalPrestamo() {
     }
   };
 
-  // Reglas por Área
   const esClienteRecoge = formData.area_proceso === 'CLIENTE RECOGE';
   const esOutboundPrincipal = formData.area_proceso === 'OUTBOUND PRINCIPAL';
   const esOutboundRetail = formData.area_proceso === 'OUTBOUND RETAIL';
@@ -150,47 +142,88 @@ export default function ModalPrestamo() {
   const cantPaletasNum = formData.nr_paletas === '' ? 0 : Number(formData.nr_paletas);
   const sinSalidaPallet = formData.nr_paletas === '' || cantPaletasNum === 0;
 
-  // Filtrado reactivo de conductores dependientes de la empresa seleccionada
   const conductoresFiltradosPorEmpresa = useMemo(() => {
     if (!formData.empresa_transporte_id) return conductores;
     return conductores.filter(c => String(c.empresa_id) === String(formData.empresa_transporte_id));
   }, [conductores, formData.empresa_transporte_id]);
 
-  // Manejo de cambio de Área de Proceso
-  const handleAreaChange = (e) => {
+    // Manejo de cambio de Área de Proceso: Resetea todos los campos al cambiar de área
+    const handleAreaChange = (e) => {
     const nuevaArea = e.target.value;
+
+    // Si no selecciona un área válida
+    if (!nuevaArea) {
+        setFormData({
+        area_proceso: '',
+        empresa_transporte_id: '',
+        conductor_nombre: '',
+        dni_conductor: '',
+        cliente_nombre: '',
+        nr_ruta: '',
+        nro_placa: '',
+        despachador: nombreUsuarioActual,
+        nr_paletas: '',
+        tipo_paleta_id: '',
+        retorno: 'NO',
+        observacion_salida: '',
+        firma_conductor_base64: '',
+        foto_salida_base64: ''
+        });
+        setClientesSeleccionados([]);
+        setClienteInputTemporal('');
+        setEmpresaBloqueadaPorPlaca(false);
+        return;
+    }
+
     if (nuevaArea === 'CLIENTE RECOGE') {
-      const empresaOther = empresas.find(
+        const empresaOther = empresas.find(
         emp => emp.nombre_empresa.toUpperCase().includes('OTHER') || emp.nombre_empresa.toUpperCase().includes('OTRO')
-      );
-      setFormData(prev => ({
-        ...prev,
+        );
+
+        // Reseteo total para CLIENTE RECOGE (fijando empresa en OTHER y retorno en NO)
+        setFormData({
         area_proceso: nuevaArea,
         empresa_transporte_id: empresaOther ? String(empresaOther.id) : '',
         conductor_nombre: '',
         dni_conductor: '',
-        nr_ruta: '',
         cliente_nombre: '',
+        nr_ruta: '',
+        nro_placa: '',
+        despachador: nombreUsuarioActual,
+        nr_paletas: '',
         tipo_paleta_id: '',
-        retorno: 'NO'
-      }));
-      setEmpresaBloqueadaPorPlaca(true);
+        retorno: 'NO',
+        observacion_salida: '',
+        firma_conductor_base64: '',
+        foto_salida_base64: ''
+        });
+        setEmpresaBloqueadaPorPlaca(true);
     } else {
-      setFormData(prev => ({
-        ...prev,
+        // Reseteo total para OUTBOUND RETAIL y OUTBOUND PRINCIPAL (todo en blanco)
+        setFormData({
         area_proceso: nuevaArea,
         empresa_transporte_id: '',
         conductor_nombre: '',
         dni_conductor: '',
+        cliente_nombre: '',
+        nr_ruta: '',
+        nro_placa: '',
+        despachador: nombreUsuarioActual,
+        nr_paletas: '',
         tipo_paleta_id: '',
-        retorno: 'NO'
-      }));
-      setEmpresaBloqueadaPorPlaca(false);
+        retorno: 'NO',
+        observacion_salida: '',
+        firma_conductor_base64: '',
+        foto_salida_base64: ''
+        });
+        setEmpresaBloqueadaPorPlaca(false);
     }
-    setClientesSeleccionados([]);
-  };
 
-  // Manejo de cambio de Placa: Bloquea y autoselecciona la empresa de transporte
+    // Limpieza de estados de chips de clientes
+    setClientesSeleccionados([]);
+    setClienteInputTemporal('');
+    };
+
   const handlePlacaInputForm = (e) => {
     const placaVal = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
     const placaObj = placas.find(p => p.nro_placa === placaVal);
@@ -205,15 +238,11 @@ export default function ModalPrestamo() {
       }));
       setEmpresaBloqueadaPorPlaca(true);
     } else {
-      setFormData(prev => ({
-        ...prev,
-        nro_placa: placaVal
-      }));
+      setFormData(prev => ({ ...prev, nro_placa: placaVal }));
       if (!esClienteRecoge) setEmpresaBloqueadaPorPlaca(false);
     }
   };
 
-  // Manejo de cambio de Conductor
   const handleConductorChange = (e) => {
     const valorEscrito = e.target.value;
     if (esClienteRecoge) {
@@ -223,10 +252,7 @@ export default function ModalPrestamo() {
 
     const normalizar = (str) => String(str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const buscado = normalizar(valorEscrito);
-
-    const encontrado = conductoresFiltradosPorEmpresa.find(
-      c => normalizar(c.nombre_conductor) === buscado
-    );
+    const encontrado = conductoresFiltradosPorEmpresa.find(c => normalizar(c.nombre_conductor) === buscado);
 
     setFormData(prev => ({
       ...prev,
@@ -238,21 +264,6 @@ export default function ModalPrestamo() {
     }));
   };
 
-  // Manejo de paletas
-  const handlePaletasChange = (e) => {
-    const val = e.target.value.replace(/\D/g, '').slice(0, 3);
-    const num = val === '' ? 0 : Number(val);
-    const esCero = val === '' || num === 0;
-
-    setFormData(prev => ({
-      ...prev,
-      nr_paletas: val,
-      tipo_paleta_id: esCero ? '' : prev.tipo_paleta_id,
-      retorno: esCero ? 'NO' : 'SI'
-    }));
-  };
-
-  // Manejo de Clientes Múltiples (Outbound Principal)
   const handleAgregarClienteChip = (cliNombre) => {
     const limpio = cliNombre.trim().toUpperCase();
     if (limpio && !clientesSeleccionados.includes(limpio)) {
@@ -265,23 +276,7 @@ export default function ModalPrestamo() {
     setClientesSeleccionados(clientesSeleccionados.filter((_, idx) => idx !== indexRemover));
   };
 
-  const handleFotoSalidaChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      return mostrarAviso('warning', 'Archivo inválido', 'Seleccione una imagen válida.');
-    }
-    try {
-      setLoading(true);
-      const dataUrlPng = await comprimirImagenAPng(file, 1280);
-      setFormData(prev => ({ ...prev, foto_salida_base64: dataUrlPng }));
-    } catch {
-      mostrarAviso('danger', 'Error de imagen', 'No se pudo procesar la fotografía.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Manejo y compresión de imagen de salida (Retail)
   const comprimirImagenAPng = (file, maxWidth = 1280) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -304,7 +299,24 @@ export default function ModalPrestamo() {
     });
   };
 
-  // Canvas Firma
+  const handleFotoSalidaChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      return mostrarAviso('warning', 'Archivo inválido', 'Seleccione una imagen válida.');
+    }
+    try {
+      setLoading(true);
+      const dataUrlPng = await comprimirImagenAPng(file, 1280);
+      setFormData(prev => ({ ...prev, foto_salida_base64: dataUrlPng }));
+    } catch {
+      mostrarAviso('danger', 'Error de imagen', 'No se pudo procesar la fotografía.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Control Canvas Firma (Retail)
   useEffect(() => {
     if (mostrarModalFirma && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -326,6 +338,7 @@ export default function ModalPrestamo() {
     ctx.beginPath();
     ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
   };
+
   const moverTrazo = (e) => {
     if (!dibujandoRef.current || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -333,14 +346,17 @@ export default function ModalPrestamo() {
     ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
     ctx.stroke();
   };
+
   const finalizarTrazo = () => { dibujandoRef.current = false; };
-  const limpiarCanvas = () => {
+
+  const limpiarCanvasFirma = () => {
     if (!canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
     tieneTrazoRef.current = false;
   };
-  const confirmarFirmaCanvas = () => {
+
+  const confirmarFirmaSalida = () => {
     if (!tieneTrazoRef.current) {
       return mostrarAviso('warning', 'Firma vacía', 'Por favor dibuje la firma antes de guardar.');
     }
@@ -348,157 +364,6 @@ export default function ModalPrestamo() {
     setMostrarModalFirma(false);
   };
 
-  // Modales Maestros de Conductor y Placa
-  const handleBuscarDniModal = async (dniInput) => {
-    const limpio = dniInput.replace(/\D/g, '').slice(0, 8);
-    setNuevoCond(prev => ({ ...prev, dni: limpio }));
-    if (limpio.length < 8) return;
-
-    const local = conductores.find(c => String(c.dni_conductor) === limpio);
-    if (local) {
-      setNuevoCond({
-        dni: limpio,
-        nombre: local.nombre_conductor || '',
-        empresa_id: String(local.empresa_id || ''),
-        existe: true,
-        estadoBusqueda: '✓ Conductor activo encontrado.',
-        colorEstado: '#16a34a',
-        infoAuditoria: ''
-      });
-      return;
-    }
-    try {
-      const remoto = await buscarConductorPorDni(limpio);
-      if (remoto) {
-        setNuevoCond({
-          dni: limpio,
-          nombre: remoto.nombre_conductor || '',
-          empresa_id: String(remoto.empresa_id || ''),
-          existe: true,
-          estadoBusqueda: '✓ Conductor encontrado en base de datos.',
-          colorEstado: '#16a34a',
-          infoAuditoria: ''
-        });
-      } else {
-        setNuevoCond(prev => ({
-          ...prev,
-          dni: limpio,
-          nombre: '',
-          empresa_id: formData.empresa_transporte_id || '',
-          existe: false,
-          estadoBusqueda: 'DNI no registrado. Complete para crearlo.',
-          colorEstado: '#0f4c81',
-          infoAuditoria: ''
-        }));
-      }
-    } catch {}
-  };
-
-  const handleGuardarConductorModal = async (e) => {
-    e.preventDefault();
-    if (nuevoCond.dni.length !== 8 || !nuevoCond.nombre.trim() || !nuevoCond.empresa_id) {
-      return mostrarAviso('warning', 'Campos obligatorios', 'Complete DNI, nombre y empresa.');
-    }
-    setLoading(true);
-    try {
-      const res = await guardarConductorMaestro({
-        dni: nuevoCond.dni,
-        nombre: nuevoCond.nombre.trim().toUpperCase(),
-        empresa_id: nuevoCond.empresa_id,
-        usuario: nombreUsuarioActual
-      });
-      await cargarMaestros();
-      setFormData(prev => ({
-        ...prev,
-        conductor_nombre: res.conductor.nombre_conductor,
-        dni_conductor: res.conductor.dni_conductor,
-        empresa_transporte_id: String(res.conductor.empresa_id)
-      }));
-      setMostrarModalConductor(false);
-      mostrarAviso('success', 'Éxito', `Conductor guardado correctamente.`);
-    } catch (err) {
-      mostrarAviso('danger', 'Error', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBuscarPlacaModal = async (inputPlaca) => {
-    const limpia = inputPlaca.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase();
-    setNuevaPlaca(prev => ({ ...prev, nro_placa: limpia }));
-    if (limpia.length < 6) return;
-
-    const local = placas.find(p => p.nro_placa === limpia);
-    if (local) {
-      setNuevaPlaca({
-        nro_placa: limpia,
-        empresa_id: String(local.empresa_id || ''),
-        volumen_m3: local.volumen_m3 || '',
-        existe: true,
-        estadoBusqueda: '✓ Placa activa encontrada.',
-        colorEstado: '#16a34a',
-        infoAuditoria: ''
-      });
-      return;
-    }
-    try {
-      const remota = await buscarPlacaPorNro(limpia);
-      if (remota) {
-        setNuevaPlaca({
-          nro_placa: limpia,
-          empresa_id: String(remota.empresa_id || ''),
-          volumen_m3: remota.volumen_m3 || '',
-          existe: true,
-          estadoBusqueda: '✓ Placa encontrada.',
-          colorEstado: '#16a34a',
-          infoAuditoria: ''
-        });
-      } else {
-        setNuevaPlaca(prev => ({
-          ...prev,
-          nro_placa: limpia,
-          empresa_id: formData.empresa_transporte_id || '',
-          volumen_m3: '',
-          existe: false,
-          estadoBusqueda: 'Placa no registrada. Seleccione empresa.',
-          colorEstado: '#0f4c81',
-          infoAuditoria: ''
-        }));
-      }
-    } catch {}
-  };
-
-  const handleGuardarPlacaModal = async (e) => {
-    e.preventDefault();
-    const placaLimpia = nuevaPlaca.nro_placa.replace(/[^A-Z0-9]/g, '').slice(0, 6);
-    if (placaLimpia.length !== 6 || !nuevaPlaca.empresa_id) {
-      return mostrarAviso('warning', 'Campos obligatorios', 'Ingrese placa de 6 caracteres y empresa.');
-    }
-    setLoading(true);
-    try {
-      const res = await guardarPlacaMaestra({
-        nro_placa: placaLimpia,
-        empresa_id: nuevaPlaca.empresa_id,
-        volumen_m3: nuevaPlaca.volumen_m3,
-        usuario: nombreUsuarioActual
-      });
-      await cargarMaestros();
-      setFormData(prev => ({
-        ...prev,
-        nro_placa: res.placa.nro_placa,
-        empresa_transporte_id: String(res.placa.empresa_id)
-      }));
-      setEmpresaBloqueadaPorPlaca(true);
-      setMostrarModalPlaca(false);
-      mostrarAviso('success', 'Éxito', `Placa guardada correctamente.`);
-    } catch (err) {
-      mostrarAviso('danger', 'Error', err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Submit Préstamo
   const handleSubmitPrestamo = async (e) => {
     e.preventDefault();
 
@@ -513,13 +378,8 @@ export default function ModalPrestamo() {
     if (!esClienteRecoge) {
       const existeEnCatalogo = placas.some(p => p.nro_placa === formData.nro_placa);
       if (!existeEnCatalogo) {
-        return mostrarAviso(
-          'warning',
-          'Placa no registrada',
-          'La placa ingresada no existe en la base de datos. Regístrela primero con el botón "+ Placa".'
-        );
+        return mostrarAviso('warning', 'Placa no registrada', 'La placa ingresada no existe en el catálogo. Regístrela primero con "+ Placa".');
       }
-
       if (!formData.empresa_transporte_id) {
         return mostrarAviso('warning', 'Falta empresa', 'Seleccione la Empresa de transporte.');
       }
@@ -531,7 +391,7 @@ export default function ModalPrestamo() {
       }
     } else {
       if (!formData.conductor_nombre.trim()) {
-        return mostrarAviso('warning', 'Falta nombre', 'Ingrese el nombre de la persona o chofer que recoge.');
+        return mostrarAviso('warning', 'Falta nombre', 'Ingrese el nombre de quien recoge.');
       }
     }
 
@@ -542,16 +402,16 @@ export default function ModalPrestamo() {
       return mostrarAviso('warning', 'Falta cliente', 'Seleccione al menos un Cliente.');
     }
 
-    // Solo exige tipo de paleta si es OUTBOUND RETAIL y hay paletas
-    if (esOutboundRetail && !sinSalidaPallet && !formData.tipo_paleta_id) {
-      return mostrarAviso('warning', 'Falta tipo de paleta', 'Seleccione el tipo de paleta.');
-    }
-
-    if (sinSalidaPallet && !formData.observacion_salida.trim()) {
-      return mostrarAviso('warning', 'Falta observación', 'La observación es obligatoria cuando no hay salida de pallet.');
-    }
-    if (!formData.firma_conductor_base64) {
-      return mostrarAviso('warning', 'Falta firma', 'Debe registrar la firma de quien retira.');
+    if (esOutboundRetail) {
+      if (!sinSalidaPallet && !formData.tipo_paleta_id) {
+        return mostrarAviso('warning', 'Falta tipo de paleta', 'Seleccione el tipo de paleta.');
+      }
+      if (sinSalidaPallet && !formData.observacion_salida.trim()) {
+        return mostrarAviso('warning', 'Falta observación', 'La observación es obligatoria cuando no hay salida de pallet.');
+      }
+      if (!formData.firma_conductor_base64) {
+        return mostrarAviso('warning', 'Falta firma', 'Debe registrar la firma de salida del conductor.');
+      }
     }
 
     setLoading(true);
@@ -568,9 +428,11 @@ export default function ModalPrestamo() {
       const creado = await crearPrestamoPallet(payloadEnvio);
       mostrarAviso(
         'success',
-        'Préstamo Registrado',
-        `El registro ${creado.id_prestamo} se guardó exitosamente.`,
-        `Placa: ${creado.nro_placa} | Paletas: ${creado.nr_paletas}`,
+        esOutboundRetail ? 'Préstamo Registrado' : 'Pre-Registro Creado',
+        esOutboundRetail 
+          ? `El préstamo ${creado.id_prestamo} se registró completamente.`
+          : `El pre-registro ${creado.id_prestamo} está listo para ser despachado por el auxiliar.`,
+        `Placa: ${creado.nro_placa}`,
         () => navigate('/prestamos/tracking')
       );
     } catch (err) {
@@ -580,32 +442,10 @@ export default function ModalPrestamo() {
     }
   };
 
-  const limpiarFormulario = () => {
-    setFormData({
-      area_proceso: '',
-      empresa_transporte_id: '',
-      conductor_nombre: '',
-      dni_conductor: '',
-      cliente_nombre: '',
-      nr_ruta: '',
-      nro_placa: '',
-      despachador: nombreUsuarioActual,
-      nr_paletas: '',
-      tipo_paleta_id: '',
-      retorno: 'NO',
-      observacion_salida: '',
-      firma_conductor_base64: '',
-      foto_salida_base64: ''
-    });
-    setClientesSeleccionados([]);
-    setEmpresaBloqueadaPorPlaca(false);
-  };
-
   return (
     <div className="registro-page-p">
       {loading && <Loading />}
 
-      {/* AVISO FLOTANTE */}
       {avisoFlotante.visible && (
         <div className="tw-modal-backdrop" onClick={cerrarAviso}>
           <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
@@ -620,15 +460,12 @@ export default function ModalPrestamo() {
               {avisoFlotante.detalleExtra && <div className="tw-modal-extra-box">{avisoFlotante.detalleExtra}</div>}
             </div>
             <div className="tw-modal-footer-alert">
-              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>
-                Entendido
-              </button>
+              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>Entendido</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* TARJETA PRINCIPAL */}
       <section className="card-p mb-4">
         <div className="card-head-modern-p">
           <div className="card-head-left-p">
@@ -642,12 +479,10 @@ export default function ModalPrestamo() {
         </div>
 
         <form onSubmit={handleSubmitPrestamo} className="form-container-p">
-          <div className="section-title-p">DATOS DE SALIDA</div>
+          <div className="section-title-p">DATOS DE SALIDA (ADMINISTRATIVO)</div>
 
-          {/* GRID DE CAMPOS */}
           <div className="form-grid-p cols-4">
-            
-            {/* 1. Fecha Entrega */}
+            {/* Fecha entrega */}
             <div className="field-p field-auto-p">
               <div className="label-head-p">
                 <label>Fecha entrega</label>
@@ -656,7 +491,7 @@ export default function ModalPrestamo() {
               <input value={reloj} readOnly />
             </div>
 
-            {/* 2. Área del Proceso */}
+            {/* Área del Proceso */}
             <div className="field-p field-manual-p">
               <div className="label-head-p">
                 <label>Área del proceso</label>
@@ -670,7 +505,7 @@ export default function ModalPrestamo() {
               </select>
             </div>
 
-            {/* 3. Placa (Al seleccionar bloquea la Empresa) */}
+            {/* Placa */}
             <div className="field-p field-manual-p">
               <div className="label-head-p">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -683,10 +518,9 @@ export default function ModalPrestamo() {
                           nro_placa: '',
                           empresa_id: formData.empresa_transporte_id || '',
                           volumen_m3: '',
-                          estadoBusqueda: 'Ingrese 6 caracteres para buscar o crear la placa.',
+                          estadoBusqueda: 'Ingrese 6 caracteres...',
                           colorEstado: '#64748b',
-                          existe: false,
-                          infoAuditoria: ''
+                          existe: false
                         });
                         setMostrarModalPlaca(true);
                       }}
@@ -711,7 +545,7 @@ export default function ModalPrestamo() {
               </datalist>
             </div>
 
-            {/* 4. Empresa Transporte */}
+            {/* Empresa Transporte */}
             <div className={`field-p ${empresaBloqueadaPorPlaca ? 'field-auto-p' : 'field-manual-p'}`}>
               <div className="label-head-p">
                 <label>Empresa transporte</label>
@@ -732,7 +566,7 @@ export default function ModalPrestamo() {
               </select>
             </div>
 
-            {/* 5. Conductor */}
+            {/* Conductor */}
             <div className="field-p field-manual-p">
               <div className="label-head-p">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -745,10 +579,9 @@ export default function ModalPrestamo() {
                           dni: '',
                           nombre: '',
                           empresa_id: formData.empresa_transporte_id || '',
-                          estadoBusqueda: 'Ingrese 8 dígitos para buscar o crear el conductor.',
+                          estadoBusqueda: 'Ingrese 8 dígitos...',
                           colorEstado: '#64748b',
-                          existe: false,
-                          infoAuditoria: ''
+                          existe: false
                         });
                         setMostrarModalConductor(true);
                       }}
@@ -763,7 +596,7 @@ export default function ModalPrestamo() {
                 list={esClienteRecoge ? undefined : "listaCond"}
                 value={formData.conductor_nombre}
                 onChange={handleConductorChange}
-                placeholder={esClienteRecoge ? "Nombre de quien recoge..." : "Buscar conductor activo..."}
+                placeholder={esClienteRecoge ? "Nombre de quien recoge..." : "Buscar conductor..."}
                 autoComplete="off"
                 required
               />
@@ -776,7 +609,7 @@ export default function ModalPrestamo() {
               )}
             </div>
 
-            {/* 6. DNI Conductor (Oculto en Cliente Recoge) */}
+            {/* DNI Conductor */}
             {!esClienteRecoge && (
               <div className="field-p field-auto-p">
                 <div className="label-head-p">
@@ -787,7 +620,7 @@ export default function ModalPrestamo() {
               </div>
             )}
 
-            {/* 7. N° Ruta (Oculto en Cliente Recoge) */}
+            {/* N° Ruta */}
             {!esClienteRecoge && (
               <div className="field-p field-manual-p">
                 <div className="label-head-p">
@@ -805,7 +638,7 @@ export default function ModalPrestamo() {
               </div>
             )}
 
-            {/* 8. Clientes: OUTBOUND RETAIL (1 Cliente) */}
+            {/* Clientes OUTBOUND RETAIL */}
             {esOutboundRetail && (
               <div className="field-p field-manual-p">
                 <div className="label-head-p">
@@ -828,191 +661,196 @@ export default function ModalPrestamo() {
               </div>
             )}
 
-            {/* 9. N° Paletas */}
-            <div className="field-p field-manual-p">
-              <div className="label-head-p">
-                <label>N° paletas</label>
-                <span className="tag-pill obligatorio">OBLIGATORIO</span>
-              </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={formData.nr_paletas}
-                onChange={handlePaletasChange}
-                placeholder="0 = sin pallet"
-              />
-            </div>
-
-            {/* 10. Clientes: OUTBOUND PRINCIPAL (Múltiples Clientes) */}
+            {/* Clientes Múltiples OUTBOUND PRINCIPAL */}
             {esOutboundPrincipal && (
-            <div className="field-p field-manual-p" style={{ gridColumn: 'span 2' }}>
+              <div className="field-p field-manual-p multicliente-box">
                 <div className="label-head-p">
-                <label>Clientes (Múltiples)</label>
-                <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                  <label>Clientes (Múltiples)</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
                 </div>
                 <div className="clientes-input-row">
-                <input
+                  <input
                     list="listaCli"
                     value={clienteInputTemporal}
                     onChange={e => setClienteInputTemporal(e.target.value.toUpperCase())}
                     onKeyDown={e => {
-                    if (e.key === 'Enter') {
+                      if (e.key === 'Enter') {
                         e.preventDefault();
                         handleAgregarClienteChip(clienteInputTemporal);
-                    }
+                      }
                     }}
                     placeholder="Escriba o seleccione..."
-                />
-                <button
+                  />
+                  <button
                     type="button"
                     className="btn-limpiar-p"
                     style={{ height: '44px' }}
                     onClick={() => handleAgregarClienteChip(clienteInputTemporal)}
-                >
+                  >
                     Añadir
-                </button>
+                  </button>
                 </div>
                 <datalist id="listaCli">
-                {clientes.map(cli => <option key={cli.id} value={cli.nombre_cliente} />)}
+                  {clientes.map(cli => <option key={cli.id} value={cli.nombre_cliente} />)}
                 </datalist>
 
-                {/* Tags de clientes agregados */}
                 <div className="clientes-chips-box">
-                {clientesSeleccionados.map((cli, idx) => (
+                  {clientesSeleccionados.map((cli, idx) => (
                     <span key={idx} className="cliente-chip">
-                    {cli}
-                    <FaTimes className="chip-close" onClick={() => handleRemoverClienteChip(idx)} />
+                      {cli}
+                      <FaTimes className="chip-close" onClick={() => handleRemoverClienteChip(idx)} />
                     </span>
-                ))}
+                  ))}
                 </div>
-            </div>
+              </div>
             )}
 
-
-            {/* 11. Tipo de Paleta: SOLO EN OUTBOUND RETAIL */}
+            {/* CAMPOS AUXILIARES: VISIBLES SOLO SI ES OUTBOUND RETAIL */}
             {esOutboundRetail && (
+              <>
+                {/* N° Paletas */}
+                <div className="field-p field-manual-p">
+                  <div className="label-head-p">
+                    <label>N° paletas</label>
+                    <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formData.nr_paletas}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+                      setFormData(prev => ({
+                        ...prev,
+                        nr_paletas: val,
+                        retorno: (val === '' || Number(val) === 0) ? 'NO' : 'SI'
+                      }));
+                    }}
+                    placeholder="0 = sin pallet"
+                  />
+                </div>
+
+                {/* Tipo de Paleta */}
+                <div className={`field-p ${sinSalidaPallet ? 'field-auto-p' : 'field-manual-p'}`}>
+                  <div className="label-head-p">
+                    <label>Tipo de paleta</label>
+                    <span className={`tag-pill ${sinSalidaPallet ? 'opcional' : 'obligatorio'}`}>
+                      {sinSalidaPallet ? 'NO APLICA' : 'OBLIGATORIO'}
+                    </span>
+                  </div>
+                  <select
+                    value={formData.tipo_paleta_id}
+                    onChange={e => setFormData({ ...formData, tipo_paleta_id: e.target.value })}
+                    disabled={sinSalidaPallet}
+                    required={!sinSalidaPallet}
+                  >
+                    <option value="">Seleccione...</option>
+                    {tiposPaleta.map(tp => (
+                      <option key={tp.id} value={tp.id}>{tp.nombre_tipo}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Firma Conductor en Retail */}
+                <div className="field-p field-manual-p">
+                  <div className="label-head-p">
+                    <label>Firma conductor</label>
+                    <span className="tag-pill obligatorio">OBLIGATORIO</span>
+                  </div>
+                  <div className="firma-input-group-p">
+                    <button type="button" className="btn-firma-p" onClick={() => setMostrarModalFirma(true)}>
+                      <FaPenNib /> Firmar Salida
+                    </button>
+                    <span className={`badge-firma-p ${formData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
+                      {formData.firma_conductor_base64 ? 'Firma lista' : 'Sin firma'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Foto de Salida en Retail: OPCIONAL */}
+                <div className="field-p field-manual-p">
+                  <div className="label-head-p">
+                    <label>Foto de salida</label>
+                    <span className="tag-pill opcional">OPCIONAL</span>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFotoSalidaChange}
+                    className="file-input-p"
+                  />
+                  <div style={{ marginTop: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span className={`badge-firma-p ${formData.foto_salida_base64 ? 'activa' : 'inactiva'}`}>
+                      {formData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
+                    </span>
+                    {formData.foto_salida_base64 && (
+                      <button
+                        type="button"
+                        className="btn-quitar-foto-p"
+                        onClick={() => setFormData(prev => ({ ...prev, foto_salida_base64: '' }))}
+                      >
+                        Quitar foto
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* PARTE AUXILIAR EN RETAIL: RETORNO Y OBSERVACIÓN */}
+          {esOutboundRetail && (
+            <div className="grid-retorna-obs">
               <div className={`field-p ${sinSalidaPallet ? 'field-auto-p' : 'field-manual-p'}`}>
                 <div className="label-head-p">
-                  <label>Tipo de paleta</label>
-                  <span className={`tag-pill ${sinSalidaPallet ? 'opcional' : 'obligatorio'}`}>
-                    {sinSalidaPallet ? 'NO APLICA' : 'OBLIGATORIO'}
-                  </span>
+                  <label>¿Retorna?</label>
+                  <span className="tag-pill obligatorio">OBLIGATORIO</span>
                 </div>
                 <select
-                  value={formData.tipo_paleta_id}
-                  onChange={e => setFormData({ ...formData, tipo_paleta_id: e.target.value })}
+                  value={formData.retorno}
+                  onChange={e => setFormData({ ...formData, retorno: e.target.value })}
                   disabled={sinSalidaPallet}
-                  required={!sinSalidaPallet}
                 >
-                  <option value="">Seleccione...</option>
-                  {tiposPaleta.map(tp => (
-                    <option key={tp.id} value={tp.id}>{tp.nombre_tipo}</option>
-                  ))}
+                  <option value="NO">NO</option>
+                  <option value="SI">SÍ</option>
                 </select>
               </div>
-            )}
 
-            {/* 12. Firma Conductor */}
-            <div className="field-p field-manual-p">
-              <div className="label-head-p">
-                <label>Firma conductor</label>
-                <span className="tag-pill obligatorio">OBLIGATORIO</span>
-              </div>
-              <div className="firma-input-group-p">
-                <button type="button" className="btn-firma-p" onClick={() => setMostrarModalFirma(true)}>
-                  <FaPenNib /> Firmar
-                </button>
-                <span className={`badge-firma-p ${formData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
-                  {formData.firma_conductor_base64 ? 'Firma lista' : 'Sin firma'}
-                </span>
-              </div>
-            </div>
-
-            {/* 13. Foto de Salida (Opcional) */}
-            <div className="field-p field-manual-p">
-              <div className="label-head-p">
-                <label>Foto de salida</label>
-                <span className="tag-pill opcional">OPCIONAL</span>
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFotoSalidaChange}
-                className="file-input-p"
-              />
-              <div style={{ marginTop: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span className={`badge-firma-p ${formData.foto_salida_base64 ? 'activa' : 'inactiva'}`}>
-                  {formData.foto_salida_base64 ? 'Foto cargada' : 'Sin foto'}
-                </span>
-                {formData.foto_salida_base64 && (
-                  <button
-                    type="button"
-                    className="btn-quitar-foto-p"
-                    onClick={() => setFormData(prev => ({ ...prev, foto_salida_base64: '' }))}
-                  >
-                    Quitar foto
-                  </button>
-                )}
+              <div className="field-p field-manual-p">
+                <div className="label-head-p">
+                  <label>Observación de salida</label>
+                  <span className={`tag-pill ${sinSalidaPallet ? 'obligatorio' : 'recomendado'}`}>
+                    {sinSalidaPallet ? 'OBLIGATORIO' : 'RECOMENDADO'}
+                  </span>
+                </div>
+                <textarea
+                  value={formData.observacion_salida}
+                  onChange={e => setFormData({ ...formData, observacion_salida: e.target.value })}
+                  maxLength={500}
+                  rows={2}
+                  placeholder={sinSalidaPallet ? 'Obligatorio cuando no hay pallet' : 'Detalles adicionales...'}
+                  required={sinSalidaPallet}
+                />
               </div>
             </div>
+          )}
 
-          </div>
-
-          {/* FILA: RETORNA + OBSERVACIÓN */}
-          <div className="grid-retorna-obs">
-            <div className={`field-p ${sinSalidaPallet || esClienteRecoge ? 'field-auto-p' : 'field-manual-p'}`}>
-              <div className="label-head-p">
-                <label>¿Retorna?</label>
-                <span className={`tag-pill ${sinSalidaPallet || esClienteRecoge ? 'opcional' : 'obligatorio'}`}>
-                  {esClienteRecoge ? 'NO RETORNA' : (sinSalidaPallet ? 'SIN PALLET' : 'OBLIGATORIO')}
-                </span>
-              </div>
-              <select
-                value={esClienteRecoge ? 'NO' : formData.retorno}
-                onChange={e => setFormData({ ...formData, retorno: e.target.value })}
-                disabled={sinSalidaPallet || esClienteRecoge}
-              >
-                <option value="NO">NO</option>
-                {!esClienteRecoge && <option value="SI">SÍ</option>}
-              </select>
-            </div>
-
-            <div className="field-p field-manual-p">
-              <div className="label-head-p">
-                <label>Observación de salida</label>
-                <span className={`tag-pill ${sinSalidaPallet ? 'obligatorio' : 'recomendado'}`}>
-                  {sinSalidaPallet ? 'OBLIGATORIO' : 'RECOMENDADO'}
-                </span>
-              </div>
-              <textarea
-                value={formData.observacion_salida}
-                onChange={e => setFormData({ ...formData, observacion_salida: e.target.value })}
-                maxLength={500}
-                rows={2}
-                placeholder={sinSalidaPallet ? 'Obligatorio cuando no hay salida de pallet' : 'Detalles adicionales...'}
-                required={sinSalidaPallet}
-              />
-              <div className="counter-p">{formData.observacion_salida.length}/500</div>
-            </div>
-          </div>
-
-          {/* FOOTER */}
           <div className="footer-form-p">
             <div className="footer-text-p">
               F-3MP-150 Rev. 01<br />07/05/2024
             </div>
             <div className="footer-actions-p">
-              <button type="button" className="btn-limpiar-p" onClick={limpiarFormulario}>Limpiar</button>
               <button type="submit" className="btn-guardar-p" disabled={loading}>
-                <FaSave style={{ marginRight: '6px' }} /> Guardar
+                <FaSave style={{ marginRight: '6px' }} />
+                {esOutboundRetail ? 'Guardar Préstamo' : 'Guardar Pre-Registro'}
               </button>
             </div>
           </div>
         </form>
       </section>
 
-      {/* MODAL FIRMA */}
+      {/* MODAL DE FIRMA (Retail) */}
       {mostrarModalFirma && (
         <div className="tw-modal-backdrop" onClick={() => setMostrarModalFirma(false)}>
           <div className="firma-box-p" onClick={e => e.stopPropagation()}>
@@ -1025,13 +863,13 @@ export default function ModalPrestamo() {
               onPointerUp={finalizarTrazo}
             />
             <div className="firma-actions-p">
-              <button type="button" className="btn-limpiar-p" onClick={limpiarCanvas}>
+              <button type="button" className="btn-limpiar-p" onClick={limpiarCanvasFirma}>
                 <FaEraser style={{ marginRight: '6px' }} /> Limpiar
               </button>
               <button type="button" className="btn-limpiar-p" onClick={() => setMostrarModalFirma(false)}>
                 Cancelar
               </button>
-              <button type="button" className="btn-guardar-p" onClick={confirmarFirmaCanvas}>
+              <button type="button" className="btn-guardar-p" onClick={confirmarFirmaSalida}>
                 <FaSave style={{ marginRight: '6px' }} /> Guardar firma
               </button>
             </div>
@@ -1046,27 +884,61 @@ export default function ModalPrestamo() {
             <h3 className="tw-modal-title" style={{ marginBottom: '14px' }}>
               {nuevoCond.existe ? 'Editar Conductor' : 'Nuevo Conductor'}
             </h3>
-            <form onSubmit={handleGuardarConductorModal}>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setLoading(true);
+              try {
+                const res = await guardarConductorMaestro({
+                  dni: nuevoCond.dni,
+                  nombre: nuevoCond.nombre.trim().toUpperCase(),
+                  empresa_id: nuevoCond.empresa_id,
+                  usuario: nombreUsuarioActual
+                });
+                await cargarMaestros();
+                setFormData(prev => ({
+                  ...prev,
+                  conductor_nombre: res.conductor.nombre_conductor,
+                  dni_conductor: res.conductor.dni_conductor,
+                  empresa_transporte_id: String(res.conductor.empresa_id)
+                }));
+                setMostrarModalConductor(false);
+              } catch (err) {
+                mostrarAviso('danger', 'Error', err.message);
+              } finally {
+                setLoading(false);
+              }
+            }}>
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>DNI del Conductor (8 dígitos) *</label>
                 <input
                   value={nuevoCond.dni}
-                  onChange={e => handleBuscarDniModal(e.target.value)}
+                  onChange={async (e) => {
+                    const limpio = e.target.value.replace(/\D/g, '').slice(0, 8);
+                    setNuevoCond(prev => ({ ...prev, dni: limpio }));
+                    if (limpio.length === 8) {
+                      const remoto = await buscarConductorPorDni(limpio);
+                      if (remoto) {
+                        setNuevoCond({
+                          dni: limpio,
+                          nombre: remoto.nombre_conductor || '',
+                          empresa_id: String(remoto.empresa_id || ''),
+                          existe: true,
+                          colorEstado: '#16a34a',
+                          estadoBusqueda: '✓ Conductor encontrado.'
+                        });
+                      }
+                    }
+                  }}
                   maxLength={8}
                   inputMode="numeric"
-                  placeholder="Ingrese 8 dígitos..."
                   required
                 />
-                <small style={{ color: nuevoCond.colorEstado, fontWeight: 700, display: 'block', marginTop: '4px', fontSize: '11.5px' }}>
-                  {nuevoCond.estadoBusqueda}
-                </small>
               </div>
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>Nombre Completo (Mayúsculas) *</label>
                 <input
                   value={nuevoCond.nombre}
                   onChange={e => setNuevoCond({ ...nuevoCond, nombre: e.target.value.toUpperCase() })}
-                  placeholder="APELLIDOS Y NOMBRES"
                   required
                 />
               </div>
@@ -1083,11 +955,9 @@ export default function ModalPrestamo() {
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
-                <button type="button" className="btn-limpiar-p" onClick={() => setMostrarModalConductor(false)} style={{ height: '38px', padding: '0 16px' }}>Cancelar</button>
-                <button type="submit" className="btn-guardar-p" style={{ height: '38px', padding: '0 20px' }}>
-                  {nuevoCond.existe ? 'Actualizar' : 'Crear'}
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" className="btn-limpiar-p" onClick={() => setMostrarModalConductor(false)}>Cancelar</button>
+                <button type="submit" className="btn-guardar-p">{nuevoCond.existe ? 'Actualizar' : 'Crear'}</button>
               </div>
             </form>
           </div>
@@ -1101,19 +971,38 @@ export default function ModalPrestamo() {
             <h3 className="tw-modal-title" style={{ marginBottom: '14px' }}>
               {nuevaPlaca.existe ? 'Editar Placa' : 'Nueva Placa'}
             </h3>
-            <form onSubmit={handleGuardarPlacaModal}>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setLoading(true);
+              try {
+                const res = await guardarPlacaMaestra({
+                  nro_placa: nuevaPlaca.nro_placa,
+                  empresa_id: nuevaPlaca.empresa_id,
+                  volumen_m3: nuevaPlaca.volumen_m3,
+                  usuario: nombreUsuarioActual
+                });
+                await cargarMaestros();
+                setFormData(prev => ({
+                  ...prev,
+                  nro_placa: res.placa.nro_placa,
+                  empresa_transporte_id: String(res.placa.empresa_id)
+                }));
+                setEmpresaBloqueadaPorPlaca(true);
+                setMostrarModalPlaca(false);
+              } catch (err) {
+                mostrarAviso('danger', 'Error', err.message);
+              } finally {
+                setLoading(false);
+              }
+            }}>
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>N° de Placa (6 caracteres) *</label>
                 <input
                   value={nuevaPlaca.nro_placa}
-                  onChange={e => handleBuscarPlacaModal(e.target.value)}
-                  placeholder="Ej: ABC123"
+                  onChange={e => setNuevaPlaca({ ...nuevaPlaca, nro_placa: e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase() })}
                   maxLength={6}
                   required
                 />
-                <small style={{ color: nuevaPlaca.colorEstado, fontWeight: 700, display: 'block', marginTop: '4px', fontSize: '11.5px' }}>
-                  {nuevaPlaca.estadoBusqueda}
-                </small>
               </div>
               <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
                 <label>Empresa de Transporte *</label>
@@ -1128,21 +1017,9 @@ export default function ModalPrestamo() {
                   ))}
                 </select>
               </div>
-              <div className="field-p field-manual-p" style={{ marginBottom: '12px' }}>
-                <label>Volumen (m³) - Opcional</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={nuevaPlaca.volumen_m3 || ''}
-                  onChange={e => setNuevaPlaca({ ...nuevaPlaca, volumen_m3: e.target.value })}
-                  placeholder="Ej: 15.5"
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '16px' }}>
-                <button type="button" className="btn-limpiar-p" onClick={() => setMostrarModalPlaca(false)} style={{ height: '38px', padding: '0 16px' }}>Cancelar</button>
-                <button type="submit" className="btn-guardar-p" style={{ height: '38px', padding: '0 20px' }}>
-                  {nuevaPlaca.existe ? 'Actualizar' : 'Crear'}
-                </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button type="button" className="btn-limpiar-p" onClick={() => setMostrarModalPlaca(false)}>Cancelar</button>
+                <button type="submit" className="btn-guardar-p">{nuevaPlaca.existe ? 'Actualizar' : 'Crear'}</button>
               </div>
             </form>
           </div>

@@ -685,26 +685,7 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
                 </select>
                 </div>
 
-                {/* Firma Conductor */}
-                <div className="field-aux">
-                <div className="label-head-aux">
-                    <label>Firma del conductor</label>
-                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
-                </div>
-                <div className="firma-group-aux">
-                    <button
-                    type="button"
-                    className="btn-firma-aux"
-                    onClick={() => { setFirmaTarget('auxiliar'); setModalFirmaVisible(true); }}
-                    >
-                    <FaPenNib /> Firmar Salida
-                    </button>
-                    <span className={`badge-status-aux ${auxData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
-                    {auxData.firma_conductor_base64 ? 'Firma lista' : 'Sin firma'}
-                    </span>
-                </div>
-                </div>
-
+            
                 {/* Foto de Salida */}
                 <div className="field-aux">
                 <div className="label-head-aux">
@@ -749,6 +730,26 @@ const comprimirFotoSalida = (file, maxWidth = 1280) => {
                     rows={2}
                     placeholder="Detalles del despacho físico..."
                 />
+                </div>
+
+                {/* Firma Conductor */}
+                <div className="field-aux">
+                <div className="label-head-aux">
+                    <label>Firma del conductor</label>
+                    <span className="tag-pill-aux obligatorio">OBLIGATORIO</span>
+                </div>
+                <div className="firma-group-aux">
+                    <button
+                    type="button"
+                    className="btn-firma-aux"
+                    onClick={() => { setFirmaTarget('auxiliar'); setModalFirmaVisible(true); }}
+                    >
+                    <FaPenNib /> Firmar Salida
+                    </button>
+                    <span className={`badge-status-aux ${auxData.firma_conductor_base64 ? 'activa' : 'inactiva'}`}>
+                    {auxData.firma_conductor_base64 ? 'Firma lista' : 'Sin firma'}
+                    </span>
+                </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

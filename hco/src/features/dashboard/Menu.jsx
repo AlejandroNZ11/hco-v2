@@ -304,7 +304,7 @@ export default function Menu() {
             buttonText: "Entrar",
             image: "/img/lup.png",
             url: "/lup/tracking",
-            estado: "En Proceso",
+            estado: "Activo",
           },
           {
             title: "Auditoría 5S",

@@ -397,7 +397,7 @@ export default function DashboardLup() {
             <div className="custom-legend">
               <div className="legend-row">
                 <span className="dot" style={{ backgroundColor: '#0369a1' }}></span>
-                <span>Seguridad ({pctMejora}%)</span>
+                <span>Mejora ({pctMejora}%)</span>
               </div>
               <div className="legend-row">
                 <span className="dot" style={{ backgroundColor: '#0ea5e9' }}></span>

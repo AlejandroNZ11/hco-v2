@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FaEdit,
   FaPlus,
@@ -11,7 +12,8 @@ import {
   FaTimes,
   FaSave,
   FaClipboardList,
-  FaImage
+  FaImage,
+  FaChartPie,
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './tracking_lup.css';
@@ -105,6 +107,7 @@ function formatearSoloFecha(fechaStr) {
 }
 
 export default function TrackingLup() {
+    const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
 
   const [lups, setLups] = useState([]);
@@ -789,7 +792,7 @@ export default function TrackingLup() {
             onClick={handleAbrirModalCrear}
           >
             <FaPlus />
-            <span>Registrar LUP</span>
+            <span>Registrar</span>
           </button>
 
           <button
@@ -809,6 +812,16 @@ export default function TrackingLup() {
             <FaUndo />
             <span>Limpiar</span>
           </button>
+
+          <button 
+                      type="button" 
+                      className="btn-action-primary" 
+                      onClick={() => navigate('/lup/dashboard')}
+                      >
+                      <FaChartPie /> <span>Dashboard</span>
+                    </button>
+          
+
         </div>
       </section>
 

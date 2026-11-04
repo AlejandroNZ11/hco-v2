@@ -11,8 +11,7 @@ import {
   FaTimes,
   FaSave,
   FaClipboardList,
-  FaImage,
-  FaSearchPlus
+  FaImage
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './tracking_lup.css';
@@ -46,6 +45,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+// Extractor exacto de préstamos (soporta todas las variantes de Google Drive)
 const extraerIdDrive = (url) => {
   if (!url) return null;
   const str = String(url).trim();
@@ -166,7 +166,7 @@ export default function TrackingLup() {
   const [guardando, setGuardando] = useState(false);
   const [errorModal, setErrorModal] = useState('');
 
-  // Estado para el Zoom de la Foto
+  // Zoom de Foto
   const [zoomFotoUrl, setZoomFotoUrl] = useState(null);
 
   const estadoInicialFormulario = {
@@ -259,6 +259,7 @@ export default function TrackingLup() {
     if (e.target.closest('button')) return;
     const container = tableContainerRef.current;
     if (!container) return;
+
     setIsDragging(true);
     dragData.current.startX = e.pageX - container.offsetLeft;
     dragData.current.scrollLeft = container.scrollLeft;
@@ -271,6 +272,7 @@ export default function TrackingLup() {
     e.preventDefault();
     const container = tableContainerRef.current;
     if (!container) return;
+
     const x = e.pageX - container.offsetLeft;
     const walk = (x - dragData.current.startX) * 1.4;
     container.scrollLeft = dragData.current.scrollLeft - walk;
@@ -653,11 +655,14 @@ export default function TrackingLup() {
     XLSX.writeFile(workbook, `Tracking_LUP_${obtenerFechaHoyLima()}.xlsx`);
   };
 
-  // URL resuelta para renderizar en el contenedor del modal
+  // URL resuelta exacta: si es Base64 lo muestra de inmediato; si es Drive extrae el ID y genera lh3
   const urlFotoRender = useMemo(() => {
     if (formData.foto_lup_base64) return formData.foto_lup_base64;
-    const driveId = extraerIdDrive(formData.foto_lup);
-    return driveId ? `https://lh3.googleusercontent.com/d/${driveId}` : null;
+    if (formData.foto_lup) {
+      const driveId = extraerIdDrive(formData.foto_lup);
+      return driveId ? `https://lh3.googleusercontent.com/d/${driveId}` : formData.foto_lup;
+    }
+    return null;
   }, [formData.foto_lup, formData.foto_lup_base64]);
 
   return (
@@ -807,7 +812,7 @@ export default function TrackingLup() {
         </div>
       </section>
 
-      {/* 3. TABLA (COLUMNA FOTO RETIRADA) */}
+      {/* 3. TABLA CON COLUMNAS HOMOGÉNEAS */}
       <section className="table-section-card">
         <div className="table-topbar">
           <span className="records-counter">
@@ -870,7 +875,7 @@ export default function TrackingLup() {
                 <th>Área</th>
                 <th>Jefe</th>
                 <th>Tipo LUP</th>
-                <th>Impacto</th>
+                <th style={{ width: '90px' }}>Impacto</th>
                 <th>Área Impacto</th>
                 <th>Título</th>
                 <th>Estado</th>
@@ -878,9 +883,9 @@ export default function TrackingLup() {
                 <th>F. Entrenamiento</th>
                 <th>¿Kaizen?</th>
                 <th>Cód. Kaizen</th>
-                <th>Operatividad</th>
+                <th style={{ width: '90px' }}>Operatividad</th>
                 <th>Impacto CO2</th>
-                <th style={{ textAlign: 'center' }}>Acciones</th>
+                <th style={{ textAlign: 'center', width: '120px' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -913,7 +918,9 @@ export default function TrackingLup() {
                         </span>
                       </td>
                       <td>
-                        <span className="empresa-tag">{reg.impacto || '-'}</span>
+                        <span className="capsula-uniforme impacto">
+                          {reg.impacto || '-'}
+                        </span>
                       </td>
                       <td>{reg.area_impacto || '-'}</td>
                       <td style={{ textAlign: 'left', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis' }} title={reg.titulo}>
@@ -931,7 +938,7 @@ export default function TrackingLup() {
                       <td style={{ fontWeight: '700' }}>{reg.realizo_kaizen || 'NO'}</td>
                       <td style={{ fontWeight: '700', color: '#0f4c81' }}>{reg.cod_kaizen || '-'}</td>
                       <td>
-                        <span className={`badge-estado ${activa ? 'tc-estado-activo' : 'tc-estado-inactivo'}`}>
+                        <span className={`capsula-uniforme capsula-operatividad ${activa ? 'activo' : 'inactivo'}`}>
                           {activa ? 'ACTIVO' : 'INACTIVO'}
                         </span>
                       </td>
@@ -954,12 +961,10 @@ export default function TrackingLup() {
                             type="button"
                             className={`btn-tabla-toggle ${activa ? 'is-active' : 'is-inactive'} ${!puedeGestionar ? 'disabled-by-role' : ''}`}
                             onClick={() => handleToggleOperatividad(reg)}
-                            title={activa ? 'Cambiar a Inactivo' : 'Cambiar a Activo'}
+                            title={activa ? 'Inactivar registro' : 'Activar registro'}
                           >
                             {activa ? <FaPowerOff /> : <FaCheck />}
-                            <span className="btn-toggle-label">
-                              {activa ? 'Inactivar' : 'Activar'}
-                            </span>
+                            <span>{activa ? 'Inactivar' : 'Activar'}</span>
                           </button>
                         </div>
                       </td>
@@ -1187,38 +1192,36 @@ export default function TrackingLup() {
                     />
                   </div>
 
-                  {/* FOTO LUP (ROWSPAN 2: FILA 5 Y 6, COLUMNA 4) */}
-                  <div className="tc-form-group foto-box-rowspan">
-                    <label><FaImage style={{ marginRight: '4px' }} /> Foto LUP (Opcional)</label>
+                  {/* FOTO LUP (ROWSPAN 3: ABARCA FILAS 5, 6 Y 7 EN COLUMNA 4) */}
+                  <div className="tc-form-group foto-box-rowspan3">
+                    <div className="label-foto-head">
+                      <label style={{ margin: 0 }}>
+                        <FaImage style={{ marginRight: '4px' }} /> Foto LUP (Opcional)
+                      </label>
+                      {urlFotoRender && (
+                        <button
+                          type="button"
+                          className="btn-quitar-foto-top"
+                          onClick={() => setFormData(prev => ({ ...prev, foto_lup: '', foto_lup_base64: '' }))}
+                        >
+                          Quitar foto
+                        </button>
+                      )}
+                    </div>
+
                     <div className="foto-lup-container">
                       {urlFotoRender ? (
                         <div className="foto-preview-wrapper">
                           <img
                             src={urlFotoRender}
                             alt="Foto LUP"
-                            className="foto-preview-img"
+                            className="foto-preview-img-max"
+                            onClick={() => setZoomFotoUrl(urlFotoRender)}
+                            title="Clic para ver en tamaño grande"
                           />
-                          <div className="foto-actions-overlay">
-                            {/* Botón de Zoom con Lupa */}
-                            <button
-                              type="button"
-                              className="btn-zoom-foto"
-                              onClick={() => setZoomFotoUrl(urlFotoRender)}
-                              title="Ampliar foto"
-                            >
-                              <FaSearchPlus />
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-quitar-foto"
-                              onClick={() => setFormData({ ...formData, foto_lup: '', foto_lup_base64: '' })}
-                            >
-                              Quitar foto
-                            </button>
-                          </div>
                         </div>
                       ) : (
-                        <>
+                        <div className="foto-upload-empty">
                           <input
                             type="file"
                             accept="image/*"
@@ -1229,7 +1232,7 @@ export default function TrackingLup() {
                           <small style={{ color: '#94a3b8', fontSize: '9.5px', marginTop: '4px' }}>
                             Subir foto PNG o JPG
                           </small>
-                        </>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1279,8 +1282,8 @@ export default function TrackingLup() {
                     </select>
                   </div>
 
-                  {/* FILA 7: Impacto CO2 */}
-                  <div className="tc-form-group span-4">
+                  {/* FILA 7: Impacto CO2 (span 3 al lado de la foto) */}
+                  <div className="tc-form-group span-3">
                     <label>Impacto CO2</label>
                     <input
                       type="text"
@@ -1291,31 +1294,33 @@ export default function TrackingLup() {
                   </div>
                 </div>
 
-                {/* AUDITORÍA COMPLETA (Fecha Registro, Usuario Actualiza y Fecha Actualiza) */}
+                {/* AUDITORÍA FORMATEADA EN CAJA COMPACTA */}
                 <div className="tc-audit-info">
                   {modoEdicion ? (
-                    <>
-                      <div>
-                        <span>Fecha Registro:</span>{' '}
+                    <div className="tc-audit-grid">
+                      <div className="tc-audit-item">
+                        <span>Fecha Registro:</span>
                         <strong>{formatearFechaHoraLima(registroSeleccionado?.fecha_registro)}</strong>
                       </div>
-                      <div>
-                        <span>Última Actualización:</span>{' '}
+                      <div className="tc-audit-item">
+                        <span>Última Actualización:</span>
                         <strong>{formatearFechaHoraLima(registroSeleccionado?.fecha_actualiza)}</strong>
                       </div>
-                      <div>
-                        <span>Actualizado por:</span>{' '}
+                      <div className="tc-audit-item">
+                        <span>Actualizado por:</span>
                         <strong>{registroSeleccionado?.usuario_actualiza || '-'}</strong>
                       </div>
-                      <div>
-                        <span>Se modificará por:</span>{' '}
+                      <div className="tc-audit-item">
+                        <span>Se modificará por:</span>
                         <strong>{nombreUsuarioSesion}</strong>
                       </div>
-                    </>
+                    </div>
                   ) : (
-                    <div>
-                      <span>Usuario que registra:</span>{' '}
-                      <strong>{nombreUsuarioSesion}</strong>
+                    <div className="tc-audit-grid single">
+                      <div className="tc-audit-item">
+                        <span>Usuario que registra:</span>
+                        <strong>{nombreUsuarioSesion}</strong>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1344,19 +1349,19 @@ export default function TrackingLup() {
         </div>
       )}
 
-      {/* MODAL LIGHTBOX PARA ZOOM DE FOTO CASI AL TAMAÑO DE LA PANTALLA */}
+      {/* MODAL ZOOM GRANDE DE LA FOTO */}
       {zoomFotoUrl && (
-        <div className="tc-modal-overlay tc-zoom-overlay" onClick={() => setZoomFotoUrl(null)}>
+        <div className="tc-zoom-overlay" onClick={() => setZoomFotoUrl(null)}>
           <div className="tc-zoom-card" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
               className="tc-zoom-close-btn"
               onClick={() => setZoomFotoUrl(null)}
-              title="Cerrar vista ampliada"
+              title="Cerrar vista grande"
             >
               <FaTimes />
             </button>
-            <img src={zoomFotoUrl} alt="Vista Ampliada LUP" className="tc-zoom-image" />
+            <img src={zoomFotoUrl} alt="Foto LUP Grande" className="tc-zoom-image" />
           </div>
         </div>
       )}

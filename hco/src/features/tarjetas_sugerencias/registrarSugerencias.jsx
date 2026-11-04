@@ -611,9 +611,6 @@ export default function RegistrarSugerencias() {
           if (!formData.fecha_plan) {
             return mostrarAviso('warning', 'Fecha Planificada requerida', 'Seleccione la Fecha Planificada para la implementación.');
           }
-          if (!formData.reconocido.trim()) {
-            return mostrarAviso('warning', 'Reconocido como requerido', 'Seleccione una opción en el campo "Reconocido como".');
-          }
           if (!formData.impacto.trim()) {
             return mostrarAviso('warning', 'Impacto requerido', 'Seleccione el tipo de Impacto.');
           }
@@ -1106,17 +1103,14 @@ export default function RegistrarSugerencias() {
 
                 <div className={`field ${puedeAnalizar ? 'field-manual' : 'field-auto'}`}>
                   <label>
-                    Reconocido como{' '}
-                    <span className={`field-badge ${formData.fecha_plan ? 'manual' : 'optional'}`}>
-                      {formData.fecha_plan ? 'OBLIGATORIO' : 'OPCIONAL'}
-                    </span>
+                    Reconocido como <span className="field-badge optional">OPCIONAL</span>
                   </label>
                   <select
                     value={formData.reconocido || ''}
                     onChange={(e) => setFormData({ ...formData, reconocido: e.target.value })}
                     disabled={!puedeAnalizar}
                   >
-                    <option value="">Seleccione opción...</option>
+                    <option value="">Seleccione opción (opcional)...</option>
                     {RECONOCIDO_OPCIONES.map((item) => (
                       <option key={item} value={item}>{item}</option>
                     ))}

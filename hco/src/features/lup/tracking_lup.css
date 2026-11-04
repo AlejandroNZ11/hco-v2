@@ -185,9 +185,7 @@
   transition: background 0.2s;
 }
 
-.tracking-lup-page .btn-action-primary:hover {
-  background: #145d9b;
-}
+.tracking-lup-page .btn-action-primary:hover { background: #145d9b; }
 
 .tracking-lup-page .btn-action-secondary {
   background: #eef2f7;
@@ -205,9 +203,7 @@
   transition: background 0.2s;
 }
 
-.tracking-lup-page .btn-action-secondary:hover {
-  background: #e2e8f0;
-}
+.tracking-lup-page .btn-action-secondary:hover { background: #e2e8f0; }
 
 /* 3. SECCIÓN DE TABLA, PAGINACIÓN Y EXPORTAR */
 .tracking-lup-page .table-section-card {
@@ -275,9 +271,7 @@
   color: #64748b;
 }
 
-.tracking-lup-page .nav-chevron {
-  font-size: 10px;
-}
+.tracking-lup-page .nav-chevron { font-size: 10px; }
 
 .tracking-lup-page .btn-exportar-excel {
   background: #1f7a3f;
@@ -294,16 +288,7 @@
   cursor: pointer;
 }
 
-.tracking-lup-page .btn-exportar-excel:hover:not(:disabled) {
-  background: #186332;
-}
-
-.tracking-lup-page .btn-exportar-excel:disabled {
-  background: #cbd5e1;
-  color: #64748b;
-  cursor: not-allowed;
-  opacity: 0.75;
-}
+.tracking-lup-page .btn-exportar-excel:hover:not(:disabled) { background: #186332; }
 
 .tracking-lup-page .excel-icon-box {
   background: rgba(255, 255, 255, 0.2);
@@ -317,7 +302,7 @@
   font-weight: 800;
 }
 
-/* 4. TABLA COMPACTA SIN SCROLLBAR Y CON ARRASTRE */
+/* 4. TABLA COMPACTA */
 .tracking-lup-page .table-container {
   width: 100%;
   overflow-x: auto;
@@ -328,13 +313,8 @@
   -ms-overflow-style: none;
 }
 
-.tracking-lup-page .table-container::-webkit-scrollbar {
-  display: none;
-}
-
-.tracking-lup-page .table-container.dragging {
-  cursor: grabbing;
-}
+.tracking-lup-page .table-container::-webkit-scrollbar { display: none; }
+.tracking-lup-page .table-container.dragging { cursor: grabbing; }
 
 .tracking-lup-page .table-container table {
   width: 100%;
@@ -355,13 +335,8 @@
   letter-spacing: 0.2px;
 }
 
-.tracking-lup-page .table-container th:first-child {
-  border-top-left-radius: 8px;
-}
-
-.tracking-lup-page .table-container th:last-child {
-  border-top-right-radius: 8px;
-}
+.tracking-lup-page .table-container th:first-child { border-top-left-radius: 8px; }
+.tracking-lup-page .table-container th:last-child { border-top-right-radius: 8px; }
 
 .tracking-lup-page .table-container td {
   font-size: 10.5px !important;
@@ -372,9 +347,7 @@
   color: #1e293b;
 }
 
-.tracking-lup-page .table-container tbody tr:hover {
-  background-color: #f8fafc;
-}
+.tracking-lup-page .table-container tbody tr:hover { background-color: #f8fafc; }
 
 .tracking-lup-page .empresa-tag {
   background: #f1f5f9;
@@ -395,8 +368,47 @@
   font-size: 10px;
 }
 
-/* 5. BADGES DE ESTADO Y CLASIFICACIÓN */
-.tracking-lup-page .badge-estado,
+/* 5. BADGES DE ESTADO Y CLASIFICACIÓN UNIFORMES */
+.tracking-lup-page .capsula-uniforme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 90px !important;
+  height: 24px !important;
+  box-sizing: border-box;
+  font-weight: 800;
+  font-size: 10px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tracking-lup-page .capsula-uniforme.impacto {
+  background: #f1f5f9;
+  color: #1e3a8a;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.tracking-lup-page .capsula-uniforme.capsula-operatividad {
+  border-radius: 999px !important;
+  font-size: 9.5px !important;
+  letter-spacing: 0.3px;
+}
+
+.tracking-lup-page .capsula-uniforme.capsula-operatividad.activo {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 5px rgba(22, 163, 74, 0.25);
+}
+
+.tracking-lup-page .capsula-uniforme.capsula-operatividad.inactivo {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 5px rgba(220, 38, 38, 0.25);
+}
+
 .tracking-lup-page .badge-concluido,
 .tracking-lup-page .badge-entrenamiento,
 .tracking-lup-page .badge-tipo-lup {
@@ -409,64 +421,12 @@
   text-transform: uppercase;
 }
 
-.tracking-lup-page .badge-estado.tc-estado-activo {
-  background: #16a34a !important;
-  color: #ffffff !important;
-}
-
-.tracking-lup-page .badge-estado.tc-estado-inactivo {
-  background: #dc2626 !important;
-  color: #ffffff !important;
-}
-
-.tracking-lup-page .badge-concluido {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.tracking-lup-page .badge-entrenamiento.es-entrenado {
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.tracking-lup-page .badge-entrenamiento.sin-entrenar {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
-}
-
-.tracking-lup-page .badge-tipo-lup.tipo-mejora {
-  background: #e0e7ff;
-  color: #3730a3;
-}
-
-.tracking-lup-page .badge-tipo-lup.tipo-problema {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.tracking-lup-page .badge-tipo-lup.tipo-condicion-basica {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-/* Miniatura de Foto en Tabla */
-.tracking-lup-page .foto-miniatura-tabla {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  object-fit: cover;
-  border: 1px solid #cbd5e1;
-  display: block;
-  margin: 0 auto;
-  cursor: pointer;
-  transition: transform 0.15s ease;
-}
-
-.tracking-lup-page .foto-miniatura-tabla:hover {
-  transform: scale(1.15);
-}
+.tracking-lup-page .badge-concluido { background: #dbeafe; color: #1e40af; }
+.tracking-lup-page .badge-entrenamiento.es-entrenado { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.tracking-lup-page .badge-entrenamiento.sin-entrenar { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.tracking-lup-page .badge-tipo-lup.tipo-mejora { background: #e0e7ff; color: #3730a3; }
+.tracking-lup-page .badge-tipo-lup.tipo-problema { background: #fee2e2; color: #991b1b; }
+.tracking-lup-page .badge-tipo-lup.tipo-condicion-basica { background: #f3e8ff; color: #6b21a8; }
 
 /* 6. BOTONES DE ACCIÓN EN FILA */
 .tracking-lup-page .acciones-cell {
@@ -492,23 +452,21 @@
   transition: all 0.2s ease;
 }
 
-.tracking-lup-page .btn-tabla-editar:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-}
+.tracking-lup-page .btn-tabla-editar:hover { background: #f1f5f9; border-color: #94a3b8; }
 
 .tracking-lup-page .btn-tabla-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 5px;
+  width: 90px !important;
+  height: 24px !important;
+  padding: 0 4px;
+  border-radius: 6px;
   font-size: 10px;
   font-weight: 700;
-  border: none;
   cursor: pointer;
+  box-sizing: border-box;
   transition: all 0.2s ease;
 }
 
@@ -517,7 +475,6 @@
   color: #b91c1c;
   border: 1px solid #fecaca;
 }
-
 .tracking-lup-page .btn-tabla-toggle.is-active:hover {
   background: #dc2626;
   color: #ffffff;
@@ -529,20 +486,10 @@
   color: #15803d;
   border: 1px solid #bbf7d0;
 }
-
 .tracking-lup-page .btn-tabla-toggle.is-inactive:hover {
   background: #16a34a;
   color: #ffffff;
   border-color: #16a34a;
-}
-
-.tracking-lup-page .btn-tabla-editar.disabled-by-role,
-.tracking-lup-page .btn-tabla-toggle.disabled-by-role {
-  background: #e2e8f0 !important;
-  color: #94a3b8 !important;
-  border-color: #cbd5e1 !important;
-  cursor: not-allowed !important;
-  opacity: 0.6;
 }
 
 /* 7. MODAL DE CREAR / EDITAR LUP (4 COLUMNAS) */
@@ -561,7 +508,7 @@
 .tracking-lup-page .tc-modal-card {
   background: #ffffff;
   width: 100%;
-  max-width: 960px; /* Ancho optimizado para 4 columnas */
+  max-width: 960px;
   max-height: 94vh;
   display: flex;
   flex-direction: column;
@@ -628,9 +575,7 @@
   transition: background 0.2s;
 }
 
-.tracking-lup-page .tc-modal-close:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
+.tracking-lup-page .tc-modal-close:hover { background: rgba(255, 255, 255, 0.25); }
 
 .tracking-lup-page .tc-modal-form {
   display: flex;
@@ -661,65 +606,86 @@
   min-width: 0;
 }
 
-.tracking-lup-page .tc-form-group.span-2 {
-  grid-column: span 2;
-}
+.tracking-lup-page .tc-form-group.span-2 { grid-column: span 2; }
+.tracking-lup-page .tc-form-group.span-3 { grid-column: span 3; }
+.tracking-lup-page .tc-form-group.span-4 { grid-column: span 4; }
 
-.tracking-lup-page .tc-form-group.span-3 {
-  grid-column: span 3;
-}
-
-.tracking-lup-page .tc-form-group.span-4 {
-  grid-column: span 4;
-}
-
-/* CAJA DE FOTO OCUPANDO FILA 5 Y 6 (ROWSPAN 2) */
-.tracking-lup-page .tc-form-group.foto-box-rowspan {
+/* FOTO LUP ABARCANDO FILAS 5, 6 Y 7 (ROWSPAN 3) */
+.tracking-lup-page .foto-box-rowspan3 {
   grid-column: 4;
-  grid-row: span 2;
+  grid-row: span 3;
   display: flex;
   flex-direction: column;
-  justify-content: stretch;
+}
+
+.tracking-lup-page .label-foto-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
 }
 
 .tracking-lup-page .foto-lup-container {
-  border: 1.5px dashed #cbd5e1;
-  border-radius: 10px;
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
   background: #f8fafc;
-  padding: 8px;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 12px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  height: 100%;
-  min-height: 120px;
+  padding: 8px;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
-.tracking-lup-page .foto-preview-img {
-  max-height: 80px;
-  max-width: 100%;
+.tracking-lup-page .foto-preview-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tracking-lup-page .foto-preview-img-max {
+  width: 100%;
+  height: 170px;
   object-fit: contain;
-  border-radius: 6px;
-  margin-bottom: 6px;
-  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: zoom-in;
+  transition: transform 0.2s ease;
 }
 
-.tracking-lup-page .btn-quitar-foto {
-  background: transparent;
-  border: 1px solid #ef4444;
-  color: #ef4444;
+.tracking-lup-page .foto-preview-img-max:hover {
+  transform: scale(1.02);
+}
+
+.tracking-lup-page .btn-quitar-foto-top {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: 5px;
   font-size: 10px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.tracking-lup-page .btn-quitar-foto:hover {
-  background: #fee2e2;
+.tracking-lup-page .btn-quitar-foto-top:hover {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.tracking-lup-page .foto-upload-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
 }
 
 .tracking-lup-page .file-input-lup {
@@ -754,9 +720,7 @@
   text-overflow: ellipsis;
 }
 
-.tracking-lup-page .tc-form-group .req {
-  color: #dc2626;
-}
+.tracking-lup-page .tc-form-group .req { color: #dc2626; }
 
 .tracking-lup-page .tc-form-group input,
 .tracking-lup-page .tc-form-group select {
@@ -797,6 +761,45 @@
   font-weight: 700;
 }
 
+/* CAJA DE AUDITORÍA ELEGANTE */
+.tracking-lup-page .tc-audit-info {
+  margin-top: 10px;
+  background: #f1f5f9;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+}
+
+.tracking-lup-page .tc-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  width: 100%;
+}
+
+.tracking-lup-page .tc-audit-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #475569;
+}
+
+.tracking-lup-page .tc-audit-item span {
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.tracking-lup-page .tc-audit-item strong {
+  font-weight: 800;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tracking-lup-page .tc-modal-footer {
   padding: 12px 18px;
   background: #f8fafc;
@@ -818,10 +821,7 @@
   font-weight: 700;
   cursor: pointer;
 }
-
-.tracking-lup-page .btn-modal-cancel:hover:not(:disabled) {
-  background: #f1f5f9;
-}
+.tracking-lup-page .btn-modal-cancel:hover:not(:disabled) { background: #f1f5f9; }
 
 .tracking-lup-page .btn-modal-save {
   height: 34px;
@@ -837,173 +837,92 @@
   gap: 6px;
   cursor: pointer;
 }
+.tracking-lup-page .btn-modal-save:hover:not(:disabled) { background: #145d9b; }
 
-.tracking-lup-page .btn-modal-save:hover:not(:disabled) {
-  background: #145d9b;
+/* LIGHTBOX ZOOM */
+.tc-zoom-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99999 !important;
+  background-color: rgba(15, 23, 42, 0.88) !important;
+  backdrop-filter: blur(6px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  box-sizing: border-box !important;
 }
 
-.tracking-lup-page .btn-modal-save:disabled,
-.tracking-lup-page .btn-modal-cancel:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.tc-zoom-card {
+  position: relative !important;
+  max-width: 92vw !important;
+  max-height: 90vh !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
-/* =========================================
-   VISOR Y CONTENEDOR DE FOTO LUP
-   ========================================= */
-.tracking-lup-page .foto-preview-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+.tc-zoom-image {
+  max-width: 90vw !important;
+  max-height: 86vh !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  border-radius: 12px !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
-.tracking-lup-page .foto-preview-img {
-  max-height: 85px;
-  max-width: 100%;
-  object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
+.tc-zoom-close-btn {
+  position: absolute !important;
+  top: -14px !important;
+  right: -14px !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1.5px solid #e2e8f0 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease !important;
+  z-index: 100000 !important;
+  padding: 0 !important;
+  outline: none !important;
 }
 
-.tracking-lup-page .foto-actions-overlay {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
+.tc-zoom-close-btn:hover {
+  background-color: #ef4444 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+  transform: scale(1.12) !important;
 }
 
-.tracking-lup-page .btn-zoom-foto {
-  background: #0f4c81;
-  border: none;
-  color: #ffffff;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.tracking-lup-page .btn-zoom-foto:hover {
-  background: #145d9b;
-  transform: scale(1.08);
-}
-
-.tracking-lup-page .btn-quitar-foto {
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 10.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.tracking-lup-page .btn-quitar-foto:hover {
-  background: #dc2626;
-  color: #ffffff;
-}
-
-/* MODAL DE ZOOM (CASI AL TAMAÑO DE LA PC) */
-.tracking-lup-page .tc-zoom-overlay {
-  z-index: 10000;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(4px);
-  padding: 20px;
-}
-
-.tracking-lup-page .tc-zoom-card {
-  position: relative;
-  max-width: 90vw;
-  max-height: 90vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tracking-lup-page .tc-zoom-image {
-  max-width: 88vw;
-  max-height: 86vh;
-  object-fit: contain;
-  border-radius: 12px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  background: #000;
-}
-
-.tracking-lup-page .tc-zoom-close-btn {
-  position: absolute;
-  top: -16px;
-  right: -16px;
-  background: #ffffff;
-  color: #0f172a;
-  border: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  transition: transform 0.15s ease;
-}
-
-.tracking-lup-page .tc-zoom-close-btn:hover {
-  transform: scale(1.1);
-  background: #f1f5f9;
-}
-
-/* 8. RESPONSIVE PARA TABLETS Y MÓVILES */
+/* 8. RESPONSIVE */
 @media (max-width: 1150px) {
-  .tracking-lup-page .top-summary-grid {
-    grid-template-columns: 1fr;
-  }
-  .tracking-lup-page .kpi-container-card {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .tracking-lup-page .kpi-blue-box {
-    min-width: 0;
-  }
-  .tracking-lup-page .filters-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tracking-lup-page .filter-group.filter-buscar {
-    grid-column: span 2;
-  }
+  .tracking-lup-page .top-summary-grid { grid-template-columns: 1fr; }
+  .tracking-lup-page .kpi-container-card { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tracking-lup-page .kpi-blue-box { min-width: 0; }
+  .tracking-lup-page .filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tracking-lup-page .filter-group.filter-buscar { grid-column: span 2; }
 }
 
 @media (max-width: 768px) {
-  .tracking-lup-page .mobile-hidden-filter {
-    display: none !important;
-  }
-  .tracking-lup-page .lup-form-grid-4cols {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .tracking-lup-page .tc-form-group.span-4 {
-    grid-column: span 2;
-  }
-  .tracking-lup-page .tc-form-group.foto-box-rowspan {
-    grid-column: span 2;
-    grid-row: span 1;
-  }
+  .tracking-lup-page .mobile-hidden-filter { display: none !important; }
+  .tracking-lup-page .lup-form-grid-4cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tracking-lup-page .tc-form-group.span-4 { grid-column: span 2; }
+  .tracking-lup-page .foto-box-rowspan3 { grid-column: span 2; grid-row: span 1; }
+  .tracking-lup-page .tc-audit-grid { grid-template-columns: 1fr; gap: 6px; }
 }
 
 @media (max-width: 600px) {
-  .tracking-lup-page {
-    padding: 8px;
-  }
+  .tracking-lup-page { padding: 8px; }
   .tracking-lup-page .hero-card,
   .tracking-lup-page .kpi-container-card,
   .tracking-lup-page .filters-card,
@@ -1011,42 +930,24 @@
     border-radius: 12px;
     padding: 12px;
   }
-  .tracking-lup-page .kpi-container-card {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-    padding: 8px;
-  }
-  .tracking-lup-page .lup-form-grid-4cols {
-    grid-template-columns: 1fr;
-  }
+  .tracking-lup-page .kpi-container-card { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 8px; }
+  .tracking-lup-page .lup-form-grid-4cols { grid-template-columns: 1fr; }
   .tracking-lup-page .tc-form-group.span-2,
   .tracking-lup-page .tc-form-group.span-3,
   .tracking-lup-page .tc-form-group.span-4,
-  .tracking-lup-page .tc-form-group.foto-box-rowspan {
+  .tracking-lup-page .foto-box-rowspan3 {
     grid-column: span 1;
     grid-row: span 1;
   }
-  .tracking-lup-page .filters-actions-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-  .tracking-lup-page .filters-actions-row button {
-    width: 100%;
-    justify-content: center;
-    padding: 0 4px;
-    font-size: 11.5px;
-  }
+  .tracking-lup-page .filters-actions-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tracking-lup-page .filters-actions-row button { width: 100%; justify-content: center; padding: 0 4px; font-size: 11.5px; }
 
+  .tracking-lup-page .tc-modal-overlay { padding: 4px !important; align-items: center !important; }
+  .tracking-lup-page .tc-modal-card { width: 99% !important; max-width: 99% !important; max-height: 99vh !important; }
+  .tracking-lup-page .tc-audit-item { flex-direction: column; align-items: flex-start; }
 }
 
 @keyframes lupModalFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }

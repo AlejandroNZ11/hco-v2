@@ -2,10 +2,11 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight, FaIdCard, FaTruck, FaUserTie,
-  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaTimes
+  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaFileExcel
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './trackingprestamos.css';
+import * as XLSX from 'xlsx';
 
 import {
   obtenerTrackingPrestamos,
@@ -44,8 +45,17 @@ export default function TrackingPrestamos() {
   const [empresas, setEmpresas] = useState([]);
   const [clientes, setClientes] = useState([]);
 
-  const [filtrosForm, setFiltrosForm] = useState({ estado: 'Todos', fechaEntrega: '', buscar: '' });
-  const [filtrosActivos, setFiltrosActivos] = useState({ estado: 'Todos', fechaEntrega: '', buscar: '' });
+  const estadoFiltrosInicial = { 
+    estado: 'Todos', 
+    areaProceso: 'Todas',
+    empresaId: 'Todas',
+    fechaDesde: '', 
+    fechaHasta: '', 
+    buscar: '' 
+  };
+
+  const [filtrosForm, setFiltrosForm] = useState(estadoFiltrosInicial);
+  const [filtrosActivos, setFiltrosActivos] = useState(estadoFiltrosInicial);
   const [paginaActual, setPaginaActual] = useState(1);
 
   // Modal Devolución
@@ -159,10 +169,61 @@ export default function TrackingPrestamos() {
     container.scrollLeft = dragData.current.scrollLeft - walk;
   };
 
-  const handleAplicarFiltros = () => { setFiltrosActivos({ ...filtrosForm }); setPaginaActual(1); };
+  const handleAplicarFiltros = () => { 
+    setFiltrosActivos({ ...filtrosForm }); 
+    setPaginaActual(1); 
+  };
+  
   const handleLimpiarFiltros = () => {
-    const inicial = { estado: 'Todos', fechaEntrega: '', buscar: '' };
-    setFiltrosForm(inicial); setFiltrosActivos(inicial); setPaginaActual(1);
+    setFiltrosForm(estadoFiltrosInicial); 
+    setFiltrosActivos(estadoFiltrosInicial); 
+    setPaginaActual(1);
+  };
+
+ const handleExportarExcel = () => {
+    if (prestamosFiltrados.length === 0) {
+      return mostrarAviso('warning', 'Sin registros', 'No hay datos que coincidan con los filtros aplicados.');
+    }
+
+    // 1. Mapeo de columnas con nombres limpios y datos formateados
+    const dataAExportar = prestamosFiltrados.map((r, i) => ({
+      'N°': i + 1,
+      'ID Préstamo': r.id_prestamo || '',
+      'Área Proceso': r.area_proceso || '',
+      'Fecha Entrega': r.fecha_entrega ? new Date(r.fecha_entrega).toLocaleString('es-PE') : '',
+      'Fecha Retorno': r.fecha_retorno_calculada ? new Date(r.fecha_retorno_calculada).toLocaleDateString('es-PE') : '',
+      'Empresa Transporte': r.empresa_transporte_nombre || '',
+      'Conductor Salida': r.conductor_nombre || '',
+      'DNI Conductor': r.dni_conductor || '',
+      'Ruta': r.nr_ruta || '',
+      'Placa': r.nro_placa || '',
+      'Paletas Prestadas': Number(r.nr_paletas || 0),
+      'Paletas Devueltas': Number(r.nr_paletas_devueltas || 0),
+      'Paletas No Retorno': Number(r.nr_paletas_noretorno || 0),
+      'Paletas Pendientes': Number(r.paletas_pendientes || 0),
+      'Estado': r.estado || '',
+      'Fecha Devolución': r.fecha_devolucion ? new Date(r.fecha_devolucion).toLocaleString('es-PE') : '',
+      'Conductor Retorno': r.conductor_retorno_nombre || '',
+      'Observación Salida': r.observacion_salida || '',
+      'Observación Regreso': r.observacion_regreso || ''
+    }));
+
+    // 2. Crear hoja de cálculo a partir del JSON
+    const worksheet = XLSX.utils.json_to_sheet(dataAExportar);
+
+    // 3. Ajustar el ancho automático de las columnas para que no salgan comprimidas
+    const anchosColumnas = Object.keys(dataAExportar[0] || {}).map(key => ({
+      wch: Math.max(key.length, 14)
+    }));
+    worksheet['!cols'] = anchosColumnas;
+
+    // 4. Crear el libro de trabajo y adjuntar la hoja
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tracking Préstamos');
+
+    // 5. Descargar archivo con extensión .xlsx nativa
+    const nombreArchivo = `Tracking_Prestamos_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(workbook, nombreArchivo);
   };
 
   const resumen = useMemo(() => {
@@ -178,6 +239,7 @@ export default function TrackingPrestamos() {
 
   const prestamosFiltrados = useMemo(() => {
     const texto = filtrosActivos.buscar.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
     return prestamos.filter(row => {
       if (filtrosActivos.estado === 'Atrasado') {
         const cerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
@@ -186,9 +248,18 @@ export default function TrackingPrestamos() {
         if (row.estado !== filtrosActivos.estado) return false;
       }
 
-      if (filtrosActivos.fechaEntrega) {
+      if (filtrosActivos.areaProceso !== 'Todas') {
+        if (row.area_proceso !== filtrosActivos.areaProceso) return false;
+      }
+
+      if (filtrosActivos.empresaId !== 'Todas') {
+        if (String(row.empresa_transporte_id) !== String(filtrosActivos.empresaId)) return false;
+      }
+
+      if (filtrosActivos.fechaDesde || filtrosActivos.fechaHasta) {
         const fEntregaRow = row.fecha_entrega ? row.fecha_entrega.slice(0, 10) : '';
-        if (fEntregaRow !== filtrosActivos.fechaEntrega) return false;
+        if (filtrosActivos.fechaDesde && fEntregaRow < filtrosActivos.fechaDesde) return false;
+        if (filtrosActivos.fechaHasta && fEntregaRow > filtrosActivos.fechaHasta) return false;
       }
 
       if (texto) {
@@ -204,7 +275,6 @@ export default function TrackingPrestamos() {
   const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA;
   const prestamosPaginados = prestamosFiltrados.slice(indiceInicio, indiceInicio + ITEMS_POR_PAGINA);
 
-  // Placas y conductores filtrados por la empresa seleccionada en edición
   const placasFiltradasEmpresa = useMemo(() => {
     if (!editDespachoData.empresa_transporte_id) return [];
     const empIdNum = Number(editDespachoData.empresa_transporte_id);
@@ -217,12 +287,8 @@ export default function TrackingPrestamos() {
     return conductores.filter(c => Number(c.empresa_id) === empIdNum);
   }, [conductores, editDespachoData.empresa_transporte_id]);
 
-  // ==========================================
-  // MODAL EDITAR DATOS (POR DESPACHAR)
-  // ==========================================
   const abrirModalEditarDespacho = (item) => {
     setPrestamoSeleccionado(item);
-
     let clientesArray = [];
     const matchClientes = (item.observacion_salida || '').match(/\[CLIENTES:\s*([^\]]+)\]/i);
     if (matchClientes) {
@@ -255,7 +321,6 @@ export default function TrackingPrestamos() {
   const handleGuardarEdicionDespacho = async (e) => {
     e.preventDefault();
     if (!prestamoSeleccionado) return;
-
     setLoading(true);
     try {
       await actualizarRegistroPorDespachar(prestamoSeleccionado, {
@@ -272,7 +337,6 @@ export default function TrackingPrestamos() {
     }
   };
 
-  // Abrir Modal Auxiliar
   const abrirModalAuxiliar = (item) => {
     setPrestamoSeleccionado(item);
     setAuxData({
@@ -298,7 +362,6 @@ export default function TrackingPrestamos() {
     setModalFirmaVisible(true);
   };
 
-  // Modal Devolución
   const abrirModalDevolucion = (item, soloLectura = false) => {
     setPrestamoSeleccionado(item);
     setModoLectura(soloLectura);
@@ -327,7 +390,6 @@ export default function TrackingPrestamos() {
     const pendientesActuales = Number(prestamoSeleccionado?.paletas_pendientes || 0);
 
     let nuevoTipoAccion = devData.tipo_accion;
-
     if (!isNaN(noRetornoNum) && noRetornoNum > 0) {
       if (noRetornoNum >= pendientesActuales) {
         nuevoTipoAccion = 'no_retorno';
@@ -401,15 +463,12 @@ export default function TrackingPrestamos() {
     }
   };
 
-  // Canvas Firma
   useEffect(() => {
     if (modalFirmaVisible && canvasRef.current) {
       const canvas = canvasRef.current;
       const contenedor = canvas.parentElement;
-
       canvas.width = contenedor.clientWidth;
       canvas.height = contenedor.clientHeight || 380;
-
       const ctx = canvas.getContext('2d');
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
@@ -513,7 +572,7 @@ export default function TrackingPrestamos() {
         </div>
       )}
 
-      {/* TOP SUMMARY */}
+      {/* TOP HEADER & RESUMEN: AL COSTADO EN LAPTOP, ABAJO EN MÓVIL */}
       <div className="top-summary-grid">
         <section className="hero-card">
           <span className="module-pill">MÓDULO LOGÍSTICA</span>
@@ -545,9 +604,10 @@ export default function TrackingPrestamos() {
         )}
       </div>
 
-      {/* FILTROS */}
+      {/* FILTROS (1 FILA EN LAPTOP, 2 COLUMNAS EN MÓVIL) */}
       <section className="filters-card">
-        <div className="filters-grid" style={{ gridTemplateColumns: '2.5fr 1fr 1fr' }}>
+        <div className="filters-grid">
+          {/* Buscar */}
           <div className="filter-group filter-buscar">
             <label>Buscar</label>
             <input
@@ -559,7 +619,21 @@ export default function TrackingPrestamos() {
             />
           </div>
 
-          <div className="filter-group">
+          {/* Área Proceso */}
+          <div className="filter-group filter-area">
+            <label>Área Proceso</label>
+            <select 
+              value={filtrosForm.areaProceso} 
+              onChange={e => setFiltrosForm({ ...filtrosForm, areaProceso: e.target.value })}
+            >
+              <option value="Todas">Todas</option>
+              <option value="OUTBOUND PRINCIPAL">OUTBOUND PRINCIPAL</option>
+              <option value="CLIENTE RECOGE">CLIENTE RECOGE</option>
+            </select>
+          </div>
+
+          {/* Estado */}
+          <div className="filter-group filter-estado">
             <label>Estado</label>
             <select value={filtrosForm.estado} onChange={e => setFiltrosForm({ ...filtrosForm, estado: e.target.value })}>
               <option value="Todos">Todos</option>
@@ -573,16 +647,42 @@ export default function TrackingPrestamos() {
             </select>
           </div>
 
-          <div className="filter-group">
-            <label>Fecha entrega</label>
-            <input
-              type="date"
-              value={filtrosForm.fechaEntrega}
-              onChange={e => setFiltrosForm({ ...filtrosForm, fechaEntrega: e.target.value })}
-            />
+          {/* Empresa Transporte */}
+          <div className="filter-group filter-empresa">
+            <label>Empresa</label>
+            <select 
+              value={filtrosForm.empresaId} 
+              onChange={e => setFiltrosForm({ ...filtrosForm, empresaId: e.target.value })}
+            >
+              <option value="Todas">Todas</option>
+              {empresas.map(emp => (
+                <option key={emp.id} value={emp.id}>{emp.nombre_empresa}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Rango de Fechas Entrega: Desde y Hasta */}
+          <div className="filter-group filter-fechas date-range-group">
+            <div className="date-sub-input">
+              <label>Fecha Desde</label>
+              <input
+                type="date"
+                value={filtrosForm.fechaDesde}
+                onChange={e => setFiltrosForm({ ...filtrosForm, fechaDesde: e.target.value })}
+              />
+            </div>
+            <div className="date-sub-input">
+              <label>Fecha Hasta</label>
+              <input
+                type="date"
+                value={filtrosForm.fechaHasta}
+                onChange={e => setFiltrosForm({ ...filtrosForm, fechaHasta: e.target.value })}
+              />
+            </div>
           </div>
         </div>
 
+        {/* Acciones de los filtros */}
         <div className="filters-actions-row">
           {!esExterno && (
             <button type="button" className="btn-action-primary" onClick={() => navigate('/prestamos/nuevo')}>
@@ -597,16 +697,16 @@ export default function TrackingPrestamos() {
           </button>
           {!esExterno && (
             <>
-              <button type="button" className="btn-action-primary" onClick={() => navigate('/conductores/tracking')}>
+              <button type="button" className="btn-action-primary btn-extra-nav" onClick={() => navigate('/conductores/tracking')}>
                 <FaIdCard /> <span>Conductores</span>
               </button>
-              <button type="button" className="btn-action-primary" onClick={() => navigate('/placas/tracking')}>
+              <button type="button" className="btn-action-primary btn-extra-nav" onClick={() => navigate('/placas/tracking')}>
                 <FaTruck /> <span>Placas</span>
               </button>
-              <button type="button" className="btn-action-primary" onClick={() => navigate('/clientes/tracking')}>
+              <button type="button" className="btn-action-primary btn-extra-nav" onClick={() => navigate('/clientes/tracking')}>
                 <FaUserTie /> <span>Clientes</span>
               </button>
-              <button type="button" className="btn-action-primary" onClick={() => navigate('/empresas-transporte/tracking')}>
+              <button type="button" className="btn-action-primary btn-extra-nav" onClick={() => navigate('/empresas-transporte/tracking')}>
                 <FaBuilding /> <span>Empresa</span>
               </button>
             </>
@@ -614,21 +714,41 @@ export default function TrackingPrestamos() {
         </div>
       </section>
 
-      {/* TABLA CON 2 BOTONES SIEMPRE EN ACCIONES */}
+{/* TABLA CON PAGINACIÓN Y EXPORTAR EXCEL */}
       <section className="table-section-card">
         <div className="table-topbar">
-          <div className="pagination-bar">
+          {/* Fila 1: Contador a la izquierda y Botón Exportar a la derecha */}
+          <div className="table-topbar-row-header">
             <span className="records-counter">
               Mostrando <strong>{prestamosPaginados.length}</strong> registros de <strong>{prestamosFiltrados.length}</strong>
             </span>
-            <div className="pagination-controls">
-              <button type="button" className="page-nav-btn" disabled={paginaActual <= 1} onClick={() => setPaginaActual(p => Math.max(1, p - 1))}>
-                <FaChevronLeft className="nav-chevron" /> <span>Anterior</span>
-              </button>
-              <button type="button" className="page-nav-btn" disabled={paginaActual >= totalPaginas} onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}>
-                <span>Siguiente</span> <FaChevronRight className="nav-chevron" />
-              </button>
-            </div>
+            <button type="button" className="btn-export-excel" onClick={handleExportarExcel} title="Exportar reporte a Excel">
+              <span className="excel-badge-icon">X</span>
+              <span>Exportar</span>
+            </button>
+          </div>
+
+          {/* Fila 2: Botón Anterior, Página X de Y, Botón Siguiente */}
+          <div className="table-topbar-row-pagination">
+            <button 
+              type="button" 
+              className="page-nav-btn" 
+              disabled={paginaActual <= 1} 
+              onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+            >
+              <FaChevronLeft className="nav-chevron" /> <span>Anterior</span>
+            </button>
+            <span className="page-current-indicator">
+              Página {paginaActual} de {totalPaginas}
+            </span>
+            <button 
+              type="button" 
+              className="page-nav-btn" 
+              disabled={paginaActual >= totalPaginas} 
+              onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+            >
+              <span>Siguiente</span> <FaChevronRight className="nav-chevron" />
+            </button>
           </div>
         </div>
 
@@ -675,7 +795,6 @@ export default function TrackingPrestamos() {
                   const fEntrega = r.fecha_entrega ? new Date(r.fecha_entrega).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
                   const fRetorno = r.fecha_retorno_calculada ? new Date(r.fecha_retorno_calculada).toLocaleDateString('es-PE') : '-';
                   const fDev = r.fecha_devolucion ? new Date(r.fecha_devolucion).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }) : '-';
-
                   const puedeEditarDespacho = esPorDespachar && esAdmin;
 
                   return (
@@ -707,7 +826,6 @@ export default function TrackingPrestamos() {
                       <td>{fDev}</td>
                       <td style={{ textAlign: 'center' }}>
                         <div className="acciones-cell">
-                          {/* BOTÓN 1: EDITAR DESPACHO (Habilitado solo si es "Por despachar" y Admin; de lo contrario disabled en gris) */}
                           <button
                             type="button"
                             className={`btn-tabla-accion btn-accion-wrench ${puedeEditarDespacho ? 'activo' : 'inactivo'}`}
@@ -718,7 +836,6 @@ export default function TrackingPrestamos() {
                             <FaWrench />
                           </button>
 
-                          {/* BOTÓN 2: DESPACHAR O DEVOLUCIÓN */}
                           {esPorDespachar ? (
                             <button
                               type="button"
@@ -756,28 +873,24 @@ export default function TrackingPrestamos() {
             </tbody>
           </table>
         </div>
-      </section>
+        </section>
 
-{/* =========================================================
-          MODAL: EDITAR DATOS (POR DESPACHAR) CON FILTRO EN CASCADA
-         ========================================================= */}
+
+      {/* ================= MODAL EDITAR DESPACHO ================= */}
       {modalEditarDespachoVisible && prestamoSeleccionado && (
         <div className="tp-modal-backdrop" onClick={() => setModalEditarDespachoVisible(false)}>
           <div className="tp-modal-card tp-modal-editar-despacho" onClick={e => e.stopPropagation()}>
-            {/* Header unificado con botón X arriba a la derecha */}
             <div className="tp-modal-header">
               <div className="tp-modal-header-titles">
                 <span className="tp-badge-pill">EDICIÓN ADMINISTRATIVA</span>
-                <h3 className="tp-modal-title">
-                  Modificar Registro ({prestamoSeleccionado.id_prestamo})
-                </h3>
+                <h3 className="tp-modal-title">Modificar Registro ({prestamoSeleccionado.id_prestamo})</h3>
                 <small className="tp-modal-subinfo" style={{ color: '#0284c7', fontWeight: '700' }}>
                   Área: {prestamoSeleccionado.area_proceso}
                 </small>
               </div>
               <button 
                 type="button" 
-                className="tp-btn-close"
+                className="tp-btn-close" 
                 onClick={() => setModalEditarDespachoVisible(false)}
                 title="Cerrar modal"
               >
@@ -787,7 +900,6 @@ export default function TrackingPrestamos() {
 
             <form onSubmit={handleGuardarEdicionDespacho} className="tp-modal-body">
               {prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? (
-                /* FORMULARIO CLIENTE RECOGE */
                 <>
                   <div className="tp-form-group">
                     <label className="tp-label-small">Placa de Vehículo</label>
@@ -814,9 +926,7 @@ export default function TrackingPrestamos() {
                   </div>
                 </>
               ) : (
-                /* FORMULARIO OUTBOUND PRINCIPAL CON FILTRO EN CASCADA */
                 <>
-                  {/* 1. Empresa de Transporte */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Empresa de Transporte</label>
                     <select
@@ -832,7 +942,6 @@ export default function TrackingPrestamos() {
                     </select>
                   </div>
 
-                  {/* 2. Placa (Filtrada por empresa) */}
                   <div className="tp-form-group">
                     <div className="tp-label-row">
                       <label className="tp-label-small">Placa</label>
@@ -860,7 +969,6 @@ export default function TrackingPrestamos() {
                     </select>
                   </div>
 
-                  {/* 3. Conductor (Filtrado por empresa) */}
                   <div className="tp-form-group">
                     <div className="tp-label-row">
                       <label className="tp-label-small">Conductor</label>
@@ -898,7 +1006,6 @@ export default function TrackingPrestamos() {
                     </select>
                   </div>
 
-                  {/* 4. N° Ruta */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">N° Ruta</label>
                     <input
@@ -910,7 +1017,6 @@ export default function TrackingPrestamos() {
                     />
                   </div>
 
-                  {/* 5. Clientes Múltiples */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Clientes (Múltiples)</label>
                     <div className="tp-client-input-wrapper">
@@ -964,11 +1070,10 @@ export default function TrackingPrestamos() {
                 </>
               )}
 
-              {/* Botones de acción */}
               <div className="tp-actions-row-end" style={{ marginTop: '8px' }}>
                 <button 
                   type="button" 
-                  className="tp-btn-secondary"
+                  className="tp-btn-secondary" 
                   onClick={() => setModalEditarDespachoVisible(false)}
                 >
                   Cancelar
@@ -986,16 +1091,14 @@ export default function TrackingPrestamos() {
         </div>
       )}
 
-      {/* MODAL FASE 2: AUXILIAR DE SALIDA */}
+      {/* ================= MODAL AUXILIAR ================= */}
       {modalAuxVisible && prestamoSeleccionado && (
         <div className="tp-modal-backdrop" onClick={() => setModalAuxVisible(false)}>
           <div className="tp-modal-card tp-modal-aux" onClick={e => e.stopPropagation()}>
             <div className="tp-modal-header">
               <div className="tp-modal-header-titles">
                 <span className="tp-badge-pill">DESPACHO AUXILIAR</span>
-                <h3 className="tp-modal-title">
-                  Completar Salida ({prestamoSeleccionado.id_prestamo})
-                </h3>
+                <h3 className="tp-modal-title">Completar Salida ({prestamoSeleccionado.id_prestamo})</h3>
                 <small className="tp-modal-subinfo">
                   Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> &nbsp;|&nbsp; Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong>
                 </small>
@@ -1011,7 +1114,6 @@ export default function TrackingPrestamos() {
             </div>
 
             <div className="tp-modal-body">
-              {/* N° Paletas */}
               <div className="tp-form-group">
                 <div className="tp-label-row">
                   <label>N° paletas prestadas</label>
@@ -1029,7 +1131,6 @@ export default function TrackingPrestamos() {
                 />
               </div>
 
-              {/* ¿Retorna? */}
               <div className="tp-form-group">
                 <div className="tp-label-row">
                   <label>¿Retorna?</label>
@@ -1046,7 +1147,6 @@ export default function TrackingPrestamos() {
                 </select>
               </div>
 
-              {/* Foto de Salida */}
               <div className="tp-form-group">
                 <div className="tp-label-row">
                   <label>Foto de salida</label>
@@ -1110,7 +1210,6 @@ export default function TrackingPrestamos() {
                 </div>
               </div>
 
-              {/* Observación de Salida */}
               <div className="tp-form-group">
                 <div className="tp-label-row">
                   <label>Observación de salida</label>
@@ -1139,7 +1238,7 @@ export default function TrackingPrestamos() {
         </div>
       )}
 
-      {/* MODAL REGISTRAR DEVOLUCIÓN DE PALETAS */}
+      {/* ================= MODAL DEVOLUCIÓN ================= */}
       {modalDevVisible && prestamoSeleccionado && (
         <div className="tp-modal-backdrop" onClick={() => setModalDevVisible(false)}>
           <div className="tp-modal-card tp-modal-devolucion" onClick={e => e.stopPropagation()}>
@@ -1162,7 +1261,6 @@ export default function TrackingPrestamos() {
 
             <form onSubmit={handleGuardarDevolucion} className="tp-modal-body">
               <div className="tp-split-layout">
-                {/* LADO IZQUIERDO: DATOS DE SALIDA */}
                 <div className="tp-split-col left-panel">
                   <div className="tp-panel-title">Datos de Salida</div>
 
@@ -1231,7 +1329,6 @@ export default function TrackingPrestamos() {
                   </div>
                 </div>
 
-                {/* LADO DERECHO: DATOS DE LA DEVOLUCIÓN */}
                 <div className="tp-split-col right-panel">
                   <div className="tp-panel-title">Datos para la Devolución</div>
 
@@ -1348,7 +1445,7 @@ export default function TrackingPrestamos() {
         </div>
       )}
 
-      {/* MODAL CANVAS FIRMA */}
+      {/* ================= MODAL FIRMA ================= */}
       {modalFirmaVisible && (
         <div className="tw-modal-backdrop" onClick={() => {
           setModalFirmaVisible(false);

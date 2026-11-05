@@ -12,12 +12,12 @@
   box-sizing: border-box;
 }
 
-/* 1. SECCIÓN SUPERIOR */
+/* 1. SECCIÓN SUPERIOR: HERO CARD A LA IZQUIERDA Y KPIS AL COSTADO EN LAPTOP */
 .tracking-prestamos-page .top-summary-grid {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   align-items: stretch;
 }
 
@@ -43,6 +43,7 @@
   letter-spacing: 0.4px;
   margin-bottom: 8px;
   display: inline-block;
+  text-transform: uppercase;
 }
 
 .tracking-prestamos-page .hero-card h1 {
@@ -66,22 +67,21 @@
 .tracking-prestamos-page .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 10px;
   height: 100%;
 }
 
 .tracking-prestamos-page .summary-card {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 16px 22px;
+  padding: 14px 18px;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
-  min-width: 130px;
+  min-width: 120px;
 }
 
 .tracking-prestamos-page .summary-card span {
@@ -100,23 +100,40 @@
   font-weight: 800;
 }
 
-.tracking-prestamos-page .card-pendientes { background: #fffaf0; border-color: #fce4b5; }
+/* =========================================================================
+   COLORES ORIGINALES KPIS (PASTEL + BORDES + NÚMEROS DESTACADOS)
+   ========================================================================= */
+.tracking-prestamos-page .card-pendientes { 
+  background: #fffaf0; 
+  border: 1.5px solid #fce4b5; 
+}
 .tracking-prestamos-page .card-pendientes span { color: #b45309; }
 .tracking-prestamos-page .card-pendientes strong { color: #92400e; }
 
-.tracking-prestamos-page .card-parciales { background: #f0f9ff; border-color: #bae6fd; }
+.tracking-prestamos-page .card-parciales { 
+  background: #f0f9ff; 
+  border: 1.5px solid #bae6fd; 
+}
 .tracking-prestamos-page .card-parciales span { color: #0284c7; }
-.tracking-prestamos-page .card-parciales strong { color: #075985; }
+.tracking-prestamos-page .card-parciales strong { color: #0369a1; }
 
-.tracking-prestamos-page .card-devueltos { background: #f0fdf4; border-color: #bbf7d0; }
+.tracking-prestamos-page .card-devueltos { 
+  background: #f0fdf4; 
+  border: 1.5px solid #bbf7d0; 
+}
 .tracking-prestamos-page .card-devueltos span { color: #16a34a; }
-.tracking-prestamos-page .card-devueltos strong { color: #14532d; }
+.tracking-prestamos-page .card-devueltos strong { color: #15803d; }
 
-.tracking-prestamos-page .card-paletas { background: #fef2f2; border-color: #fecaca; }
+.tracking-prestamos-page .card-paletas { 
+  background: #fef2f2; 
+  border: 1.5px solid #fecaca; 
+}
 .tracking-prestamos-page .card-paletas span { color: #dc2626; }
 .tracking-prestamos-page .card-paletas strong { color: #b91c1c; }
 
-/* 2. FILTROS */
+/* =========================================================================
+   2. FILTROS (1 FILA EN LAPTOP)
+   ========================================================================= */
 .tracking-prestamos-page .filters-card {
   background: #ffffff;
   border-radius: 14px;
@@ -128,6 +145,7 @@
 
 .tracking-prestamos-page .filters-grid {
   display: grid;
+  grid-template-columns: 2.2fr 1.3fr 1.2fr 1.5fr 2.2fr;
   gap: 10px;
   margin-bottom: 12px;
   align-items: end;
@@ -140,7 +158,20 @@
   min-width: 0;
 }
 
-.tracking-prestamos-page .filter-group label {
+.tracking-prestamos-page .date-range-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.tracking-prestamos-page .date-sub-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tracking-prestamos-page .filter-group label,
+.tracking-prestamos-page .date-sub-input label {
   font-size: 11px;
   font-weight: 700;
   color: #334155;
@@ -179,91 +210,160 @@
 .tracking-prestamos-page .btn-action-primary {
   background: #0f4c81;
   color: #ffffff;
-  height: 34px;
-  padding: 0 14px;
+  height: 36px;
+  padding: 0 16px;
   border-radius: 8px;
   border: none;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 .tracking-prestamos-page .btn-action-primary:hover { background: #145d9b; }
 
 .tracking-prestamos-page .btn-action-secondary {
   background: #eef2f7;
   color: #1e3a6d;
-  height: 34px;
-  padding: 0 12px;
+  height: 36px;
+  padding: 0 14px;
   border-radius: 8px;
   border: 1px solid #d8e2ee;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 .tracking-prestamos-page .btn-action-secondary:hover { background: #e2e8f0; }
 
-/* 3. TABLA Y BOTONES ACCIONES */
+/* =========================================================================
+   3. BARRA SUPERIOR DE LA TABLA (LAPTOP: 1 FILA COMPLETA)
+   ========================================================================= */
 .tracking-prestamos-page .table-section-card {
   background: #ffffff;
   border-radius: 14px;
   border: 1px solid #e2e8f0;
-  padding: 12px 14px 16px;
+  padding: 14px 16px 16px;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
 }
 
 .tracking-prestamos-page .table-topbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  width: 100%;
 }
 
-.tracking-prestamos-page .pagination-bar {
+.tracking-prestamos-page .table-topbar-row-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  width: 100%;
-  justify-content: space-between;
+  gap: 16px;
 }
 
 .tracking-prestamos-page .records-counter {
-  font-size: 11.5px;
+  font-size: 13px;
   color: #334155;
+  white-space: nowrap;
+}
+.tracking-prestamos-page .records-counter strong {
+  color: #0b2239;
+  font-weight: 800;
 }
 
-.tracking-prestamos-page .pagination-controls {
-  display: inline-flex;
+.tracking-prestamos-page .table-topbar-row-pagination {
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .tracking-prestamos-page .page-nav-btn {
-  background: transparent;
-  border: none;
+  background: #ffffff;
+  border: 1px solid #d8e2ee;
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tracking-prestamos-page .page-nav-btn:hover:not(:disabled) {
+  background-color: #f8fafc;
   color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.tracking-prestamos-page .page-nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: #94a3b8;
+}
+
+.tracking-prestamos-page .page-current-indicator {
   font-size: 13px;
+  font-weight: 800;
+  color: #0b2239;
+  white-space: nowrap;
+}
+
+.tracking-prestamos-page .btn-export-excel {
+  background-color: #15803d;
+  color: #ffffff;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12.5px;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   cursor: pointer;
+  box-shadow: 0 2px 4px rgba(21, 128, 61, 0.18);
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
 }
-.tracking-prestamos-page .page-nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
+.tracking-prestamos-page .btn-export-excel:hover {
+  background-color: #166534;
+}
+
+.tracking-prestamos-page .excel-badge-icon {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tabla Estructura */
 .tracking-prestamos-page .table-container {
   width: 100%;
   overflow-x: auto;
   border-radius: 8px;
   cursor: grab;
   user-select: none;
+  -webkit-overflow-scrolling: touch;
 }
-.tracking-prestamos-page .table-container.dragging { cursor: grabbing; }
+
+.tracking-prestamos-page .table-container.dragging {
+  cursor: grabbing;
+}
 
 .tracking-prestamos-page .table-container table {
   width: 100%;
@@ -281,6 +381,7 @@
   text-align: center;
   letter-spacing: 0.3px;
 }
+
 .tracking-prestamos-page .table-container th:first-child { border-top-left-radius: 8px; }
 .tracking-prestamos-page .table-container th:last-child { border-top-right-radius: 8px; }
 
@@ -309,6 +410,7 @@
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
+
 .tracking-prestamos-page .badge-estado.por-despachar { background: #ea580c; color: #ffffff; }
 .tracking-prestamos-page .badge-estado.pendiente { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
 .tracking-prestamos-page .badge-estado.parcial { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
@@ -363,13 +465,154 @@
 .tracking-prestamos-page .btn-accion-eye { background: #ffffff; border-color: #cbd5e1; color: #1e3a6d; }
 .tracking-prestamos-page .btn-accion-eye:hover { background: #f1f5f9; }
 
+/* Badge pequeño y estilizado para el conteo de placas y conductores */
+.tp-subinfo-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: #0369a1;
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+}
 
 /* =========================================================================
-   4. SISTEMA DE MODALES UNIFICADO (PREFIJO tp- / INMUNE A CONFLICTOS)
+   4. COMPORTAMIENTO MÓVIL EXACTO (<= 768px)
    ========================================================================= */
+@media (max-width: 768px) {
+  .tracking-prestamos-page {
+    padding: 10px;
+  }
 
-/* Fondo oscuro flotante */
-.tp-modal-backdrop {
+  /* 1°: Hero Card arriba y KPIs abajo en una sola fila continua */
+  .tracking-prestamos-page .top-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .tracking-prestamos-page .summary-section {
+    width: 100%;
+  }
+
+  .tracking-prestamos-page .summary-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    width: 100%;
+  }
+
+  .tracking-prestamos-page .summary-card {
+    min-width: 0;
+    padding: 10px 4px;
+    border-radius: 10px;
+  }
+
+  .tracking-prestamos-page .summary-card span {
+    font-size: 8px;
+    margin-bottom: 3px;
+    letter-spacing: 0;
+  }
+
+  .tracking-prestamos-page .summary-card strong {
+    font-size: 18px;
+  }
+
+  /* 2°: Filtros en móvil: Buscar arriba ancho completo, Área y Estado en 2 columnas */
+  .tracking-prestamos-page .filters-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .tracking-prestamos-page .filter-buscar {
+    grid-column: 1 / -1;
+  }
+
+  /* OCULTAR EN MÓVIL: Empresa de transporte y Rango de fechas */
+  .tracking-prestamos-page .filter-empresa,
+  .tracking-prestamos-page .filter-fechas,
+  .tracking-prestamos-page .date-range-group {
+    display: none !important;
+  }
+
+  /* BOTONES DE ACCIÓN: EN UNA SOLA FILA HORIZONTAL DE 3 BOTONES */
+  .tracking-prestamos-page .filters-actions-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important; /* 3 columnas iguales */
+    gap: 8px !important;
+    width: 100% !important;
+    margin-top: 4px;
+  }
+
+  .tracking-prestamos-page .btn-action-primary,
+  .tracking-prestamos-page .btn-action-secondary {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    padding: 0 6px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+    justify-content: center !important;
+  }
+
+  /* Ocultar accesos secundarios en móvil */
+  .tracking-prestamos-page .btn-extra-nav {
+    display: none !important;
+  }
+
+  /* 3°: BARRA TABLA EN MÓVIL (2 FILAS LIMPIAS) */
+  .tracking-prestamos-page .table-topbar {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    margin-bottom: 12px;
+  }
+
+  /* Fila 1 móvil: "Mostrando 30 registros de 30" (izq) y "Exportar" (der) */
+  .tracking-prestamos-page .table-topbar-row-header {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .tracking-prestamos-page .table-topbar-row-header .records-counter {
+    font-size: 13px !important;
+    white-space: nowrap;
+  }
+
+  /* Fila 2 móvil: Anterior | Página 1 de X | Siguiente */
+  .tracking-prestamos-page .table-topbar-row-pagination {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding-top: 8px !important;
+    border-top: 1px solid #f1f5f9 !important;
+  }
+
+  .tracking-prestamos-page .page-nav-btn {
+    padding: 6px 14px !important;
+    font-size: 12px !important;
+  }
+
+  .tracking-prestamos-page .page-current-indicator {
+    flex: 1;
+    text-align: center;
+    font-size: 13px !important;
+  }
+}
+/* =========================================================================
+   5. MODALES UNIFICADOS (tp- / INMUNES A CONFLICTOS)
+   ========================================================================= */
+.tp-modal-backdrop,
+.tw-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 99999;
@@ -382,7 +625,6 @@
   box-sizing: border-box;
 }
 
-/* Tarjeta base del modal */
 .tp-modal-card {
   background: #ffffff;
   border-radius: 16px;
@@ -398,10 +640,10 @@
 
 .tp-modal-card.tp-modal-aux { max-width: 470px; width: 100%; }
 .tp-modal-card.tp-modal-devolucion { max-width: 960px; width: 100%; }
+.tp-modal-card.tp-modal-editar-despacho { max-width: 500px; width: 100%; }
 
-/* Cabecera con la X arriba a la derecha */
 .tp-modal-header {
-  padding: 18px 22px 14px;
+  padding: 16px 20px 12px;
   display: flex !important;
   flex-direction: row !important;
   justify-content: space-between !important;
@@ -433,7 +675,7 @@
 
 .tp-modal-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1.25;
@@ -441,23 +683,22 @@
 
 .tp-modal-subinfo {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 11.5px;
   color: #64748b;
 }
 
-/* BOTÓN CERRAR X (ARRIBA DERECHA) */
 .tp-btn-close {
   background: #f1f5f9 !important;
   border: 1px solid #e2e8f0 !important;
-  width: 32px !important;
-  height: 32px !important;
-  min-width: 32px !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
   border-radius: 8px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   color: #64748b !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   cursor: pointer !important;
   padding: 0 !important;
   transition: all 0.15s ease !important;
@@ -468,21 +709,19 @@
   color: #0f172a !important;
 }
 
-/* Cuerpo de los modales */
 .tp-modal-body {
-  padding: 18px 22px 22px;
+  padding: 16px 20px 20px;
   overflow-y: auto;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-/* Grupos y Labels */
 .tp-form-group {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   width: 100%;
 }
 
@@ -494,16 +733,16 @@
 
 .tp-label-row label,
 .tp-label-small {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   color: #334155;
   margin: 0;
 }
 
 .tp-tag-pill {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 800;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 4px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -511,14 +750,13 @@
 .tp-tag-pill.obligatorio { background: #fef3c7; color: #d97706; }
 .tp-tag-pill.opcional { background: #e2e8f0; color: #475569; }
 
-/* Inputs estilizados */
 .tp-input-clean,
 .tp-select-clean {
-  height: 38px;
+  height: 36px;
   border-radius: 8px;
   border: 1.5px solid #cbd5e1;
-  padding: 0 12px;
-  font-size: 13px;
+  padding: 0 10px;
+  font-size: 12.5px;
   color: #0f172a;
   background-color: #ffffff;
   outline: none;
@@ -537,8 +775,8 @@
 .tp-textarea-clean {
   border-radius: 8px;
   border: 1.5px solid #cbd5e1;
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 8px 10px;
+  font-size: 12.5px;
   color: #0f172a;
   background-color: #ffffff;
   outline: none;
@@ -561,7 +799,6 @@
   outline: none;
 }
 
-/* INPUT FILE ESTILIZADO (ELEGIR ARCHIVO) */
 .tp-file-custom-box {
   width: 100%;
   position: relative;
@@ -580,7 +817,7 @@
   display: flex;
   align-items: center;
   width: 100%;
-  height: 38px;
+  height: 36px;
   border: 1.5px solid #cbd5e1;
   border-radius: 8px;
   background: #ffffff;
@@ -597,10 +834,10 @@
 .tp-file-btn {
   background: #f1f5f9;
   color: #1e293b;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   height: 100%;
-  padding: 0 14px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   border-right: 1.5px solid #cbd5e1;
@@ -608,8 +845,8 @@
 }
 
 .tp-file-name {
-  padding: 0 12px;
-  font-size: 12px;
+  padding: 0 10px;
+  font-size: 11.5px;
   color: #64748b;
   white-space: nowrap;
   overflow: hidden;
@@ -624,9 +861,9 @@
 }
 
 .tp-badge-file-status {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
-  padding: 2px 7px;
+  padding: 2px 6px;
   border-radius: 5px;
 }
 .tp-badge-file-status.cargado { background: #dcfce7; color: #15803d; }
@@ -642,15 +879,14 @@
 }
 .tp-btn-quitar-foto:hover { text-decoration: underline; }
 
-/* Botón Finalizar Despacho */
 .tp-btn-submit-main {
   width: 100%;
-  height: 44px;
+  height: 42px;
   background-color: #0f4c81;
   color: #ffffff;
   border: none;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -662,12 +898,9 @@
 }
 .tp-btn-submit-main:hover { background-color: #0b3c67; }
 
-/* =========================================================================
-   SPLIT LAYOUT (MODAL DEVOLUCIÓN)
-   ========================================================================= */
 .tp-split-layout {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
 }
 
@@ -675,18 +908,18 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .tp-split-col.left-panel {
   background: #f8fafc;
-  padding: 16px;
+  padding: 14px;
   border-radius: 12px;
   border: 1px solid #eef2f6;
 }
 
 .tp-panel-title {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   color: #0f4c81;
   text-transform: uppercase;
@@ -694,12 +927,11 @@
   margin-bottom: 4px;
 }
 
-/* Tarjetas mini KPI de salida */
 .tp-kpis-mini-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   text-align: center;
 }
 
@@ -707,24 +939,23 @@
   background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 8px 4px;
+  padding: 6px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
-.tp-mini-kpi strong { font-size: 16px; font-weight: 800; color: #0f172a; }
-.tp-mini-kpi span { font-size: 8.5px; font-weight: 800; color: #64748b; margin-top: 2px; }
+.tp-mini-kpi strong { font-size: 15px; font-weight: 800; color: #0f172a; }
+.tp-mini-kpi span { font-size: 8px; font-weight: 800; color: #64748b; margin-top: 2px; }
 
 .tp-mini-kpi.blue strong { color: #0f4c81; }
 .tp-mini-kpi.amber strong { color: #d97706; }
 .tp-mini-kpi.red strong { color: #dc2626; }
 .tp-mini-kpi.green strong { color: #16a34a; }
 
-/* Evidencias Firma / Foto */
 .tp-evidence-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   margin-top: 4px;
 }
 
@@ -733,7 +964,7 @@
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   padding: 6px;
-  min-height: 80px;
+  min-height: 70px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -742,7 +973,7 @@
 }
 
 .tp-evidence-title {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 800;
   color: #64748b;
   display: block;
@@ -750,22 +981,21 @@
 }
 
 .tp-evidence-img {
-  max-height: 60px;
+  max-height: 55px;
   max-width: 100%;
   object-fit: contain;
 }
 
 .tp-no-evidence {
-  font-size: 11px;
+  font-size: 10.5px;
   color: #94a3b8;
   font-style: italic;
 }
 
-/* Badges y botones del lado derecho */
 .tp-badge-status-pill {
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
   display: inline-block;
   width: fit-content;
@@ -776,18 +1006,18 @@
 .tp-actions-row-end {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .tp-btn-secondary {
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   color: #1e3a6d;
-  height: 38px;
-  padding: 0 16px;
+  height: 36px;
+  padding: 0 14px;
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -801,10 +1031,10 @@
   background: #0f4c81;
   color: #ffffff;
   border: none;
-  height: 38px;
-  padding: 0 18px;
+  height: 36px;
+  padding: 0 16px;
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -814,82 +1044,144 @@
 }
 .tp-btn-primary:hover:not(:disabled) { background: #0c3b64; }
 
-/* Tamaño específico para el modal de edición de despacho */
-.tp-modal-card.tp-modal-editar-despacho {
-  max-width: 500px;
-  width: 100%;
-}
-
-/* Subinformación en los labels (ej: cantidad de placas/conductores) */
-.tp-subinfo-text {
-  font-size: 11px;
-  font-weight: 700;
-  color: #0284c7;
-}
-
-/* Caja para agregar clientes con el botón '+' integrado */
 .tp-client-input-wrapper {
   display: flex;
   gap: 6px;
   width: 100%;
 }
-
-.tp-client-input-wrapper .tp-input-clean {
-  flex: 1;
-}
+.tp-client-input-wrapper .tp-input-clean { flex: 1; }
 
 .tp-btn-add-tag {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
   background-color: #e0f2fe;
   color: #0284c7;
   border: 1px solid #bae6fd;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
   flex-shrink: 0;
 }
-.tp-btn-add-tag:hover {
-  background-color: #bae6fd;
-}
 
-/* Chips de clientes seleccionados */
 .tp-chips-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 5px;
+  margin-top: 5px;
 }
 
 .tp-chip-item {
   background-color: #e0f2fe;
   color: #0369a1;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 6px;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 .tp-chip-item button {
   background: transparent;
   border: none;
   color: #dc2626;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   cursor: pointer;
   padding: 0;
   line-height: 1;
 }
-.tp-chip-item button:hover {
-  color: #991b1b;
+
+/* Modal Firma Canvas */
+.firma-modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.firma-modal-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.firma-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.firma-modal-body {
+  padding: 14px;
+}
+
+.canvas-container-firma {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.canvas-hint-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+  user-select: none;
+}
+
+#firmaCanvas {
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.firma-modal-footer {
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr;
+  gap: 8px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.btn-firma-full {
+  height: 38px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  border: none;
+}
+.btn-firma-outline {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+.btn-firma-primary {
+  background: #0f4c81;
+  color: #ffffff;
 }
 
 @keyframes tpFadeInAnim {

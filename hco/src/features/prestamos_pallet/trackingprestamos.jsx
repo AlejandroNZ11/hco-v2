@@ -1301,11 +1301,13 @@ export default function TrackingPrestamos() {
                       <span className="tp-evidence-title">Firma Salida</span>
                       {prestamoSeleccionado.firma_conductor ? (
                         <a href={prestamoSeleccionado.firma_conductor} target="_blank" rel="noopener noreferrer">
-                          <img 
+                        <img 
                             src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
                             alt="Firma" 
                             className="tp-evidence-img"
-                          />
+                            crossOrigin="anonymous"
+                            referrerPolicy="no-referrer"
+                            />
                         </a>
                       ) : (
                         <span className="tp-no-evidence">Sin firma</span>
@@ -1320,7 +1322,9 @@ export default function TrackingPrestamos() {
                             src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
                             alt="Foto" 
                             className="tp-evidence-img"
-                          />
+                            crossOrigin="anonymous"
+                            referrerPolicy="no-referrer"
+                            />
                         </a>
                       ) : (
                         <span className="tp-no-evidence">Sin foto</span>

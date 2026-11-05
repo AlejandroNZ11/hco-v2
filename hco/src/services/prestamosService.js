@@ -356,12 +356,15 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
   const hoy = new Date();
 
   const listaFormateada = (resPrest.data || []).map(row => {
+    const noRetornoAcumulado = Number(row.nr_paletas_noretorno || 0);
+    const devueltasAcumuladas = Number(row.nr_paletas_devueltas || 0);
+    const prestadas = Number(row.nr_paletas || 0);
     const fRetorno = row.fecha_retorno ? new Date(row.fecha_retorno) : calcularFechaRetornoPeru(row.fecha_entrega, 7);
     const fechaRetornoDate = fRetorno ? new Date(fRetorno) : null;
     const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
     const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
-    const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
-
+    //const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
+    const paletasPendientesCalc = Math.max(0, prestadas - devueltasAcumuladas - noRetornoAcumulado);
     // Extracción de Conductor si es CLIENTE RECOGE
     let conductorFinal = condMap[String(row.dni_conductor)] || row.dni_conductor || '';
     if (!conductorFinal && row.observacion_salida) {
@@ -448,30 +451,34 @@ export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {
   const ahoraISO = obtenerFechaHoraPeruISO();
   const idPrestamo = prestamoActual.id_prestamo;
 
-  const nrPaletasPrestadas = Number(payload.nr_paletas_editada !== undefined ? payload.nr_paletas_editada : prestamoActual.nr_paletas);
+  const nrPaletasPrestadas = Number(prestamoActual.nr_paletas || 0);
   const devueltasAnteriores = Number(prestamoActual.nr_paletas_devueltas || 0);
+  const noRetornoAnteriores = Number(prestamoActual.nr_paletas_noretorno || 0);
+
   const devuelveAhora = Number(payload.cantidad_devuelta || 0);
+  const noRetornoAhora = Number(payload.cantidad_noretorno || 0);
   const tipoAccion = payload.tipo_accion || 'devolucion';
 
   let nuevoEstado = prestamoActual.estado;
-  let totalDevueltas = devueltasAnteriores;
+  let totalDevueltas = devueltasAnteriores + devuelveAhora;
+  let totalNoRetorno = noRetornoAnteriores + noRetornoAhora;
   let fechaDevolucion = prestamoActual.fecha_devolucion;
 
   if (tipoAccion === 'no_retorno') {
     nuevoEstado = 'NO RETORNO';
+    totalNoRetorno = nrPaletasPrestadas - devueltasAnteriores;
     fechaDevolucion = ahoraISO;
   } else if (tipoAccion === 'cerrado_mixto') {
-    totalDevueltas = devueltasAnteriores + devuelveAhora;
     nuevoEstado = 'Cerrado mixto';
     fechaDevolucion = ahoraISO;
   } else {
-    totalDevueltas = devueltasAnteriores + devuelveAhora;
-    const nuevasPendientes = nrPaletasPrestadas - totalDevueltas;
-    if (totalDevueltas > 0 && nuevasPendientes > 0) {
-      nuevoEstado = 'Devolución Parcial';
-    } else if (nuevasPendientes <= 0) {
+    // Devolución normal
+    const pendientesRestantes = nrPaletasPrestadas - totalDevueltas - totalNoRetorno;
+    if (pendientesRestantes <= 0) {
       nuevoEstado = 'Devuelto';
       fechaDevolucion = ahoraISO;
+    } else {
+      nuevoEstado = 'Devolución Parcial';
     }
   }
 
@@ -482,9 +489,9 @@ export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {
   }
 
   const camposActualizar = {
-    nr_paletas: nrPaletasPrestadas,
     estado: nuevoEstado,
     nr_paletas_devueltas: totalDevueltas,
+    nr_paletas_noretorno: totalNoRetorno,
     fecha_devolucion: fechaDevolucion,
     recibido_por: payload.recibido_por,
     observacion_regreso: payload.observacion_regreso || prestamoActual.observacion_regreso,
@@ -672,4 +679,70 @@ export const asegurarPlacaExiste = async (nroPlaca, empresaId, usuario) => {
 
     if (error) throw new Error(error.message);
   }
+};
+
+
+// =========================================================================
+// ACTUALIZAR REGISTRO CUANDO ESTÁ 'Por despachar' (ADMIN / SUPERVISOR / SUPERADMIN)
+// =========================================================================
+export const actualizarRegistroPorDespachar = async (prestamoActual, payload) => {
+  const ahoraISO = obtenerFechaHoraPeruISO();
+  const esClienteRecoge = prestamoActual.area_proceso === 'CLIENTE RECOGE';
+
+  let empresaIdFinal = payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null;
+  let dniConductorFinal = payload.dni_conductor || null;
+  let nroPlacaFinal = String(payload.nro_placa || '').trim().toUpperCase();
+  let observacionFinal = payload.observacion_salida || '';
+
+  if (esClienteRecoge) {
+    if (!empresaIdFinal) {
+      empresaIdFinal = await obtenerOcrearEmpresaOther(payload.usuario_actualiza);
+    }
+    dniConductorFinal = null;
+
+    const metaRecoge = [];
+    if (payload.conductor_nombre) metaRecoge.push(`[CONDUCTOR RECOGE: ${payload.conductor_nombre.trim().toUpperCase()}]`);
+    if (nroPlacaFinal) metaRecoge.push(`[PLACA RECOGE: ${nroPlacaFinal}]`);
+    nroPlacaFinal = null;
+
+    // Quitar marcas anteriores de conductor/placa si existían
+    let obsLimpia = (prestamoActual.observacion_salida || '')
+      .replace(/\[CONDUCTOR RECOGE:\s*[^\]]+\]/gi, '')
+      .replace(/\[PLACA RECOGE:\s*[^\]]+\]/gi, '')
+      .trim();
+
+    const prefixRecoge = metaRecoge.join(' ');
+    observacionFinal = obsLimpia ? `${prefixRecoge} - ${obsLimpia}` : prefixRecoge;
+  } else {
+    // OUTBOUND PRINCIPAL: asegurar placa en catálogo
+    if (nroPlacaFinal && empresaIdFinal) {
+      await asegurarPlacaExiste(nroPlacaFinal, empresaIdFinal, payload.usuario_actualiza);
+    }
+
+    if (Array.isArray(payload.clientes_multiples) && payload.clientes_multiples.length > 0) {
+      let obsSinClientes = (observacionFinal || '').replace(/\[CLIENTES:\s*[^\]]+\]\s*-?\s*/gi, '').trim();
+      const listadoTexto = payload.clientes_multiples.join(', ');
+      observacionFinal = obsSinClientes ? `[CLIENTES: ${listadoTexto}] - ${obsSinClientes}` : `[CLIENTES: ${listadoTexto}]`;
+    }
+  }
+
+  const camposActualizar = {
+    empresa_transporte_id: empresaIdFinal,
+    dni_conductor: dniConductorFinal,
+    nr_ruta: esClienteRecoge ? prestamoActual.nr_ruta : String(payload.nr_ruta || '').trim(),
+    nro_placa: nroPlacaFinal,
+    observacion_salida: observacionFinal,
+    usuario_actualiza: payload.usuario_actualiza,
+    fecha_actualiza: ahoraISO
+  };
+
+  const { data, error } = await supabase
+    .from('prestamos')
+    .update(camposActualizar)
+    .eq('uuid', prestamoActual.uuid)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Error al actualizar préstamo por despachar: ${error.message}`);
+  return data;
 };

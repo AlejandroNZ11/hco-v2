@@ -318,9 +318,22 @@ export default function TrackingPrestamos() {
     }));
   };
 
-  const handleGuardarEdicionDespacho = async (e) => {
+    const handleGuardarEdicionDespacho = async (e) => {
     e.preventDefault();
     if (!prestamoSeleccionado) return;
+
+    // Validación estricta para CLIENTE RECOGE: exactamente 6 dígitos alfanuméricos sin guiones
+    if (prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE') {
+      const placaLimpia = (editDespachoData.nro_placa || '').replace(/[^A-Za-z0-9]/g, '').trim();
+      if (placaLimpia.length !== 6) {
+        return mostrarAviso(
+          'warning',
+          'Placa inválida',
+          'La placa debe tener exactamente 6 caracteres alfanuméricos sin guiones (Ej: OUI564).'
+        );
+      }
+    }
+
     setLoading(true);
     try {
       await actualizarRegistroPorDespachar(prestamoSeleccionado, {
@@ -901,14 +914,24 @@ export default function TrackingPrestamos() {
             <form onSubmit={handleGuardarEdicionDespacho} className="tp-modal-body">
               {prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? (
                 <>
+                  {/* Placa de Vehículo: Obligatorio, exactamente 6 caracteres alfanuméricos sin guion */}
                   <div className="tp-form-group">
-                    <label className="tp-label-small">Placa de Vehículo</label>
+                    <label className="tp-label-small">
+                      Placa de Vehículo <span style={{ color: '#dc2626' }}>* (6 caracteres)</span>
+                    </label>
                     <input
                       type="text"
                       className="tp-input-clean"
                       value={editDespachoData.nro_placa}
-                      onChange={e => setEditDespachoData({ ...editDespachoData, nro_placa: e.target.value.toUpperCase() })}
-                      placeholder="Ej: ABC-123"
+                      onChange={e => {
+                        // Elimina guiones, espacios y caracteres especiales; solo letras y números, máx 6
+                        const limpia = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
+                        setEditDespachoData({ ...editDespachoData, nro_placa: limpia });
+                      }}
+                      placeholder="Ej: ABC123"
+                      maxLength={6}
+                      pattern="[A-Za-z0-9]{6}"
+                      title="Debe contener exactamente 6 caracteres alfanuméricos sin guiones ni espacios"
                       required
                     />
                   </div>

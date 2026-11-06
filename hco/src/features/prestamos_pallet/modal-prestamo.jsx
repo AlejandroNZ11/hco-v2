@@ -416,11 +416,30 @@ export default function ModalPrestamo() {
       }
     }
 
+    // 1. Obtener el cliente_id para OUTBOUND RETAIL
+    let clienteIdFinal = null;
+    if (esOutboundRetail && formData.cliente_nombre.trim()) {
+      const normalizar = (str) => String(str || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const buscado = normalizar(formData.cliente_nombre);
+      
+      // Buscar coincidencia en la lista maestra de clientes
+      const clienteEncontrado = clientes.find(c => normalizar(c.nombre_cliente) === buscado);
+      
+      if (clienteEncontrado) {
+        clienteIdFinal = Number(clienteEncontrado.id);
+      } else {
+        // Opcional: Si el usuario escribió un cliente que no está en el catálogo,
+        // lo guardamos o podemos crearlo en la tabla clientes (ver función abajo si lo necesitas)
+        console.warn('El cliente escrito no está en el catálogo maestro:', formData.cliente_nombre);
+      }
+    }
+
     setLoading(true);
     try {
       const payloadEnvio = {
         ...formData,
-        tipo_paleta_id: esOutboundRetail ? (formData.tipo_paleta_id || null) : null,
+        cliente_id: esOutboundRetail ? clienteIdFinal : null, // <--- AQUÍ ESTABA EL ERROR: AHORA SÍ VIAJA EL ID
+        tipo_paleta_id: esOutboundRetail ? (formData.tipo_paleta_id ? Number(formData.tipo_paleta_id) : null) : null,
         retorno: esClienteRecoge ? 'NO' : formData.retorno,
         clientes_multiples: esOutboundPrincipal ? clientesSeleccionados : null,
         usuario_registra: nombreUsuarioActual,
@@ -442,6 +461,7 @@ export default function ModalPrestamo() {
     } finally {
       setLoading(false);
     }
+    
   };
 
   return (

@@ -485,32 +485,34 @@
    ========================================================================= */
 
 .tw-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 999999;
-  background-color: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  box-sizing: border-box;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important; /* Valor máximo permitido en navegadores (int32) */
+  background-color: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(6px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
 }
 
 .tw-modal-card-alert {
-  background: #ffffff;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 420px;
-  padding: 24px 22px 20px;
-  box-shadow: 0 20px 35px -8px rgba(15, 23, 42, 0.25);
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  animation: twAlertPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-sizing: border-box;
-  text-align: center;
-  align-items: center;
+  background: #ffffff !important;
+  border-radius: 16px !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  padding: 24px 22px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  animation: twAlertPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+  align-items: center !important;
+  position: relative !important;
+  z-index: 2147483647 !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6) !important;
 }
 
 .tw-modal-header {
@@ -632,18 +634,17 @@
 /* =========================================================================
    5. MODALES UNIFICADOS (tp- / INMUNES A CONFLICTOS)
    ========================================================================= */
-.tp-modal-backdrop,
-.tw-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 99999;
-  background-color: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  box-sizing: border-box;
+.tp-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99990 !important; /* Capa intermedia para que los modales operen */
+  background-color: rgba(15, 23, 42, 0.6) !important;
+  backdrop-filter: blur(4px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
 }
 
 .tp-modal-card {
@@ -657,6 +658,8 @@
   flex-direction: column;
   animation: tpFadeInAnim 0.2s ease-out;
   box-sizing: border-box;
+  position: relative !important;
+  z-index: 99991 !important;
 }
 
 .tp-modal-card.tp-modal-aux { max-width: 470px; width: 100%; }
@@ -1133,6 +1136,8 @@
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  position: relative !important;
+  z-index: 99995 !important;
 }
 
 .firma-modal-header {

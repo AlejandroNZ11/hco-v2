@@ -334,7 +334,7 @@ export default function TrackingPrestamos() {
     }));
   };
 
-    const handleGuardarEdicionDespacho = async (e) => {
+  const handleGuardarEdicionDespacho = async (e) => {
     e.preventDefault();
     if (!prestamoSeleccionado) return;
 
@@ -350,16 +350,20 @@ export default function TrackingPrestamos() {
       }
     }
 
+    // 1. Ocultar el modal de inmediato y activar loading
+    setModalEditarDespachoVisible(false);
     setLoading(true);
+
     try {
       await actualizarRegistroPorDespachar(prestamoSeleccionado, {
         ...editDespachoData,
         usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Admin'
       });
-      setModalEditarDespachoVisible(false);
-      mostrarAviso('success', 'Registro Actualizado', 'Los datos del despacho han sido modificados.');
       await cargarDatos();
+      mostrarAviso('success', 'Registro Actualizado', 'Los datos del despacho han sido modificados.');
     } catch (err) {
+      // Si ocurre un error, reabre el modal para no perder los datos escritos
+      setModalEditarDespachoVisible(true);
       mostrarAviso('danger', 'Error al editar', err.message);
     } finally {
       setLoading(false);
@@ -414,63 +418,104 @@ export default function TrackingPrestamos() {
     setModalDevVisible(true);
   };
 
-  const handleCambioNoRetorno = (valor) => {
-    const noRetornoNum = Number(valor);
-    const pendientesActuales = Number(prestamoSeleccionado?.paletas_pendientes || 0);
+  // Detección automática en el modal al tipear devueltas y no retorno
+  const calcularTipoAccionAuto = (cantDev, cantNoRet, totalPendientes) => {
+    const dev = Number(cantDev || 0);
+    const noRet = Number(cantNoRet || 0);
+    const sumaAhora = dev + noRet;
 
-    let nuevoTipoAccion = devData.tipo_accion;
-    if (!isNaN(noRetornoNum) && noRetornoNum > 0) {
-      if (noRetornoNum >= pendientesActuales) {
-        nuevoTipoAccion = 'no_retorno';
-      } else {
-        nuevoTipoAccion = 'cerrado_mixto';
-      }
-    } else {
-      if (devData.tipo_accion === 'cerrado_mixto' || devData.tipo_accion === 'no_retorno') {
-        nuevoTipoAccion = esAdmin ? 'cerrado_mixto' : 'devolucion';
-      }
+    // Solo si cubre el total de las pendientes y hay de ambos tipos es Cerrado Mixto
+    if (sumaAhora >= totalPendientes && dev > 0 && noRet > 0) {
+      return 'cerrado_mixto';
     }
 
+    // Si cubre el 100% solo con no retorno
+    if (sumaAhora >= totalPendientes && noRet > 0 && dev === 0) {
+      return 'no_retorno';
+    }
+
+    // En cualquier otro caso donde aún queden pendientes o sea retorno normal
+    return 'devolucion';
+  };
+
+  const handleCambioDevuelta = (valor) => {
+    const pendientes = Number(prestamoSeleccionado?.paletas_pendientes || 0);
+    const nuevoTipo = calcularTipoAccionAuto(valor, devData.cantidad_noretorno, pendientes);
     setDevData(prev => ({
       ...prev,
-      cantidad_noretorno: valor,
-      tipo_accion: nuevoTipoAccion
+      cantidad_devuelta: valor,
+      tipo_accion: nuevoTipo
     }));
   };
 
-  const handleGuardarDevolucion = async (e) => {
+  const handleCambioNoRetorno = (valor) => {
+    const pendientes = Number(prestamoSeleccionado?.paletas_pendientes || 0);
+    const nuevoTipo = calcularTipoAccionAuto(devData.cantidad_devuelta, valor, pendientes);
+    setDevData(prev => ({
+      ...prev,
+      cantidad_noretorno: valor,
+      tipo_accion: nuevoTipo
+    }));
+  };
+
+const handleGuardarDevolucion = async (e) => {
     e.preventDefault();
     if (!prestamoSeleccionado) return;
     const cantDev = Number(devData.cantidad_devuelta || 0);
     const cantNoRet = Number(devData.cantidad_noretorno || 0);
     const pendientes = Number(prestamoSeleccionado.paletas_pendientes || 0);
 
-    if (devData.tipo_accion === 'devolucion') {
-      if (isNaN(cantDev) || cantDev <= 0) {
-        return mostrarAviso('warning', 'Cantidad requerida', 'Ingrese una cantidad devuelta válida mayor a 0.');
+    // 1. Validar que ingrese al menos un movimiento
+    if (cantDev <= 0 && cantNoRet <= 0 && devData.tipo_accion !== 'no_retorno') {
+      return mostrarAviso(
+        'warning', 
+        'Cantidad requerida', 
+        'Debe ingresar una cantidad devuelta o una cantidad no retorno mayor a 0.'
+      );
+    }
+
+    // 2. Validar que no exceda las paletas pendientes
+    if (cantDev + cantNoRet > pendientes) {
+      return mostrarAviso(
+        'warning', 
+        'Excede pendientes', 
+        `La suma de devueltas (${cantDev}) y no retorno (${cantNoRet}) no puede exceder las ${pendientes} paletas pendientes.`
+      );
+    }
+
+    // 3. REGLA OBLIGATORIA: Si ingresa Cantidad Devuelta (> 0)
+    if (cantDev > 0) {
+      if (!devData.conductor_regreso.trim()) {
+        return mostrarAviso(
+          'warning',
+          'Conductor obligatorio',
+          'Debe ingresar el conductor de regreso cuando hay paletas devueltas.'
+        );
       }
-      if (cantDev > pendientes) {
-        return mostrarAviso('warning', 'Excede pendientes', `No puede devolver más de las ${pendientes} paletas pendientes.`);
+      if (!devData.firma_retorno_base64 && !prestamoSeleccionado.firma_retorno) {
+        return mostrarAviso(
+          'warning',
+          'Firma obligatoria',
+          'Debe registrar la firma de regreso del conductor antes de guardar.'
+        );
       }
     }
 
-    if (devData.tipo_accion === 'cerrado_mixto') {
-      if (cantDev <= 0 && cantNoRet <= 0) {
-        return mostrarAviso('warning', 'Datos requeridos', 'Ingrese cantidad devuelta o cantidad no retorno.');
-      }
-      if (cantDev + cantNoRet > pendientes) {
-        return mostrarAviso('warning', 'Excede pendientes', `La suma de devueltas (${cantDev}) y no retorno (${cantNoRet}) excede las ${pendientes} pendientes.`);
-      }
+    // 4. REGLA OBLIGATORIA: Si ingresa Cantidad No Retorno (> 0) o es Cierre Mixto / No Retorno
+    if (cantNoRet > 0 || devData.tipo_accion === 'no_retorno' || devData.tipo_accion === 'cerrado_mixto') {
       if (!devData.observacion_regreso.trim()) {
-        return mostrarAviso('warning', 'Observación obligatoria', 'La observación es obligatoria para un cierre mixto.');
+        return mostrarAviso(
+          'warning',
+          'Observación obligatoria',
+          'Debe indicar en la observación el motivo por el cual las paletas no retornaron.'
+        );
       }
     }
 
-    if (devData.tipo_accion === 'no_retorno' && !devData.observacion_regreso.trim()) {
-      return mostrarAviso('warning', 'Observación obligatoria', 'La observación es obligatoria para declarar NO RETORNO.');
-    }
-
+    // Ocultar modal de inmediato y activar loading
+    setModalDevVisible(false);
     setLoading(true);
+
     try {
       await registrarDevolucionPrestamo(prestamoSeleccionado, {
         cantidad_devuelta: cantDev,
@@ -482,10 +527,10 @@ export default function TrackingPrestamos() {
         firma_retorno_base64: devData.firma_retorno_base64,
         usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Usuario'
       });
-      setModalDevVisible(false);
-      mostrarAviso('success', 'Devolución Procesada', 'El estado del préstamo ha sido actualizado.');
       await cargarDatos();
+      mostrarAviso('success', 'Devolución Procesada', 'El estado del préstamo ha sido actualizado.');
     } catch (err) {
+      setModalDevVisible(true);
       mostrarAviso('danger', 'Error al procesar devolución', err.message);
     } finally {
       setLoading(false);
@@ -804,6 +849,7 @@ export default function TrackingPrestamos() {
                 <th>Placa</th>
                 <th>Paletas</th>
                 <th>Devueltas</th>
+                <th>No Retorno</th>
                 <th>Pendientes</th>
                 <th>Estado</th>
                 <th>Fecha devolución</th>
@@ -855,6 +901,9 @@ export default function TrackingPrestamos() {
                       <td style={{ fontWeight: 800 }}>{r.nro_placa}</td>
                       <td>{r.nr_paletas}</td>
                       <td style={{ fontWeight: 700, color: '#0f4c81' }}>{r.nr_paletas_devueltas}</td>
+                      <td style={{ fontWeight: 700, color: Number(r.nr_paletas_noretorno) > 0 ? '#d97706' : '#64748b' }}>
+                        {r.nr_paletas_noretorno || 0}
+                      </td>
                       <td style={{ fontWeight: 700, color: Number(r.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>{r.paletas_pendientes}</td>
                       <td>{renderBadgeEstado(r.estado)}</td>
                       <td>{fDev}</td>
@@ -1452,10 +1501,10 @@ export default function TrackingPrestamos() {
                         min="0"
                         className="tp-input-clean"
                         value={devData.cantidad_devuelta}
-                        onChange={e => setDevData({ ...devData, cantidad_devuelta: e.target.value })}
+                        onChange={e => handleCambioDevuelta(e.target.value)}
                         disabled={modoLectura || devData.tipo_accion === 'no_retorno'}
                         placeholder="Paletas que ingresan..."
-                      />
+                        />
                     </div>
 
                     {esAdmin && (
@@ -1496,17 +1545,18 @@ export default function TrackingPrestamos() {
                     </datalist>
                   </div>
 
-                  {/* FILA 4: Recibido por */}
+                  {/* FILA 4: Recibido por (Bloqueado sin permisos de edición) */}
                   <div className="tp-form-group">
-                    <label className="tp-label-small">Recibido por</label>
+                    <div className="tp-label-row">
+                      <label className="tp-label-small">Recibido por</label>
+                      <span className="tp-tag-pill opcional">BLOQUEADO</span>
+                    </div>
                     <input
                       type="text"
-                      className="tp-input-clean"
+                      className="tp-input-readonly"
                       value={devData.recibido_por}
-                      onChange={e => setDevData({ ...devData, recibido_por: e.target.value })}
-                      disabled={modoLectura}
-                      placeholder="Nombre de quien recibe las paletas..."
-                      required
+                      readOnly
+                      title="Campo bloqueado: asignado automáticamente al usuario en sesión"
                     />
                   </div>
 
@@ -1613,6 +1663,34 @@ export default function TrackingPrestamos() {
                 onClick={confirmarFirma}
               >
                 <FaSave /> <span>Guardar firma</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {avisoFlotante.visible && (
+        <div className="tw-modal-backdrop" onClick={cerrarAviso}>
+          <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
+            <div className="tw-modal-header">
+              <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
+                {avisoFlotante.tipo === 'danger' && <span>✖</span>}
+                {avisoFlotante.tipo === 'warning' && <span>⚠️</span>}
+                {avisoFlotante.tipo === 'success' && <span>✔</span>}
+              </div>
+              <div className="tw-modal-text">
+                <h3 className="tw-modal-title">{avisoFlotante.titulo}</h3>
+                <p className="tw-modal-desc">{avisoFlotante.mensaje}</p>
+                {avisoFlotante.detalleExtra && (
+                  <div className="tw-modal-extra-box" style={{ marginTop: '8px' }}>
+                    {avisoFlotante.detalleExtra}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="tw-modal-footer">
+              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>
+                Entendido
               </button>
             </div>
           </div>

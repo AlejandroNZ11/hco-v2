@@ -363,8 +363,12 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
     const fechaRetornoDate = fRetorno ? new Date(fRetorno) : null;
     const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
     const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
-    //const paletasPendientesCalc = row.paletas_pendientes ?? Math.max(0, Number(row.nr_paletas || 0) - Number(row.nr_paletas_devueltas || 0));
-    const paletasPendientesCalc = Math.max(0, prestadas - devueltasAcumuladas - noRetornoAcumulado);
+
+    // Si el estado es NO RETORNO, pendientes es 0; si no, calcula restando devueltas y no retorno
+    const paletasPendientesCalc = (row.estado === 'NO RETORNO') 
+      ? 0 
+      : Math.max(0, prestadas - devueltasAcumuladas - noRetornoAcumulado);
+
     // Extracción de Conductor si es CLIENTE RECOGE
     let conductorFinal = condMap[String(row.dni_conductor)] || row.dni_conductor || '';
     if (!conductorFinal && row.observacion_salida) {
@@ -424,6 +428,7 @@ export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
     : (obsNueva || obsPrevia);
 
   const camposActualizar = {
+    despachador: payload.usuario_actualiza || prestamoActual.despachador, // <-- AHORA SE ACTUALIZA EL DESPACHADOR CON EL AUXILIAR
     nr_paletas: Number(payload.nr_paletas || 0),
     retorno: retornaBool,
     estado: estadoFinal,
@@ -459,26 +464,39 @@ export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {
   const noRetornoAhora = Number(payload.cantidad_noretorno || 0);
   const tipoAccion = payload.tipo_accion || 'devolucion';
 
-  let nuevoEstado = prestamoActual.estado;
   let totalDevueltas = devueltasAnteriores + devuelveAhora;
   let totalNoRetorno = noRetornoAnteriores + noRetornoAhora;
+  let nuevoEstado = prestamoActual.estado;
   let fechaDevolucion = prestamoActual.fecha_devolucion;
 
+  // 1. Forzado explícito a NO RETORNO total (100% no retorno)
   if (tipoAccion === 'no_retorno') {
     nuevoEstado = 'NO RETORNO';
     totalNoRetorno = nrPaletasPrestadas - devueltasAnteriores;
     fechaDevolucion = ahoraISO;
-  } else if (tipoAccion === 'cerrado_mixto') {
-    nuevoEstado = 'Cerrado mixto';
-    fechaDevolucion = ahoraISO;
   } else {
-    // Devolución normal
-    const pendientesRestantes = nrPaletasPrestadas - totalDevueltas - totalNoRetorno;
+    // Calculamos si la suma cubre el 100% de las prestadas
+    const totalLiquidado = totalDevueltas + totalNoRetorno;
+    const pendientesRestantes = nrPaletasPrestadas - totalLiquidado;
+
     if (pendientesRestantes <= 0) {
-      nuevoEstado = 'Devuelto';
+      // Caso 100% cubierto: ya no quedan pendientes
+      if (totalDevueltas > 0 && totalNoRetorno > 0) {
+        // DEVUELTAS + NO RETORNO = PRESTADAS (Mixto)
+        nuevoEstado = 'Cerrado mixto';
+      } else if (totalDevueltas === 0 && totalNoRetorno > 0) {
+        // 100% NO RETORNO
+        nuevoEstado = 'NO RETORNO';
+      } else {
+        // 100% DEVUELTO
+        nuevoEstado = 'Devuelto';
+      }
       fechaDevolucion = ahoraISO;
     } else {
+      // Caso donde DEVUELTAS + NO RETORNO < PRESTADAS (Aún hay pendientes)
+      // Como todavía hay saldo que no se sabe si volverá o no, el estado es PARCIAL
       nuevoEstado = 'Devolución Parcial';
+      fechaDevolucion = null;
     }
   }
 

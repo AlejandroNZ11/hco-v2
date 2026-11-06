@@ -932,11 +932,14 @@
   gap: 8px;
 }
 
-.tp-split-col.left-panel {
+/* Paneles izquierdo y derecho cubiertos con marco y fondo suave */
+.tp-split-col.left-panel,
+.tp-split-col.right-panel {
   background: #f8fafc;
-  padding: 14px;
+  padding: 16px;
   border-radius: 12px;
   border: 1px solid #eef2f6;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02);
 }
 
 .tp-panel-title {

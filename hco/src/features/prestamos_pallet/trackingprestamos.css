@@ -1205,6 +1205,54 @@
   color: #ffffff;
 }
 
+/* =========================================================================
+   MEJORAS VISUALES PARA MODAL DEVOLUCIÓN DE PALETAS
+   ========================================================================= */
+
+/* Grid de 2 columnas para campos dobles (Cantidad Devuelta / No Retorno, Cliente / Tipo Paleta) */
+.tracking-prestamos-page .tp-grid-2cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.tracking-prestamos-page .tp-grid-1col {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: 100%;
+}
+
+/* Fila interactiva para la Firma de Regreso */
+.tracking-prestamos-page .tp-firma-row-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.tracking-prestamos-page .tp-btn-firma-action {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 12px;
+  flex: 1;
+  justify-content: center;
+}
+
+.tracking-prestamos-page .tp-badge-status-pill {
+  height: 34px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+
 
 @media (max-width: 820px) {
   .tp-split-layout { flex-direction: column; }
@@ -1382,6 +1430,20 @@
     overflow-y: auto !important;
     padding: 10px 12px 28px !important;
     -webkit-overflow-scrolling: touch !important;
+  }
+    .tracking-prestamos-page .tp-split-layout {
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+
+  .tracking-prestamos-page .tp-grid-2cols {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .tracking-prestamos-page .tp-firma-row-wrapper {
+    flex-direction: row;
+    gap: 8px;
   }
 }
 

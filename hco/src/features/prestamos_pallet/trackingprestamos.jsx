@@ -180,6 +180,7 @@ export default function TrackingPrestamos() {
     setPaginaActual(1);
   };
 
+
  const handleExportarExcel = () => {
     if (prestamosFiltrados.length === 0) {
       return mostrarAviso('warning', 'Sin registros', 'No hay datos que coincidan con los filtros aplicados.');
@@ -270,6 +271,21 @@ export default function TrackingPrestamos() {
       return true;
     });
   }, [prestamos, filtrosActivos]);
+
+    // Extrae dinámicamente todas las áreas únicas que existan en la BD (OUTBOUND PRINCIPAL, OUTBOUND RETAIL, CLIENTE RECOGE, etc.)
+  const areasProcesoDisponibles = useMemo(() => {
+    const setAreas = new Set();
+    prestamos.forEach(r => {
+      if (r.area_proceso && String(r.area_proceso).trim() !== '') {
+        setAreas.add(String(r.area_proceso).trim());
+      }
+    });
+    // Si la lista estuviera vacía, dejamos las estándar por defecto
+    if (setAreas.size === 0) {
+      return ['OUTBOUND PRINCIPAL', 'OUTBOUND RETAIL', 'CLIENTE RECOGE'];
+    }
+    return Array.from(setAreas).sort();
+  }, [prestamos]);
 
   const totalPaginas = Math.max(1, Math.ceil(prestamosFiltrados.length / ITEMS_POR_PAGINA));
   const indiceInicio = (paginaActual - 1) * ITEMS_POR_PAGINA;
@@ -632,7 +648,7 @@ export default function TrackingPrestamos() {
             />
           </div>
 
-          {/* Área Proceso */}
+          {/* Área Proceso Dinámico */}
           <div className="filter-group filter-area">
             <label>Área Proceso</label>
             <select 
@@ -640,8 +656,9 @@ export default function TrackingPrestamos() {
               onChange={e => setFiltrosForm({ ...filtrosForm, areaProceso: e.target.value })}
             >
               <option value="Todas">Todas</option>
-              <option value="OUTBOUND PRINCIPAL">OUTBOUND PRINCIPAL</option>
-              <option value="CLIENTE RECOGE">CLIENTE RECOGE</option>
+              {areasProcesoDisponibles.map(area => (
+                <option key={area} value={area}>{area}</option>
+              ))}
             </select>
           </div>
 
@@ -820,8 +837,12 @@ export default function TrackingPrestamos() {
                           fontWeight: '700',
                           padding: '2px 6px',
                           borderRadius: '4px',
-                          background: r.area_proceso === 'CLIENTE RECOGE' ? '#f3e8ff' : '#e0f2fe',
-                          color: r.area_proceso === 'CLIENTE RECOGE' ? '#6b21a8' : '#0369a1'
+                          background: 
+                            r.area_proceso === 'CLIENTE RECOGE' ? '#f3e8ff' :
+                            r.area_proceso === 'OUTBOUND RETAIL' ? '#fef3c7' : '#e0f2fe',
+                          color: 
+                            r.area_proceso === 'CLIENTE RECOGE' ? '#6b21a8' :
+                            r.area_proceso === 'OUTBOUND RETAIL' ? '#b45309' : '#0369a1'
                         }}>
                           {r.area_proceso || '-'}
                         </span>
@@ -1282,8 +1303,11 @@ export default function TrackingPrestamos() {
               </button>
             </div>
 
-            <form onSubmit={handleGuardarDevolucion} className="tp-modal-body">
+<form onSubmit={handleGuardarDevolucion} className="tp-modal-body">
               <div className="tp-split-layout">
+                {/* =========================================================
+                    LADO IZQUIERDO: DATOS DE SALIDA
+                    ========================================================= */}
                 <div className="tp-split-col left-panel">
                   <div className="tp-panel-title">Datos de Salida</div>
 
@@ -1306,31 +1330,65 @@ export default function TrackingPrestamos() {
                     </div>
                   </div>
 
-                  <div className="tp-form-group">
-                    <label className="tp-label-small">Placa (Salida)</label>
-                    <input className="tp-input-readonly" value={prestamoSeleccionado.nro_placa} readOnly />
+                  {/* Placa (Salida) al costado de Conductor (Salida) */}
+                  <div className="tp-grid-2cols">
+                    <div className="tp-form-group">
+                      <label className="tp-label-small">Placa (Salida)</label>
+                      <input 
+                        className="tp-input-readonly" 
+                        value={prestamoSeleccionado.nro_placa} 
+                        readOnly 
+                      />
+                    </div>
+                    <div className="tp-form-group">
+                      <label className="tp-label-small">Conductor (Salida)</label>
+                      <input 
+                        className="tp-input-readonly" 
+                        value={prestamoSeleccionado.conductor_nombre || '-'} 
+                        readOnly 
+                      />
+                    </div>
                   </div>
+
+                  {/* 3. Cliente y Tipo Paleta (Solo OUTBOUND RETAIL) */}
+                  {prestamoSeleccionado.area_proceso === 'OUTBOUND RETAIL' && (
+                    <div className="tp-grid-2cols">
+                      <div className="tp-form-group">
+                        <label className="tp-label-small">Cliente</label>
+                        <input className="tp-input-readonly" value={prestamoSeleccionado.cliente_nombre || '-'} readOnly />
+                      </div>
+                      <div className="tp-form-group">
+                        <label className="tp-label-small">Tipo Paleta</label>
+                        <input className="tp-input-readonly" value={prestamoSeleccionado.tipo_paleta_nombre || '-'} readOnly />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. Despachador */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Despachador</label>
                     <input className="tp-input-readonly" value={prestamoSeleccionado.despachador} readOnly />
                   </div>
+
+                  {/* 5. Observación de salida */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Observación de salida</label>
                     <textarea className="tp-textarea-readonly" value={prestamoSeleccionado.observacion_salida || 'Sin observaciones'} rows={2} readOnly />
                   </div>
 
+                  {/* Evidencias de salida */}
                   <div className="tp-evidence-grid">
                     <div className="tp-evidence-box">
                       <span className="tp-evidence-title">Firma Salida</span>
                       {prestamoSeleccionado.firma_conductor ? (
                         <a href={prestamoSeleccionado.firma_conductor} target="_blank" rel="noopener noreferrer">
-                        <img 
+                          <img 
                             src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
                             alt="Firma" 
                             className="tp-evidence-img"
                             crossOrigin="anonymous"
                             referrerPolicy="no-referrer"
-                            />
+                          />
                         </a>
                       ) : (
                         <span className="tp-no-evidence">Sin firma</span>
@@ -1347,7 +1405,7 @@ export default function TrackingPrestamos() {
                             className="tp-evidence-img"
                             crossOrigin="anonymous"
                             referrerPolicy="no-referrer"
-                            />
+                          />
                         </a>
                       ) : (
                         <span className="tp-no-evidence">Sin foto</span>
@@ -1356,9 +1414,13 @@ export default function TrackingPrestamos() {
                   </div>
                 </div>
 
+                {/* =========================================================
+                    LADO DERECHO: DATOS PARA LA DEVOLUCIÓN (6 FILAS ORDENADAS)
+                    ========================================================= */}
                 <div className="tp-split-col right-panel">
                   <div className="tp-panel-title">Datos para la Devolución</div>
 
+                  {/* FILA 1: Tipo de Acción */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Tipo de Acción</label>
                     <select
@@ -1381,34 +1443,38 @@ export default function TrackingPrestamos() {
                     </select>
                   </div>
 
-                  <div className="tp-form-group">
-                    <label className="tp-label-small">Cantidad devuelta ahora</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="tp-input-clean"
-                      value={devData.cantidad_devuelta}
-                      onChange={e => setDevData({ ...devData, cantidad_devuelta: e.target.value })}
-                      disabled={modoLectura || devData.tipo_accion === 'no_retorno'}
-                      placeholder="Paletas que ingresan físicamente..."
-                    />
-                  </div>
-
-                  {esAdmin && (
+                  {/* FILA 2: Cantidad devuelta ahora - Cantidad no retorno (en la misma fila) */}
+                  <div className={`tp-grid-${esAdmin ? '2cols' : '1col'}`}>
                     <div className="tp-form-group">
-                      <label className="tp-label-small">Cantidad no retorno</label>
+                      <label className="tp-label-small">Cantidad devuelta ahora</label>
                       <input
                         type="number"
                         min="0"
                         className="tp-input-clean"
-                        value={devData.cantidad_noretorno}
-                        onChange={e => handleCambioNoRetorno(e.target.value)}
+                        value={devData.cantidad_devuelta}
+                        onChange={e => setDevData({ ...devData, cantidad_devuelta: e.target.value })}
                         disabled={modoLectura || devData.tipo_accion === 'no_retorno'}
-                        placeholder="Paletas que ya no volverán..."
+                        placeholder="Paletas que ingresan..."
                       />
                     </div>
-                  )}
 
+                    {esAdmin && (
+                      <div className="tp-form-group">
+                        <label className="tp-label-small">Cantidad no retorno</label>
+                        <input
+                          type="number"
+                          min="0"
+                          className="tp-input-clean"
+                          value={devData.cantidad_noretorno}
+                          onChange={e => handleCambioNoRetorno(e.target.value)}
+                          disabled={modoLectura || devData.tipo_accion === 'no_retorno'}
+                          placeholder="No volverán..."
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* FILA 3: Conductor (Regreso) */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Conductor (Regreso)</label>
                     <input
@@ -1421,42 +1487,64 @@ export default function TrackingPrestamos() {
                         setDevData({ ...devData, conductor_regreso: val, dni_conductor_retorno: condObj?.dni_conductor || '' });
                       }}
                       disabled={modoLectura}
-                      placeholder="Conductor..."
+                      placeholder="Buscar o ingresar conductor..."
                     />
-                    <datalist id="listaCondReg">{conductores.map(c => <option key={c.dni_conductor} value={c.nombre_conductor} />)}</datalist>
+                    <datalist id="listaCondReg">
+                      {conductores.map(c => (
+                        <option key={c.dni_conductor} value={c.nombre_conductor} />
+                      ))}
+                    </datalist>
                   </div>
 
+                  {/* FILA 4: Recibido por */}
+                  <div className="tp-form-group">
+                    <label className="tp-label-small">Recibido por</label>
+                    <input
+                      type="text"
+                      className="tp-input-clean"
+                      value={devData.recibido_por}
+                      onChange={e => setDevData({ ...devData, recibido_por: e.target.value })}
+                      disabled={modoLectura}
+                      placeholder="Nombre de quien recibe las paletas..."
+                      required
+                    />
+                  </div>
+
+                  {/* FILA 5: Firma de regreso (Botón + Badge en la misma fila) */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Firma de regreso</label>
-                    {!modoLectura && (
-                      <button 
-                        type="button" 
-                        className="tp-btn-secondary" 
-                        style={{ width: '100%', marginBottom: '6px' }}
-                        onClick={() => { setFirmaTarget('devolucion'); setModalFirmaVisible(true); }}
-                      >
-                        <FaEdit /> <span>Firmar Regreso</span>
-                      </button>
-                    )}
-                    <span className={`tp-badge-status-pill ${devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno ? 'operativo' : 'observado'}`}>
-                      {devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno ? 'Firma Lista' : 'Pendiente de firma'}
-                    </span>
+                    <div className="tp-firma-row-wrapper">
+                      {!modoLectura && (
+                        <button 
+                          type="button" 
+                          className="tp-btn-secondary tp-btn-firma-action" 
+                          onClick={() => { setFirmaTarget('devolucion'); setModalFirmaVisible(true); }}
+                        >
+                          <FaEdit /> <span>Firmar Regreso</span>
+                        </button>
+                      )}
+                      <span className={`tp-badge-status-pill ${devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno ? 'operativo' : 'observado'}`}>
+                        {devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno ? '✓ Firma Lista' : 'Pendiente de firma'}
+                      </span>
+                    </div>
                   </div>
 
+                  {/* FILA 6: Observación de regreso */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Observación de regreso</label>
                     <textarea
                       className="tp-textarea-clean"
                       value={devData.observacion_regreso}
                       onChange={e => setDevData({ ...devData, observacion_regreso: e.target.value })}
-                      rows={3}
+                      rows={2}
                       disabled={modoLectura}
                       placeholder="Motivo del cierre, diferencias o comentarios..."
                     />
                   </div>
 
+                  {/* Acciones finales */}
                   {!modoLectura && (
-                    <div className="tp-actions-row-end">
+                    <div className="tp-actions-row-end" style={{ marginTop: '4px' }}>
                       <button type="button" className="tp-btn-secondary" onClick={() => setModalDevVisible(false)}>
                         Cancelar
                       </button>
@@ -1468,6 +1556,7 @@ export default function TrackingPrestamos() {
                 </div>
               </div>
             </form>
+
           </div>
         </div>
       )}

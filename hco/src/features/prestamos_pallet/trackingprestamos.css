@@ -1433,7 +1433,7 @@
     height: 100% !important;
     max-height: none !important;
     overflow-y: auto !important;
-    padding: 12px 14px 60px !important;
+    padding: 10px 12px 40px !important;
     -webkit-overflow-scrolling: touch !important;
   }
     .tracking-prestamos-page .tp-split-layout {

@@ -469,35 +469,29 @@ export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {
   let nuevoEstado = prestamoActual.estado;
   let fechaDevolucion = prestamoActual.fecha_devolucion;
 
-  // 1. Forzado explícito a NO RETORNO total (100% no retorno)
+  // Si se selecciona explícitamente "NO RETORNO", todo el saldo pendiente restante pasa a No Retorno
   if (tipoAccion === 'no_retorno') {
-    nuevoEstado = 'NO RETORNO';
-    totalNoRetorno = nrPaletasPrestadas - devueltasAnteriores;
+    totalNoRetorno = Math.max(0, nrPaletasPrestadas - totalDevueltas);
+  }
+
+  // MISMA LÓGICA UNIVERSAL PARA RETAIL Y PRINCIPAL:
+  const totalLiquidado = totalDevueltas + totalNoRetorno;
+  const pendientesRestantes = nrPaletasPrestadas - totalLiquidado;
+
+  if (pendientesRestantes <= 0) {
+    // Liquidado al 100% (pendientes = 0)
+    if (totalDevueltas > 0 && totalNoRetorno > 0) {
+      nuevoEstado = 'Cerrado mixto'; // DEVUELTAS + NO RETORNO = PRESTADAS
+    } else if (totalDevueltas === 0 && totalNoRetorno > 0) {
+      nuevoEstado = 'NO RETORNO';    // 100% no retorno
+    } else {
+      nuevoEstado = 'Devuelto';      // 100% devuelto
+    }
     fechaDevolucion = ahoraISO;
   } else {
-    // Calculamos si la suma cubre el 100% de las prestadas
-    const totalLiquidado = totalDevueltas + totalNoRetorno;
-    const pendientesRestantes = nrPaletasPrestadas - totalLiquidado;
-
-    if (pendientesRestantes <= 0) {
-      // Caso 100% cubierto: ya no quedan pendientes
-      if (totalDevueltas > 0 && totalNoRetorno > 0) {
-        // DEVUELTAS + NO RETORNO = PRESTADAS (Mixto)
-        nuevoEstado = 'Cerrado mixto';
-      } else if (totalDevueltas === 0 && totalNoRetorno > 0) {
-        // 100% NO RETORNO
-        nuevoEstado = 'NO RETORNO';
-      } else {
-        // 100% DEVUELTO
-        nuevoEstado = 'Devuelto';
-      }
-      fechaDevolucion = ahoraISO;
-    } else {
-      // Caso donde DEVUELTAS + NO RETORNO < PRESTADAS (Aún hay pendientes)
-      // Como todavía hay saldo que no se sabe si volverá o no, el estado es PARCIAL
-      nuevoEstado = 'Devolución Parcial';
-      fechaDevolucion = null;
-    }
+    // Aún quedan paletas pendientes por regularizar
+    nuevoEstado = 'Devolución Parcial';
+    fechaDevolucion = null;
   }
 
   let urlFirmaRetorno = prestamoActual.firma_retorno || null;

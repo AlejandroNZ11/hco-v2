@@ -397,7 +397,7 @@
 .tracking-prestamos-page .table-container tbody tr:hover td { background-color: #f8fafc; }
 .tracking-prestamos-page .table-danger td { background-color: #fef2f2 !important; }
 
-/* BADGES ESTADO */
+/* BADGES ESTADO: CERRADO MIXTO EN VERDE IGUAL QUE DEVUELTO */
 .tracking-prestamos-page .badge-estado {
   display: inline-flex;
   align-items: center;
@@ -416,7 +416,13 @@
 .tracking-prestamos-page .badge-estado.parcial { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
 .tracking-prestamos-page .badge-estado.devuelto { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
 .tracking-prestamos-page .badge-estado.no-retorno { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
-.tracking-prestamos-page .badge-estado.cerrado-mixto { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+/* CERRADO MIXTO COLOR VERDE */
+.tracking-prestamos-page .badge-estado.cerrado-mixto { 
+  background: #dcfce7 !important; 
+  color: #15803d !important; 
+  border: 1px solid #bbf7d0 !important; 
+}
 
 /* ACCIONES EN FILA */
 .tracking-prestamos-page .acciones-cell {
@@ -465,7 +471,7 @@
 .tracking-prestamos-page .btn-accion-eye { background: #ffffff; border-color: #cbd5e1; color: #1e3a6d; }
 .tracking-prestamos-page .btn-accion-eye:hover { background: #f1f5f9; }
 
-/* Badge pequeño y estilizado para el conteo de placas y conductores */
+/* Badge conteo */
 .tp-subinfo-text {
   font-size: 10px;
   font-weight: 700;
@@ -481,13 +487,91 @@
 }
 
 /* =========================================================================
-   ESTILOS PARA EL MODAL DE AVISO FLOTANTE (ALERTAS: SUCCESS, DANGER, WARNING)
+   VISOR DE IMÁGENES AMPLIADAS (LIGHTBOX)
    ========================================================================= */
+.tp-evidence-preview-wrapper {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+.tp-evidence-preview-wrapper:hover .tp-evidence-img {
+  transform: scale(1.05);
+}
 
+.tp-zoom-hint {
+  font-size: 9px;
+  font-weight: 700;
+  color: #0284c7;
+  user-select: none;
+}
+
+.tp-lightbox-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1000000 !important;
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(5px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  box-sizing: border-box !important;
+  animation: tpFadeInAnim 0.2s ease-out;
+}
+
+.tp-lightbox-card {
+  background: #ffffff;
+  border-radius: 16px;
+  max-width: 600px;
+  width: 100%;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.tp-lightbox-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.tp-lightbox-header h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0b2239;
+}
+
+.tp-lightbox-body {
+  padding: 16px;
+  background-color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  max-height: 75vh;
+  overflow: auto;
+}
+.tp-lightbox-body img {
+  max-width: 100%;
+  max-height: 68vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* =========================================================================
+   AVISOS FLOTANTES DE ALERTA: CAPA MÁXIMA ABSOLUTA
+   ========================================================================= */
 .tw-modal-backdrop {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 2147483647 !important; /* Valor máximo permitido en navegadores (int32) */
+  z-index: 2147483647 !important;
   background-color: rgba(15, 23, 42, 0.75) !important;
   backdrop-filter: blur(6px) !important;
   display: flex !important;
@@ -523,7 +607,6 @@
   width: 100%;
 }
 
-/* Círculo del ícono de estado */
 .tw-modal-icon-circle {
   width: 54px;
   height: 54px;
@@ -541,20 +624,17 @@
   color: #15803d;
   border: 2px solid #bbf7d0;
 }
-
 .tw-modal-icon-circle.danger {
   background-color: #fee2e2;
   color: #dc2626;
   border: 2px solid #fecaca;
 }
-
 .tw-modal-icon-circle.warning {
   background-color: #fef3c7;
   color: #d97706;
   border: 2px solid #fde68a;
 }
 
-/* Textos de la alerta */
 .tw-modal-text {
   display: flex;
   flex-direction: column;
@@ -587,7 +667,6 @@
   text-align: left;
 }
 
-/* Pie y botón de confirmación */
 .tw-modal-footer {
   width: 100%;
   margin-top: 4px;
@@ -609,35 +688,20 @@
   justify-content: center;
 }
 
-.tw-modal-btn.success {
-  background-color: #15803d;
-}
-.tw-modal-btn.success:hover {
-  background-color: #166534;
-}
-
-.tw-modal-btn.danger {
-  background-color: #dc2626;
-}
-.tw-modal-btn.danger:hover {
-  background-color: #b91c1c;
-}
-
-.tw-modal-btn.warning {
-  background-color: #d97706;
-}
-.tw-modal-btn.warning:hover {
-  background-color: #b45309;
-}
-
+.tw-modal-btn.success { background-color: #15803d; }
+.tw-modal-btn.success:hover { background-color: #166534; }
+.tw-modal-btn.danger { background-color: #dc2626; }
+.tw-modal-btn.danger:hover { background-color: #b91c1c; }
+.tw-modal-btn.warning { background-color: #d97706; }
+.tw-modal-btn.warning:hover { background-color: #b45309; }
 
 /* =========================================================================
-   5. MODALES UNIFICADOS (tp- / INMUNES A CONFLICTOS)
+   MODALES BASE (tp-)
    ========================================================================= */
 .tp-modal-backdrop {
   position: fixed !important;
   inset: 0 !important;
-  z-index: 99990 !important; /* Capa intermedia para que los modales operen */
+  z-index: 99990 !important;
   background-color: rgba(15, 23, 42, 0.6) !important;
   backdrop-filter: blur(4px) !important;
   display: flex !important;
@@ -935,7 +999,6 @@
   gap: 8px;
 }
 
-/* Paneles izquierdo y derecho cubiertos con marco y fondo suave */
 .tp-split-col.left-panel,
 .tp-split-col.right-panel {
   background: #f8fafc;
@@ -1011,6 +1074,7 @@
   max-height: 55px;
   max-width: 100%;
   object-fit: contain;
+  transition: transform 0.2s ease;
 }
 
 .tp-no-evidence {
@@ -1035,7 +1099,7 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 14px;
-  margin-bottom: 0px; /* Margen inferior para que respire */
+  margin-bottom: 0px;
   padding-bottom: 10px;
 }
 
@@ -1215,11 +1279,6 @@
   color: #ffffff;
 }
 
-/* =========================================================================
-   MEJORAS VISUALES PARA MODAL DEVOLUCIÓN DE PALETAS
-   ========================================================================= */
-
-/* Grid de 2 columnas para campos dobles (Cantidad Devuelta / No Retorno, Cliente / Tipo Paleta) */
 .tracking-prestamos-page .tp-grid-2cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1233,7 +1292,6 @@
   width: 100%;
 }
 
-/* Fila interactiva para la Firma de Regreso */
 .tracking-prestamos-page .tp-firma-row-wrapper {
   display: flex;
   align-items: center;
@@ -1262,7 +1320,29 @@
   white-space: nowrap;
 }
 
+/* Caja de evidencia para la firma de regreso */
+.tracking-prestamos-page .tp-evidence-box-retorno {
+  background: #ffffff;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 65px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
 
+.tracking-prestamos-page .tp-evidence-box-retorno:hover {
+  border-color: #0f4c81;
+  background-color: #f1f5f9;
+}
+
+.tracking-prestamos-page .tp-evidence-box-retorno .tp-evidence-img {
+  max-height: 50px;
+  max-width: 100%;
+  object-fit: contain;
+}
 
 @media (max-width: 820px) {
   .tp-split-layout { flex-direction: column; }
@@ -1277,7 +1357,6 @@
     padding: 10px;
   }
 
-  /* 1°: Hero Card arriba y KPIs abajo en una sola fila continua */
   .tracking-prestamos-page .top-summary-grid {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -1309,7 +1388,6 @@
     font-size: 18px;
   }
 
-  /* 2°: Filtros en móvil: Buscar arriba ancho completo, Área y Estado en 2 columnas */
   .tracking-prestamos-page .filters-grid {
     grid-template-columns: 1fr 1fr;
     gap: 8px;
@@ -1320,17 +1398,15 @@
     grid-column: 1 / -1;
   }
 
-  /* OCULTAR EN MÓVIL: Empresa de transporte y Rango de fechas */
   .tracking-prestamos-page .filter-empresa,
   .tracking-prestamos-page .filter-fechas,
   .tracking-prestamos-page .date-range-group {
     display: none !important;
   }
 
-  /* BOTONES DE ACCIÓN: EN UNA SOLA FILA HORIZONTAL DE 3 BOTONES */
   .tracking-prestamos-page .filters-actions-row {
     display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important; /* 3 columnas iguales */
+    grid-template-columns: repeat(3, 1fr) !important;
     gap: 8px !important;
     width: 100% !important;
     margin-top: 4px;
@@ -1347,12 +1423,10 @@
     justify-content: center !important;
   }
 
-  /* Ocultar accesos secundarios en móvil */
   .tracking-prestamos-page .btn-extra-nav {
     display: none !important;
   }
 
-  /* 3°: BARRA TABLA EN MÓVIL (2 FILAS LIMPIAS) */
   .tracking-prestamos-page .table-topbar {
     display: flex !important;
     flex-direction: column !important;
@@ -1361,7 +1435,6 @@
     margin-bottom: 12px;
   }
 
-  /* Fila 1 móvil: "Mostrando 30 registros de 30" (izq) y "Exportar" (der) */
   .tracking-prestamos-page .table-topbar-row-header {
     display: flex !important;
     flex-direction: row !important;
@@ -1375,7 +1448,6 @@
     white-space: nowrap;
   }
 
-  /* Fila 2 móvil: Anterior | Página 1 de X | Siguiente */
   .tracking-prestamos-page .table-topbar-row-pagination {
     display: flex !important;
     flex-direction: row !important;
@@ -1401,18 +1473,16 @@
     padding: 8px !important;
   }
 
-  /* 2. Modales (Modificar y Auxiliar): Borde delgado lateral y tarjeta redondeada */
   .tp-modal-card.tp-modal-editar-despacho,
   .tp-modal-card.tp-modal-aux {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 auto !important;
     border-radius: 14px !important;
-    border: 1px solid #e2e8f0 !important; /* Borde delgado y sutil */
+    border: 1px solid #e2e8f0 !important;
     box-shadow: 0 10px 25px rgba(15, 23, 42, 0.2) !important;
   }
 
-  /* 3. Modal Devolución: Este sí se mantiene 100% pegado (pantalla completa) */
   .tp-modal-card.tp-modal-devolucion {
     position: fixed !important;
     inset: 0 !important;
@@ -1441,7 +1511,8 @@
     padding: 10px 12px 40px !important;
     -webkit-overflow-scrolling: touch !important;
   }
-    .tracking-prestamos-page .tp-split-layout {
+
+  .tracking-prestamos-page .tp-split-layout {
     flex-direction: column !important;
     gap: 14px !important;
   }
@@ -1459,9 +1530,8 @@
   .tracking-prestamos-page .tp-actions-row-end {
     margin-top: 16px !important;
     margin-bottom: 24px !important;
-    padding-bottom: env(safe-area-inset-bottom, 20px) !important; /* Respeta la barra inferior de iPhone/Android */
+    padding-bottom: env(safe-area-inset-bottom, 20px) !important;
   }
-
 }
 
 @keyframes twAlertPop {

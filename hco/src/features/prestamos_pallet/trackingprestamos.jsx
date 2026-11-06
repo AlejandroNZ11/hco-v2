@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight, FaIdCard, FaTruck, FaUserTie,
-  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaFileExcel
+  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaFileExcel, FaTimes
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './trackingprestamos.css';
@@ -99,6 +99,9 @@ export default function TrackingPrestamos() {
     foto_salida_base64: ''
   });
 
+  // Modal Visor de Imagen Ampliada (Firma o Foto)
+  const [imagenModal, setImagenModal] = useState({ visible: false, url: '', titulo: '' });
+
   // Canvas Firma
   const [modalFirmaVisible, setModalFirmaVisible] = useState(false);
   const [firmaTarget, setFirmaTarget] = useState('devolucion');
@@ -180,13 +183,11 @@ export default function TrackingPrestamos() {
     setPaginaActual(1);
   };
 
-
- const handleExportarExcel = () => {
+  const handleExportarExcel = () => {
     if (prestamosFiltrados.length === 0) {
       return mostrarAviso('warning', 'Sin registros', 'No hay datos que coincidan con los filtros aplicados.');
     }
 
-    // 1. Mapeo de columnas con nombres limpios y datos formateados
     const dataAExportar = prestamosFiltrados.map((r, i) => ({
       'N°': i + 1,
       'ID Préstamo': r.id_prestamo || '',
@@ -209,20 +210,15 @@ export default function TrackingPrestamos() {
       'Observación Regreso': r.observacion_regreso || ''
     }));
 
-    // 2. Crear hoja de cálculo a partir del JSON
     const worksheet = XLSX.utils.json_to_sheet(dataAExportar);
-
-    // 3. Ajustar el ancho automático de las columnas para que no salgan comprimidas
     const anchosColumnas = Object.keys(dataAExportar[0] || {}).map(key => ({
       wch: Math.max(key.length, 14)
     }));
     worksheet['!cols'] = anchosColumnas;
 
-    // 4. Crear el libro de trabajo y adjuntar la hoja
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Tracking Préstamos');
 
-    // 5. Descargar archivo con extensión .xlsx nativa
     const nombreArchivo = `Tracking_Prestamos_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(workbook, nombreArchivo);
   };
@@ -272,7 +268,6 @@ export default function TrackingPrestamos() {
     });
   }, [prestamos, filtrosActivos]);
 
-    // Extrae dinámicamente todas las áreas únicas que existan en la BD (OUTBOUND PRINCIPAL, OUTBOUND RETAIL, CLIENTE RECOGE, etc.)
   const areasProcesoDisponibles = useMemo(() => {
     const setAreas = new Set();
     prestamos.forEach(r => {
@@ -280,7 +275,6 @@ export default function TrackingPrestamos() {
         setAreas.add(String(r.area_proceso).trim());
       }
     });
-    // Si la lista estuviera vacía, dejamos las estándar por defecto
     if (setAreas.size === 0) {
       return ['OUTBOUND PRINCIPAL', 'OUTBOUND RETAIL', 'CLIENTE RECOGE'];
     }
@@ -338,7 +332,6 @@ export default function TrackingPrestamos() {
     e.preventDefault();
     if (!prestamoSeleccionado) return;
 
-    // Validación estricta para CLIENTE RECOGE: exactamente 6 dígitos alfanuméricos sin guiones
     if (prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE') {
       const placaLimpia = (editDespachoData.nro_placa || '').replace(/[^A-Za-z0-9]/g, '').trim();
       if (placaLimpia.length !== 6) {
@@ -350,7 +343,6 @@ export default function TrackingPrestamos() {
       }
     }
 
-    // 1. Ocultar el modal de inmediato y activar loading
     setModalEditarDespachoVisible(false);
     setLoading(true);
 
@@ -362,7 +354,6 @@ export default function TrackingPrestamos() {
       await cargarDatos();
       mostrarAviso('success', 'Registro Actualizado', 'Los datos del despacho han sido modificados.');
     } catch (err) {
-      // Si ocurre un error, reabre el modal para no perder los datos escritos
       setModalEditarDespachoVisible(true);
       mostrarAviso('danger', 'Error al editar', err.message);
     } finally {
@@ -399,15 +390,15 @@ export default function TrackingPrestamos() {
     setPrestamoSeleccionado(item);
     setModoLectura(soloLectura);
 
+    // Iniciar siempre en 'devolucion' para que evalúe limpiamente sin trabarse en NO RETORNO
     let tipoInicial = 'devolucion';
-    if (item.estado === 'NO RETORNO') tipoInicial = 'no_retorno';
     if (item.estado === 'Cerrado mixto') tipoInicial = 'cerrado_mixto';
 
     setDevData({
       tipo_accion: tipoInicial,
       cantidad_devuelta: '',
       cantidad_noretorno: '',
-      recibido_por: item.recibido_por || currentUser?.nombre || currentUser?.usuario || 'Usuario',
+      recibido_por: currentUser?.nombre || currentUser?.usuario || item.recibido_por || 'Usuario',
       conductor_regreso: item.conductor_retorno_nombre || '',
       dni_conductor_retorno: item.conductor_retorno || '',
       observacion_regreso: item.observacion_regreso || '',
@@ -418,23 +409,17 @@ export default function TrackingPrestamos() {
     setModalDevVisible(true);
   };
 
-  // Detección automática en el modal al tipear devueltas y no retorno
   const calcularTipoAccionAuto = (cantDev, cantNoRet, totalPendientes) => {
     const dev = Number(cantDev || 0);
     const noRet = Number(cantNoRet || 0);
     const sumaAhora = dev + noRet;
 
-    // Solo si cubre el total de las pendientes y hay de ambos tipos es Cerrado Mixto
     if (sumaAhora >= totalPendientes && dev > 0 && noRet > 0) {
       return 'cerrado_mixto';
     }
-
-    // Si cubre el 100% solo con no retorno
     if (sumaAhora >= totalPendientes && noRet > 0 && dev === 0) {
       return 'no_retorno';
     }
-
-    // En cualquier otro caso donde aún queden pendientes o sea retorno normal
     return 'devolucion';
   };
 
@@ -458,14 +443,13 @@ export default function TrackingPrestamos() {
     }));
   };
 
-const handleGuardarDevolucion = async (e) => {
+  const handleGuardarDevolucion = async (e) => {
     e.preventDefault();
     if (!prestamoSeleccionado) return;
     const cantDev = Number(devData.cantidad_devuelta || 0);
     const cantNoRet = Number(devData.cantidad_noretorno || 0);
     const pendientes = Number(prestamoSeleccionado.paletas_pendientes || 0);
 
-    // 1. Validar que ingrese al menos un movimiento
     if (cantDev <= 0 && cantNoRet <= 0 && devData.tipo_accion !== 'no_retorno') {
       return mostrarAviso(
         'warning', 
@@ -474,7 +458,6 @@ const handleGuardarDevolucion = async (e) => {
       );
     }
 
-    // 2. Validar que no exceda las paletas pendientes
     if (cantDev + cantNoRet > pendientes) {
       return mostrarAviso(
         'warning', 
@@ -483,7 +466,6 @@ const handleGuardarDevolucion = async (e) => {
       );
     }
 
-    // 3. REGLA OBLIGATORIA: Si ingresa Cantidad Devuelta (> 0)
     if (cantDev > 0) {
       if (!devData.conductor_regreso.trim()) {
         return mostrarAviso(
@@ -501,7 +483,6 @@ const handleGuardarDevolucion = async (e) => {
       }
     }
 
-    // 4. REGLA OBLIGATORIA: Si ingresa Cantidad No Retorno (> 0) o es Cierre Mixto / No Retorno
     if (cantNoRet > 0 || devData.tipo_accion === 'no_retorno' || devData.tipo_accion === 'cerrado_mixto') {
       if (!devData.observacion_regreso.trim()) {
         return mostrarAviso(
@@ -512,7 +493,6 @@ const handleGuardarDevolucion = async (e) => {
       }
     }
 
-    // Ocultar modal de inmediato y activar loading
     setModalDevVisible(false);
     setLoading(true);
 
@@ -616,35 +596,6 @@ const handleGuardarDevolucion = async (e) => {
   return (
     <div className="tracking-prestamos-page">
       {loading && <Loading />}
-
-      {/* AVISO FLOTANTE */}
-      {avisoFlotante.visible && (
-        <div className="tw-modal-backdrop" onClick={cerrarAviso}>
-          <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>
-            <div className="tw-modal-header">
-              <div className={`tw-modal-icon-circle ${avisoFlotante.tipo}`}>
-                {avisoFlotante.tipo === 'danger' && <span>✖</span>}
-                {avisoFlotante.tipo === 'warning' && <span>⚠️</span>}
-                {avisoFlotante.tipo === 'success' && <span>✔</span>}
-              </div>
-              <div className="tw-modal-text">
-                <h3 className="tw-modal-title">{avisoFlotante.titulo}</h3>
-                <p className="tw-modal-desc">{avisoFlotante.mensaje}</p>
-                {avisoFlotante.detalleExtra && (
-                  <div className="tw-modal-extra-box" style={{ marginTop: '8px' }}>
-                    {avisoFlotante.detalleExtra}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="tw-modal-footer">
-              <button type="button" className={`tw-modal-btn ${avisoFlotante.tipo}`} onClick={cerrarAviso}>
-                Entendido
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* TOP HEADER & RESUMEN: AL COSTADO EN LAPTOP, ABAJO EN MÓVIL */}
       <div className="top-summary-grid">
@@ -770,7 +721,9 @@ const handleGuardarDevolucion = async (e) => {
           <button type="button" className="btn-action-secondary" onClick={handleLimpiarFiltros}>
             <FaUndo /> <span>Limpiar</span>
           </button>
-          {!esExterno && (
+          
+          {/* VISIBLE SOLO PARA ROLES ADMINISTRATIVOS (OCULTO PARA USUARIO REGULAR) */}
+          {esAdmin && (
             <>
               <button type="button" className="btn-action-primary btn-extra-nav" onClick={() => navigate('/conductores/tracking')}>
                 <FaIdCard /> <span>Conductores</span>
@@ -789,10 +742,9 @@ const handleGuardarDevolucion = async (e) => {
         </div>
       </section>
 
-{/* TABLA CON PAGINACIÓN Y EXPORTAR EXCEL */}
+      {/* TABLA CON PAGINACIÓN Y EXPORTAR EXCEL */}
       <section className="table-section-card">
         <div className="table-topbar">
-          {/* Fila 1: Contador a la izquierda y Botón Exportar a la derecha */}
           <div className="table-topbar-row-header">
             <span className="records-counter">
               Mostrando <strong>{prestamosPaginados.length}</strong> registros de <strong>{prestamosFiltrados.length}</strong>
@@ -803,7 +755,6 @@ const handleGuardarDevolucion = async (e) => {
             </button>
           </div>
 
-          {/* Fila 2: Botón Anterior, Página X de Y, Botón Siguiente */}
           <div className="table-topbar-row-pagination">
             <button 
               type="button" 
@@ -859,7 +810,7 @@ const handleGuardarDevolucion = async (e) => {
             <tbody>
               {prestamosPaginados.length === 0 ? (
                 <tr>
-                  <td colSpan="15" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
+                  <td colSpan="16" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
                     No se encontraron registros de préstamos.
                   </td>
                 </tr>
@@ -956,8 +907,7 @@ const handleGuardarDevolucion = async (e) => {
             </tbody>
           </table>
         </div>
-        </section>
-
+      </section>
 
       {/* ================= MODAL EDITAR DESPACHO ================= */}
       {modalEditarDespachoVisible && prestamoSeleccionado && (
@@ -984,7 +934,6 @@ const handleGuardarDevolucion = async (e) => {
             <form onSubmit={handleGuardarEdicionDespacho} className="tp-modal-body">
               {prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? (
                 <>
-                  {/* Placa de Vehículo: Obligatorio, exactamente 6 caracteres alfanuméricos sin guion */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">
                       Placa de Vehículo <span style={{ color: '#dc2626' }}>* (6 caracteres)</span>
@@ -994,7 +943,6 @@ const handleGuardarDevolucion = async (e) => {
                       className="tp-input-clean"
                       value={editDespachoData.nro_placa}
                       onChange={e => {
-                        // Elimina guiones, espacios y caracteres especiales; solo letras y números, máx 6
                         const limpia = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 6);
                         setEditDespachoData({ ...editDespachoData, nro_placa: limpia });
                       }}
@@ -1039,7 +987,7 @@ const handleGuardarDevolucion = async (e) => {
                     <div className="tp-label-row">
                       <label className="tp-label-small">Placa</label>
                       {editDespachoData.empresa_transporte_id && (
-                        <span className="tp-subinfo-text">({placasFiltradasEmpresa.length} asociadas)</span>
+                        <span className="tp-subinfo-text">{placasFiltradasEmpresa.length} asociadas</span>
                       )}
                     </div>
                     <select
@@ -1066,7 +1014,7 @@ const handleGuardarDevolucion = async (e) => {
                     <div className="tp-label-row">
                       <label className="tp-label-small">Conductor</label>
                       {editDespachoData.empresa_transporte_id && (
-                        <span className="tp-subinfo-text">({conductoresFiltradosEmpresa.length} asociados)</span>
+                        <span className="tp-subinfo-text">{conductoresFiltradosEmpresa.length} asociados</span>
                       )}
                     </div>
                     <select
@@ -1352,11 +1300,9 @@ const handleGuardarDevolucion = async (e) => {
               </button>
             </div>
 
-<form onSubmit={handleGuardarDevolucion} className="tp-modal-body">
+            <form onSubmit={handleGuardarDevolucion} className="tp-modal-body">
               <div className="tp-split-layout">
-                {/* =========================================================
-                    LADO IZQUIERDO: DATOS DE SALIDA
-                    ========================================================= */}
+                {/* LADO IZQUIERDO: DATOS DE SALIDA */}
                 <div className="tp-split-col left-panel">
                   <div className="tp-panel-title">Datos de Salida</div>
 
@@ -1379,27 +1325,17 @@ const handleGuardarDevolucion = async (e) => {
                     </div>
                   </div>
 
-                  {/* Placa (Salida) al costado de Conductor (Salida) */}
                   <div className="tp-grid-2cols">
                     <div className="tp-form-group">
                       <label className="tp-label-small">Placa (Salida)</label>
-                      <input 
-                        className="tp-input-readonly" 
-                        value={prestamoSeleccionado.nro_placa} 
-                        readOnly 
-                      />
+                      <input className="tp-input-readonly" value={prestamoSeleccionado.nro_placa} readOnly />
                     </div>
                     <div className="tp-form-group">
                       <label className="tp-label-small">Conductor (Salida)</label>
-                      <input 
-                        className="tp-input-readonly" 
-                        value={prestamoSeleccionado.conductor_nombre || '-'} 
-                        readOnly 
-                      />
+                      <input className="tp-input-readonly" value={prestamoSeleccionado.conductor_nombre || '-'} readOnly />
                     </div>
                   </div>
 
-                  {/* 3. Cliente y Tipo Paleta (Solo OUTBOUND RETAIL) */}
                   {prestamoSeleccionado.area_proceso === 'OUTBOUND RETAIL' && (
                     <div className="tp-grid-2cols">
                       <div className="tp-form-group">
@@ -1413,24 +1349,30 @@ const handleGuardarDevolucion = async (e) => {
                     </div>
                   )}
 
-                  {/* 4. Despachador */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Despachador</label>
                     <input className="tp-input-readonly" value={prestamoSeleccionado.despachador} readOnly />
                   </div>
 
-                  {/* 5. Observación de salida */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Observación de salida</label>
                     <textarea className="tp-textarea-readonly" value={prestamoSeleccionado.observacion_salida || 'Sin observaciones'} rows={2} readOnly />
                   </div>
 
-                  {/* Evidencias de salida */}
+                  {/* MINIATURAS INTERACTIVAS: AL TOCAR SE ABRE EL VISOR SIN IRSE A DRIVE */}
                   <div className="tp-evidence-grid">
                     <div className="tp-evidence-box">
                       <span className="tp-evidence-title">Firma Salida</span>
                       {prestamoSeleccionado.firma_conductor ? (
-                        <a href={prestamoSeleccionado.firma_conductor} target="_blank" rel="noopener noreferrer">
+                        <div 
+                          className="tp-evidence-preview-wrapper"
+                          onClick={() => setImagenModal({
+                            visible: true,
+                            url: `https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`,
+                            titulo: 'Firma del Conductor (Salida)'
+                          })}
+                          title="Tocar para ampliar firma"
+                        >
                           <img 
                             src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_conductor)}`} 
                             alt="Firma" 
@@ -1438,7 +1380,8 @@ const handleGuardarDevolucion = async (e) => {
                             crossOrigin="anonymous"
                             referrerPolicy="no-referrer"
                           />
-                        </a>
+                         
+                        </div>
                       ) : (
                         <span className="tp-no-evidence">Sin firma</span>
                       )}
@@ -1447,7 +1390,15 @@ const handleGuardarDevolucion = async (e) => {
                     <div className="tp-evidence-box">
                       <span className="tp-evidence-title">Foto Salida</span>
                       {prestamoSeleccionado.foto_salida ? (
-                        <a href={prestamoSeleccionado.foto_salida} target="_blank" rel="noopener noreferrer">
+                        <div 
+                          className="tp-evidence-preview-wrapper"
+                          onClick={() => setImagenModal({
+                            visible: true,
+                            url: `https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`,
+                            titulo: 'Fotografía de Salida'
+                          })}
+                          title="Tocar para ampliar foto"
+                        >
                           <img 
                             src={`https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.foto_salida)}`} 
                             alt="Foto" 
@@ -1455,7 +1406,8 @@ const handleGuardarDevolucion = async (e) => {
                             crossOrigin="anonymous"
                             referrerPolicy="no-referrer"
                           />
-                        </a>
+                         
+                        </div>
                       ) : (
                         <span className="tp-no-evidence">Sin foto</span>
                       )}
@@ -1463,13 +1415,10 @@ const handleGuardarDevolucion = async (e) => {
                   </div>
                 </div>
 
-                {/* =========================================================
-                    LADO DERECHO: DATOS PARA LA DEVOLUCIÓN (6 FILAS ORDENADAS)
-                    ========================================================= */}
+                {/* LADO DERECHO: DATOS PARA LA DEVOLUCIÓN */}
                 <div className="tp-split-col right-panel">
                   <div className="tp-panel-title">Datos para la Devolución</div>
 
-                  {/* FILA 1: Tipo de Acción */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Tipo de Acción</label>
                     <select
@@ -1481,7 +1430,7 @@ const handleGuardarDevolucion = async (e) => {
                       <option value="devolucion">Registrar Devolución Normal</option>
                       {esAdmin && (
                         <>
-                          <option value="cerrado_mixto" style={{ color: '#d97706', fontWeight: 'bold' }}>
+                          <option value="cerrado_mixto" style={{ color: '#15803d', fontWeight: 'bold' }}>
                             Cierre Forzado (Cerrado mixto)
                           </option>
                           <option value="no_retorno" style={{ color: '#dc2626', fontWeight: 'bold' }}>
@@ -1492,7 +1441,6 @@ const handleGuardarDevolucion = async (e) => {
                     </select>
                   </div>
 
-                  {/* FILA 2: Cantidad devuelta ahora - Cantidad no retorno (en la misma fila) */}
                   <div className={`tp-grid-${esAdmin ? '2cols' : '1col'}`}>
                     <div className="tp-form-group">
                       <label className="tp-label-small">Cantidad devuelta ahora</label>
@@ -1504,7 +1452,7 @@ const handleGuardarDevolucion = async (e) => {
                         onChange={e => handleCambioDevuelta(e.target.value)}
                         disabled={modoLectura || devData.tipo_accion === 'no_retorno'}
                         placeholder="Paletas que ingresan..."
-                        />
+                      />
                     </div>
 
                     {esAdmin && (
@@ -1523,7 +1471,6 @@ const handleGuardarDevolucion = async (e) => {
                     )}
                   </div>
 
-                  {/* FILA 3: Conductor (Regreso) */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Conductor (Regreso)</label>
                     <input
@@ -1545,7 +1492,6 @@ const handleGuardarDevolucion = async (e) => {
                     </datalist>
                   </div>
 
-                  {/* FILA 4: Recibido por (Bloqueado sin permisos de edición) */}
                   <div className="tp-form-group">
                     <div className="tp-label-row">
                       <label className="tp-label-small">Recibido por</label>
@@ -1556,11 +1502,11 @@ const handleGuardarDevolucion = async (e) => {
                       className="tp-input-readonly"
                       value={devData.recibido_por}
                       readOnly
-                      title="Campo bloqueado: asignado automáticamente al usuario en sesión"
+                      title="Asignado automáticamente al usuario en sesión"
                     />
                   </div>
 
-                  {/* FILA 5: Firma de regreso (Botón + Badge en la misma fila) */}
+                  {/* FILA 5: Firma de regreso con visualizador y ampliación */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Firma de regreso</label>
                     <div className="tp-firma-row-wrapper">
@@ -1570,16 +1516,47 @@ const handleGuardarDevolucion = async (e) => {
                           className="tp-btn-secondary tp-btn-firma-action" 
                           onClick={() => { setFirmaTarget('devolucion'); setModalFirmaVisible(true); }}
                         >
-                          <FaEdit /> <span>Firmar Regreso</span>
+                          <FaEdit /> <span>{devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno ? 'Cambiar Firma' : 'Firmar Regreso'}</span>
                         </button>
                       )}
                       <span className={`tp-badge-status-pill ${devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno ? 'operativo' : 'observado'}`}>
                         {devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno ? '✓ Firma Lista' : 'Pendiente de firma'}
                       </span>
                     </div>
+
+                    {/* MINIATURA DE LA FIRMA DE REGRESO (Se muestra si existe en Base64 o Drive) */}
+                    {(devData.firma_retorno_base64 || prestamoSeleccionado.firma_retorno) && (
+                      <div className="tp-evidence-box tp-evidence-box-retorno" style={{ marginTop: '8px' }}>
+                        {(() => {
+                          const urlImg = devData.firma_retorno_base64 
+                            ? devData.firma_retorno_base64 
+                            : `https://lh3.googleusercontent.com/d/${extraerIdDrive(prestamoSeleccionado.firma_retorno)}`;
+
+                          return (
+                            <div 
+                              className="tp-evidence-preview-wrapper"
+                              onClick={() => setImagenModal({
+                                visible: true,
+                                url: urlImg,
+                                titulo: `Firma del Conductor - Regreso (${prestamoSeleccionado.id_prestamo})`
+                              })}
+                              title="Tocar para ampliar firma de regreso"
+                            >
+                              <img 
+                                src={urlImg} 
+                                alt="Firma de Regreso" 
+                                className="tp-evidence-img"
+                                crossOrigin="anonymous"
+                                referrerPolicy="no-referrer"
+                              />
+                             
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
 
-                  {/* FILA 6: Observación de regreso */}
                   <div className="tp-form-group">
                     <label className="tp-label-small">Observación de regreso</label>
                     <textarea
@@ -1592,7 +1569,6 @@ const handleGuardarDevolucion = async (e) => {
                     />
                   </div>
 
-                  {/* Acciones finales */}
                   {!modoLectura && (
                     <div className="tp-actions-row-end" style={{ marginTop: '4px' }}>
                       <button type="button" className="tp-btn-secondary" onClick={() => setModalDevVisible(false)}>
@@ -1606,12 +1582,11 @@ const handleGuardarDevolucion = async (e) => {
                 </div>
               </div>
             </form>
-
           </div>
         </div>
       )}
 
-      {/* ================= MODAL FIRMA ================= */}
+      {/* ================= MODAL FIRMA CANVAS ================= */}
       {modalFirmaVisible && (
         <div className="tw-modal-backdrop" onClick={() => {
           setModalFirmaVisible(false);
@@ -1669,6 +1644,38 @@ const handleGuardarDevolucion = async (e) => {
         </div>
       )}
 
+      {/* =========================================================
+          MODAL LIGHTBOX: VISOR DE FOTO / FIRMA AMPLIADA CON "X"
+          ========================================================= */}
+      {imagenModal.visible && (
+        <div className="tp-lightbox-backdrop" onClick={() => setImagenModal({ visible: false, url: '', titulo: '' })}>
+          <div className="tp-lightbox-card" onClick={e => e.stopPropagation()}>
+            <div className="tp-lightbox-header">
+              <h4>{imagenModal.titulo}</h4>
+              <button 
+                type="button" 
+                className="tp-btn-close" 
+                onClick={() => setImagenModal({ visible: false, url: '', titulo: '' })}
+                title="Cerrar visor"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="tp-lightbox-body">
+              <img 
+                src={imagenModal.url} 
+                alt={imagenModal.titulo} 
+                crossOrigin="anonymous" 
+                referrerPolicy="no-referrer" 
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          AVISO FLOTANTE DE ALERTA: AL FINAL DEL DOM PARA ESTAR AL FRENTE
+          ========================================================= */}
       {avisoFlotante.visible && (
         <div className="tw-modal-backdrop" onClick={cerrarAviso}>
           <div className="tw-modal-card-alert" onClick={e => e.stopPropagation()}>

@@ -358,7 +358,7 @@ export default function Menu() {
             buttonText: "Entrar",
             image: "/img/palet.jpg",
             url: "/prestamos/tracking",
-            estado: "En Proceso",
+            estado: "Activo",
           },
         ],
       },

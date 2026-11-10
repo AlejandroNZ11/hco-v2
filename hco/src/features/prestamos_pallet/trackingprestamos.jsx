@@ -153,7 +153,7 @@ export default function TrackingPrestamos() {
     setModalGaritaVisible(true);
   };
 
-  const handleGuardarGarita = async (e) => {
+   const handleGuardarGarita = async (e) => {
     e.preventDefault();
     if (!prestamoSeleccionado) return;
 
@@ -168,6 +168,7 @@ export default function TrackingPrestamos() {
       await registrarControlGarita(prestamoSeleccionado.uuid, {
         estado_garita: garitaData.estado_garita,
         comentario_garita: garitaData.comentario_garita,
+        comentario_anterior: prestamoSeleccionado.comentario_garita, // <-- Conserva la evidencia anterior
         usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Seguridad'
       });
       await cargarDatos();
@@ -1786,6 +1787,26 @@ export default function TrackingPrestamos() {
             </div>
 
             <form onSubmit={handleGuardarGarita} className="tp-modal-body">
+              
+              {/* >>>>> AQUÍ VA EXACTAMENTE EL BLOQUE QUE ME MOSTRASTE <<<<< */}
+              {/* ALERTA VISUAL SI YA EXISTE UN COMENTARIO PREVIO DE NO CONFORME */}
+              {prestamoSeleccionado.comentario_garita && (
+                <div style={{
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  fontSize: '11.5px',
+                  color: '#991b1b'
+                }}>
+                  <strong>⚠️ Antecedente registrado en garita:</strong>
+                  <div style={{ marginTop: '3px', color: '#7f1d1d' }}>
+                    {prestamoSeleccionado.comentario_garita}
+                  </div>
+                </div>
+              )}
+
               <div className="tp-garita-status-selector">
                 <button
                   type="button"
@@ -1811,6 +1832,7 @@ export default function TrackingPrestamos() {
                   </div>
                 </button>
               </div>
+              {/* >>>>> FIN DEL BLOQUE <<<<< */}
 
               <div className="tp-form-group" style={{ marginTop: '12px' }}>
                 <div className="tp-label-row">

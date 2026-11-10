@@ -897,16 +897,35 @@ export const obtenerAreaEmpleadoPorIdentificador = async (identificador) => {
 
 
 // =========================================================================
-// REGISTRAR CHECK DE SALIDA EN GARITA (ROL EXTERNO / SEGURIDAD)
+// REGISTRAR CHECK DE SALIDA EN GARITA (CONCATENA HISTORIAL DE EVIDENCIA)
 // =========================================================================
-export const registrarControlGarita = async (uuidPrestamo, { estado_garita, comentario_garita, usuario_actualiza }) => {
+export const registrarControlGarita = async (uuidPrestamo, { estado_garita, comentario_garita, comentario_anterior, usuario_actualiza }) => {
   const ahoraISO = obtenerFechaHoraPeruISO();
+  const fechaPeruLegible = new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' });
+
+  let comentarioFinal = '';
+  const obsPrevia = String(comentario_anterior || '').trim();
+  const obsNueva = String(comentario_garita || '').trim();
+
+  if (obsPrevia) {
+    if (obsNueva && obsNueva !== obsPrevia) {
+      // Si ya había observación previa (ej. No Conforme) y agrega una nueva al dar Conforme
+      comentarioFinal = `${obsPrevia} | [${fechaPeruLegible} - ${usuario_actualiza}]: ${obsNueva}`;
+    } else if (estado_garita === 'Conforme' && obsPrevia.includes('[OBSERVACIÓN PREVIA') === false) {
+      // Si pasa a Conforme sin escribir nuevo texto, se sella el antecedente
+      comentarioFinal = `[OBSERVACIÓN PREVIA]: ${obsPrevia} | [REGULARIZADO CONFORME el ${fechaPeruLegible} por ${usuario_actualiza}]`;
+    } else {
+      comentarioFinal = obsPrevia;
+    }
+  } else {
+    comentarioFinal = obsNueva ? `[${fechaPeruLegible} - ${usuario_actualiza}]: ${obsNueva}` : '';
+  }
 
   const { data, error } = await supabase
     .from('prestamos')
     .update({
       estado_garita,
-      comentario_garita: comentario_garita ? String(comentario_garita).trim() : null,
+      comentario_garita: comentarioFinal || null,
       usuario_actualiza,
       fecha_actualiza: ahoraISO
     })

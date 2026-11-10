@@ -148,14 +148,19 @@ const esRegistroActivo = (item) => {
   return true;
 };
 
+// =========================================================================
+// 1. OBTENER DATOS MAESTROS (INCLUYE EMPLEADOS Y ÁREAS)
+// =========================================================================
 export const obtenerDatosMaestrosPrestamos = async () => {
   try {
-    const [resEmp, resCond, resPlac, resCli, resTip] = await Promise.all([
+    const [resEmp, resCond, resPlac, resCli, resTip, resEmpleados, resAreas] = await Promise.all([
       supabase.from('empresas_transporte').select('*'),
       supabase.from('conductores').select('*'),
       supabase.from('placas').select('*'),
       supabase.from('clientes').select('*'),
-      supabase.from('tipos_paleta').select('*')
+      supabase.from('tipos_paleta').select('*'),
+      supabase.from('empleados').select('nombre, usuario, dni, area_id'),
+      supabase.from('areas').select('*')
     ]);
 
     if (resEmp.error && resCond.error && resPlac.error) {
@@ -167,6 +172,8 @@ export const obtenerDatosMaestrosPrestamos = async () => {
     const placasActivas = (resPlac.data || []).filter(esRegistroActivo);
     const clientesActivos = (resCli.data || []).filter(esRegistroActivo);
     const tiposPaleta = resTip.data || [];
+    const empleados = resEmpleados.data || [];
+    const areas = resAreas.data || [];
 
     const empresas = empresasActivas.sort((a, b) =>
       String(a.nombre_empresa || '').localeCompare(String(b.nombre_empresa || ''), 'es', { sensitivity: 'base' })
@@ -203,7 +210,7 @@ export const obtenerDatosMaestrosPrestamos = async () => {
       String(a.nombre_tipo || '').localeCompare(String(b.nombre_tipo || ''), 'es', { sensitivity: 'base' })
     );
 
-    const dataMaestra = { empresas, conductores, placas, clientes, tipos_paleta };
+    const dataMaestra = { empresas, conductores, placas, clientes, tipos_paleta, empleados, areas };
 
     try {
       localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify(dataMaestra));
@@ -230,7 +237,6 @@ export const crearPrestamoPallet = async (payload) => {
   const esRegistroParcial = esClienteRecoge || esOutboundPrincipal;
 
   const retornaBool = payload.retorno === 'SI' || payload.retorno === true;
-
   const estadoInicial = esRegistroParcial 
     ? 'Por despachar' 
     : (retornaBool ? 'Pendiente' : 'NO RETORNO');
@@ -244,26 +250,18 @@ export const crearPrestamoPallet = async (payload) => {
   let nroPlacaFinal = String(payload.nro_placa || '').trim().toUpperCase();
   let observacionFinal = payload.observacion_salida || '';
 
-  // CASO ESPECIAL: CLIENTE RECOGE (No crea ni placa ni conductor en tablas maestras)
   if (esClienteRecoge) {
     if (!empresaIdFinal) {
       empresaIdFinal = await obtenerOcrearEmpresaOther(payload.usuario_registra);
     }
-
     dniConductorFinal = null;
-
-    // Guardar placa y chofer dentro de observación de salida para evitar foreign keys
     const metaRecoge = [];
     if (payload.conductor_nombre) metaRecoge.push(`[CONDUCTOR RECOGE: ${payload.conductor_nombre.trim().toUpperCase()}]`);
     if (nroPlacaFinal) metaRecoge.push(`[PLACA RECOGE: ${nroPlacaFinal}]`);
-    
-    // nro_placa se manda null para no violar prestamos_nro_placa_fkey
     nroPlacaFinal = null; 
 
     const prefixRecoge = metaRecoge.join(' ');
-    observacionFinal = observacionFinal 
-      ? `${prefixRecoge} - ${observacionFinal}`
-      : prefixRecoge;
+    observacionFinal = observacionFinal ? `${prefixRecoge} - ${observacionFinal}` : prefixRecoge;
   }
 
   if (Array.isArray(payload.clientes_multiples) && payload.clientes_multiples.length > 0) {
@@ -273,6 +271,14 @@ export const crearPrestamoPallet = async (payload) => {
       : `[CLIENTES: ${listadoTexto}]`;
   }
 
+  // RESOLVER EL ÁREA REAL DESDE LA TABLA 'areas' (NUNCA USAR AREA_PROCESO)
+  let areaFinal = String(payload.area_registrador || '').trim();
+  const valoresInvalidos = ['OUTBOUND PRINCIPAL', 'OUTBOUND RETAIL', 'CLIENTE RECOGE', 'OPERACIONES', 'OUTBOUND', 'EMPTY', ''];
+  if (valoresInvalidos.includes(areaFinal.toUpperCase())) {
+    const areaDetectada = await obtenerAreaEmpleadoPorIdentificador(payload.usuario_registra);
+    areaFinal = areaDetectada || '';
+  }
+
   const datosInsertar = {
     fecha_entrega: ahoraISO,
     fecha_retorno: fechaRetornoISO,
@@ -280,7 +286,7 @@ export const crearPrestamoPallet = async (payload) => {
     dni_conductor: dniConductorFinal,
     nr_ruta: String(payload.nr_ruta || '').trim(),
     nro_placa: nroPlacaFinal,
-    despachador: payload.despachador,
+    despachador: payload.despachador || (esRegistroParcial ? 'Por despachar' : payload.usuario_registra),
     nr_paletas: Number(payload.nr_paletas || 0),
     estado: estadoInicial,
     nr_paletas_devueltas: 0,
@@ -288,7 +294,7 @@ export const crearPrestamoPallet = async (payload) => {
     observacion_salida: observacionFinal,
     cliente_id: payload.cliente_id || null,
     tipo_paleta_id: payload.tipo_paleta_id ? Number(payload.tipo_paleta_id) : null,
-    area_registrador: payload.area_registrador || '',
+    area_registrador: areaFinal, // <-- GUARDA EL NOMBRE EXACTO DE LA TABLA 'areas'
     area_proceso: payload.area_proceso,
     retorno: retornaBool,
     usuario_registra: payload.usuario_registra,
@@ -306,7 +312,6 @@ export const crearPrestamoPallet = async (payload) => {
   }
 
   const idPrestamo = prestamoCreado.id_prestamo;
-
   if (payload.firma_conductor_base64 || payload.foto_salida_base64) {
     const token = await obtenerAccessTokenGoogleDrive();
 
@@ -353,6 +358,20 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
   const cliMap = Object.fromEntries((maestros.clientes || []).map(c => [String(c.id), c.nombre_cliente]));
   const tipMap = Object.fromEntries((maestros.tipos_paleta || []).map(t => [String(t.id), t.nombre_tipo]));
 
+  // Mapa id -> nombre de la tabla areas
+  const areasMap = Object.fromEntries(
+    (maestros.areas || []).map(a => [String(a.id), a.nombre || ''])
+  );
+
+  // Mapa empleado (dni, usuario, nombre) -> nombre del área
+  const empAreaMap = {};
+  (maestros.empleados || []).forEach(emp => {
+    const areaNombre = areasMap[String(emp.area_id)] || '';
+    if (emp.dni) empAreaMap[String(emp.dni).trim()] = areaNombre;
+    if (emp.usuario) empAreaMap[String(emp.usuario).toLowerCase().trim()] = areaNombre;
+    if (emp.nombre) empAreaMap[String(emp.nombre).toLowerCase().trim()] = areaNombre;
+  });
+
   const hoy = new Date();
 
   const listaFormateada = (resPrest.data || []).map(row => {
@@ -364,23 +383,29 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
     const estaCerrado = ['Devuelto', 'NO RETORNO', 'Cerrado mixto', 'Por despachar'].includes(row.estado);
     const atrasado = !estaCerrado && fechaRetornoDate && hoy > fechaRetornoDate;
 
-    // Si el estado es NO RETORNO, pendientes es 0; si no, calcula restando devueltas y no retorno
     const paletasPendientesCalc = (row.estado === 'NO RETORNO') 
       ? 0 
       : Math.max(0, prestadas - devueltasAcumuladas - noRetornoAcumulado);
 
-    // Extracción de Conductor si es CLIENTE RECOGE
     let conductorFinal = condMap[String(row.dni_conductor)] || row.dni_conductor || '';
     if (!conductorFinal && row.observacion_salida) {
       const matchConductor = row.observacion_salida.match(/\[CONDUCTOR RECOGE:\s*([^\]]+)\]/i);
       if (matchConductor) conductorFinal = matchConductor[1].trim();
     }
 
-    // Extracción de Placa si es CLIENTE RECOGE
     let placaFinal = row.nro_placa || '';
     if (!placaFinal && row.observacion_salida) {
       const matchPlaca = row.observacion_salida.match(/\[PLACA RECOGE:\s*([^\]]+)\]/i);
       if (matchPlaca) placaFinal = matchPlaca[1].trim();
+    }
+
+    // Corregir valores guardados incorrectamente (CLIENTE RECOGE, OUTBOUND RETAIL, EMPTY, etc.)
+    let areaRegistradorFinal = String(row.area_registrador || '').trim();
+    const esInvalido = ['OUTBOUND PRINCIPAL', 'OUTBOUND RETAIL', 'CLIENTE RECOGE', 'OPERACIONES', 'OUTBOUND', 'EMPTY', ''].includes(areaRegistradorFinal.toUpperCase());
+
+    if (esInvalido && row.usuario_registra) {
+      const areaRecuperada = empAreaMap[String(row.usuario_registra).toLowerCase().trim()] || '';
+      if (areaRecuperada) areaRegistradorFinal = areaRecuperada;
     }
 
     return {
@@ -392,6 +417,7 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
       conductor_retorno_nombre: condMap[String(row.conductor_retorno)] || row.conductor_retorno || '',
       cliente_nombre: cliMap[String(row.cliente_id)] || '',
       tipo_paleta_nombre: tipMap[String(row.tipo_paleta_id)] || '',
+      area_registrador: areaRegistradorFinal || '-',
       fecha_retorno_calculada: fechaRetornoDate ? fechaRetornoDate.toISOString() : null,
       atrasado
     };
@@ -399,6 +425,8 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
 
   return listaFormateada;
 };
+
+
 
 // =========================================================================
 // 2.1 COMPLETAR DESPACHO AUXILIAR (FASE 2)
@@ -757,4 +785,112 @@ export const actualizarRegistroPorDespachar = async (prestamoActual, payload) =>
 
   if (error) throw new Error(`Error al actualizar préstamo por despachar: ${error.message}`);
   return data;
+};
+
+
+// Obtener el nombre del área del usuario a partir de su sesión o de la tabla empleados
+export const obtenerNombreAreaUsuario = async (currentUser, areaProcesoFallback = '') => {
+  try {
+    // 1. Si ya viene el texto directamente en el usuario
+    if (currentUser?.area_nombre) return currentUser.area_nombre;
+    if (currentUser?.area && isNaN(currentUser.area)) return currentUser.area;
+
+    // 2. Si viene el area_id en el usuario en sesión
+    const areaId = currentUser?.area_id;
+    if (areaId) {
+      const { data: areaData } = await supabase
+        .from('areas')
+        .select('nombre, nombre_area')
+        .eq('id', areaId)
+        .maybeSingle();
+
+      if (areaData) {
+        return areaData.nombre || areaData.nombre_area || areaProcesoFallback;
+      }
+    }
+
+    // 3. Si en authUser solo tenemos el dni o usuario, buscamos su área en la tabla empleados
+    const identificador = currentUser?.dni || currentUser?.usuario || currentUser?.id;
+    if (identificador) {
+      const { data: emp } = await supabase
+        .from('empleados')
+        .select('area_id')
+        .or(`dni.eq.${identificador},usuario.eq.${identificador}`)
+        .maybeSingle();
+
+      if (emp?.area_id) {
+        const { data: areaData } = await supabase
+          .from('areas')
+          .select('nombre, nombre_area')
+          .eq('id', emp.area_id)
+          .maybeSingle();
+
+        if (areaData) return areaData.nombre || areaData.nombre_area || areaProcesoFallback;
+      }
+    }
+  } catch (err) {
+    console.warn('No se pudo resolver el nombre del área:', err);
+  }
+
+  // Fallback seguro: el área del proceso seleccionado
+  return areaProcesoFallback || 'OUTBOUND';
+};
+
+
+// =========================================================================
+// BUSCAR EL ÁREA REAL DEL EMPLEADO (EMPLEADOS.AREA_ID -> AREAS.NOMBRE)
+// =========================================================================
+export const obtenerAreaEmpleadoPorIdentificador = async (identificador) => {
+  if (!identificador || String(identificador).trim() === '' || identificador === 'Por despachar') {
+    return '';
+  }
+  const term = String(identificador).trim();
+
+  try {
+    let emp = null;
+
+    // 1. Buscar en empleados por DNI
+    const resDni = await supabase
+      .from('empleados')
+      .select('area_id')
+      .eq('dni', term)
+      .maybeSingle();
+    emp = resDni.data;
+
+    // 2. Si no encuentra por DNI, buscar por usuario
+    if (!emp) {
+      const resUser = await supabase
+        .from('empleados')
+        .select('area_id')
+        .eq('usuario', term)
+        .maybeSingle();
+      emp = resUser.data;
+    }
+
+    // 3. Si no, buscar por nombre exacto o parcial
+    if (!emp) {
+      const resNom = await supabase
+        .from('empleados')
+        .select('area_id')
+        .ilike('nombre', `%${term}%`)
+        .maybeSingle();
+      emp = resNom.data;
+    }
+
+    // 4. Con el area_id, obtener el nombre real de la tabla 'areas'
+    if (emp?.area_id) {
+      const { data: areaData } = await supabase
+        .from('areas')
+        .select('nombre')
+        .eq('id', emp.area_id)
+        .maybeSingle();
+
+      if (areaData?.nombre) {
+        return String(areaData.nombre).trim().toUpperCase();
+      }
+    }
+  } catch (err) {
+    console.error('Error al resolver área en Supabase:', err);
+  }
+  return '';
 };

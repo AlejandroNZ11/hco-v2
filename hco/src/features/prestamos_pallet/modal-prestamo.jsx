@@ -10,7 +10,9 @@ import {
   buscarConductorPorDni,
   guardarConductorMaestro,
   buscarPlacaPorNro,
-  guardarPlacaMaestra
+  guardarPlacaMaestra,
+  obtenerNombreAreaUsuario,
+  obtenerAreaEmpleadoPorIdentificador
 } from '../../services/prestamosService';
 
 function getStoredAuthUser() {
@@ -434,16 +436,56 @@ export default function ModalPrestamo() {
       }
     }
 
+    // 1. Obtener el área real a la que pertenece el usuario en sesión
+    let areaRegistradorFinal = '';
+    try {
+      let areaId = currentUser?.area_id;
+
+      // Si no viene area_id en el localStorage, lo buscamos en empleados por su usuario/dni
+      if (!areaId) {
+        const idUsuario = currentUser?.usuario || currentUser?.dni || currentUser?.nombre;
+        const { data: empData } = await supabase
+          .from('empleados')
+          .select('area_id')
+          .or(`usuario.eq."${idUsuario}",dni.eq."${idUsuario}",nombre.eq."${idUsuario}"`)
+          .maybeSingle();
+        if (empData?.area_id) areaId = empData.area_id;
+      }
+
+      if (areaId) {
+        const { data: areaObj } = await supabase
+          .from('areas')
+          .select('*')
+          .eq('id', Number(areaId))
+          .maybeSingle();
+
+        if (areaObj) {
+          areaRegistradorFinal = areaObj.nombre || areaObj.nombre_area || areaObj.area || '';
+        }
+      }
+    } catch (e) {
+      console.warn('Error resolviendo área del empleado:', e);
+    }
+
     setLoading(true);
     try {
+      // 1. Obtener el área del empleado consultando su DNI/Usuario/Nombre
+      const identificadorUsuario = currentUser?.dni || currentUser?.usuario || currentUser?.nombre || currentUser?.id;
+      const areaNombreReal = await obtenerAreaEmpleadoPorIdentificador(identificadorUsuario);
+
+      const despachadorInicial = esOutboundRetail 
+        ? nombreUsuarioActual 
+        : 'Por despachar';
+
       const payloadEnvio = {
         ...formData,
-        cliente_id: esOutboundRetail ? clienteIdFinal : null, // <--- AQUÍ ESTABA EL ERROR: AHORA SÍ VIAJA EL ID
+        despachador: despachadorInicial,
+        cliente_id: esOutboundRetail ? clienteIdFinal : null,
         tipo_paleta_id: esOutboundRetail ? (formData.tipo_paleta_id ? Number(formData.tipo_paleta_id) : null) : null,
         retorno: esClienteRecoge ? 'NO' : formData.retorno,
         clientes_multiples: esOutboundPrincipal ? clientesSeleccionados : null,
         usuario_registra: nombreUsuarioActual,
-        area_registrador: currentUser?.area || ''
+        area_registrador: areaNombreReal // <-- GUARDA EL NOMBRE DE LA TABLA 'areas' (Ej: INVENTARIOS, ALMACEN)
       };
 
       const creado = await crearPrestamoPallet(payloadEnvio);
@@ -461,7 +503,7 @@ export default function ModalPrestamo() {
     } finally {
       setLoading(false);
     }
-    
+
   };
 
   return (

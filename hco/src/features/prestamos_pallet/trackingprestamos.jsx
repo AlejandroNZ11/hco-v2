@@ -767,7 +767,8 @@ export default function TrackingPrestamos() {
 
         {/* Acciones de los filtros */}
         <div className="filters-actions-row">
-          {!esExterno && (
+          {/* VISIBLE SOLO PARA ROLES ADMINISTRATIVOS (OCULTO PARA USUARIO Y EXTERNO) */}
+          {esAdmin && (
             <button type="button" className="btn-action-primary" onClick={() => navigate('/prestamos/nuevo')}>
               <FaPlus /> <span>Registrar</span>
             </button>

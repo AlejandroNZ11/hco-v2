@@ -1344,6 +1344,195 @@
   object-fit: contain;
 }
 
+/* =========================================================================
+   ESTILOS PARA BOTÓN Y MODAL DE SALIDA EN GARITA
+   ========================================================================= */
+
+/* Botón de acción Garita en la tabla */
+.tracking-prestamos-page .btn-accion-garita {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+.tracking-prestamos-page .btn-accion-garita:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.tracking-prestamos-page .btn-accion-garita.ok {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+.tracking-prestamos-page .btn-accion-garita.alerta {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Badges Estado Garita */
+.tracking-prestamos-page .badge-garita {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 95px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.tracking-prestamos-page .badge-garita.conforme {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.tracking-prestamos-page .badge-garita.no-conforme {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.tracking-prestamos-page .badge-garita.pendiente-garita {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px dashed #cbd5e1;
+}
+
+/* Modal Garita Card */
+.tp-modal-card.tp-modal-garita {
+  max-width: 480px;
+  width: 100%;
+}
+
+.tp-garita-status-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.btn-garita-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.btn-garita-option .icon-circulo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.btn-garita-option strong {
+  display: block;
+  font-size: 13.5px;
+  color: #0f172a;
+}
+.btn-garita-option small {
+  display: block;
+  font-size: 10.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* Conforme Activo */
+.btn-garita-option.conforme .icon-circulo {
+  background: #dcfce7;
+  color: #15803d;
+}
+.btn-garita-option.conforme.selected {
+  border-color: #15803d;
+  background: #f0fdf4;
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.12);
+}
+
+/* No Conforme Activo */
+.btn-garita-option.no-conforme .icon-circulo {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.btn-garita-option.no-conforme.selected {
+  border-color: #dc2626;
+  background: #fef2f2;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+/* =========================================================================
+   ESTILOS DE BLOQUEO Y ESTADOS DE BOTONES EN ACCIONES
+   ========================================================================= */
+
+/* Botón bloqueado en gris para externo / sin permisos */
+.tracking-prestamos-page .btn-accion-bloqueado {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border: 1px solid #e2e8f0 !important;
+  cursor: not-allowed !important;
+  opacity: 0.65;
+}
+
+/* Botón de garita */
+.tracking-prestamos-page .btn-accion-garita {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* 1. Botón garita bloqueado / en gris */
+.tracking-prestamos-page .btn-accion-garita.inactivo {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  border: 1px solid #e2e8f0 !important;
+  cursor: not-allowed !important;
+  opacity: 0.65;
+}
+
+/* 2. Botón garita pendiente interactivo */
+.tracking-prestamos-page .btn-accion-garita.pendiente {
+  background: #f8fafc;
+  color: #475569;
+  border: 1.5px dashed #cbd5e1;
+}
+.tracking-prestamos-page .btn-accion-garita.pendiente:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* 3. Botón garita conforme activo (solo SuperAdmin cuando ya salió) */
+.tracking-prestamos-page .btn-accion-garita.ok {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border: 1px solid #bbf7d0 !important;
+}
+.tracking-prestamos-page .btn-accion-garita.ok:hover {
+  background: #bbf7d0 !important;
+}
+
+/* 4. Botón garita no conforme activo (alerta para volver a evaluar) */
+.tracking-prestamos-page .btn-accion-garita.alerta {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+.tracking-prestamos-page .btn-accion-garita.alerta:hover {
+  background: #fecaca !important;
+}
+
 @media (max-width: 820px) {
   .tp-split-layout { flex-direction: column; }
   .tp-modal-card.tp-modal-devolucion { max-width: 95%; }

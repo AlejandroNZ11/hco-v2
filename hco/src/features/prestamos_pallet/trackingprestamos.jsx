@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight, FaIdCard, FaTruck, FaUserTie,
-  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaFileExcel, FaTimes
+  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaFileExcel, FaTimes, FaShieldAlt
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './trackingprestamos.css';
@@ -13,7 +13,8 @@ import {
   registrarDevolucionPrestamo,
   obtenerDatosMaestrosPrestamos,
   completarDespachoAuxiliar,
-  actualizarRegistroPorDespachar
+  actualizarRegistroPorDespachar,
+  registrarControlGarita
 } from '../../services/prestamosService';
 
 function getStoredAuthUser() {
@@ -127,9 +128,57 @@ export default function TrackingPrestamos() {
     if (typeof cb === 'function') cb();
   };
 
+  // Detección de Rol y Cargo (Seguridad / Externo)
   const rolUsuario = String(currentUser?.rol || currentUser?.role || '').trim().toUpperCase();
+  const cargoUsuario = String(currentUser?.cargo_nombre || currentUser?.cargo || '').trim().toUpperCase();
+  const esSuperAdmin = ['SUPERADMIN', 'SUPER_ADMIN'].includes(rolUsuario);
   const esAdmin = ROLES_ADMIN.includes(rolUsuario);
   const esExterno = rolUsuario === 'EXTERNO';
+
+  const esSeguridadGarita = esExterno || cargoUsuario.includes('SEGURIDAD');
+
+  // Estado del modal de garita
+  const [modalGaritaVisible, setModalGaritaVisible] = useState(false);
+  const [garitaData, setGaritaData] = useState({
+    estado_garita: 'Conforme',
+    comentario_garita: ''
+  });
+
+  const abrirModalGarita = (item) => {
+    setPrestamoSeleccionado(item);
+    setGaritaData({
+      estado_garita: item.estado_garita === 'No Conforme' ? 'No Conforme' : 'Conforme',
+      comentario_garita: item.comentario_garita || ''
+    });
+    setModalGaritaVisible(true);
+  };
+
+  const handleGuardarGarita = async (e) => {
+    e.preventDefault();
+    if (!prestamoSeleccionado) return;
+
+    if (garitaData.estado_garita === 'No Conforme' && !garitaData.comentario_garita.trim()) {
+      return mostrarAviso('warning', 'Comentario obligatorio', 'Debe ingresar el motivo por el cual la salida es No Conforme.');
+    }
+
+    setModalGaritaVisible(false);
+    setLoading(true);
+
+    try {
+      await registrarControlGarita(prestamoSeleccionado.uuid, {
+        estado_garita: garitaData.estado_garita,
+        comentario_garita: garitaData.comentario_garita,
+        usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Seguridad'
+      });
+      await cargarDatos();
+      mostrarAviso('success', 'Control de Garita Guardado', `Salida registrada como: ${garitaData.estado_garita}`);
+    } catch (err) {
+      setModalGaritaVisible(true);
+      mostrarAviso('danger', 'Error en garita', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentUser) { navigate('/'); return; }
@@ -593,6 +642,13 @@ export default function TrackingPrestamos() {
     return <span className="badge-estado pendiente">Pendiente</span>;
   };
 
+  const renderBadgeGarita = (estado) => {
+    const e = String(estado || '').trim();
+    if (e === 'Conforme') return <span className="badge-garita conforme">Conforme</span>;
+    if (e === 'No Conforme') return <span className="badge-garita no-conforme">No Conforme</span>;
+    return <span className="badge-garita pendiente-garita">Pendiente</span>;
+  };
+
   return (
     <div className="tracking-prestamos-page">
       {loading && <Loading />}
@@ -803,8 +859,9 @@ export default function TrackingPrestamos() {
                 <th>No Retorno</th>
                 <th>Pendientes</th>
                 <th>Estado</th>
+                <th>Estado Garita</th>
                 <th>Fecha devolución</th>
-                <th style={{ textAlign: 'center', width: '80px' }}>Acciones</th>
+                <th style={{ textAlign: 'center', width: '90px' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -857,20 +914,38 @@ export default function TrackingPrestamos() {
                       </td>
                       <td style={{ fontWeight: 700, color: Number(r.paletas_pendientes) > 0 ? '#dc2626' : '#16a34a' }}>{r.paletas_pendientes}</td>
                       <td>{renderBadgeEstado(r.estado)}</td>
+                      <td>{renderBadgeGarita(r.estado_garita)}</td>
                       <td>{fDev}</td>
                       <td style={{ textAlign: 'center' }}>
                         <div className="acciones-cell">
+                          {/* 1. BOTÓN WRENCH (Modificar Registro - Solo Admin en Por despachar) */}
                           <button
                             type="button"
-                            className={`btn-tabla-accion btn-accion-wrench ${puedeEditarDespacho ? 'activo' : 'inactivo'}`}
-                            onClick={() => puedeEditarDespacho && abrirModalEditarDespacho(r)}
-                            disabled={!puedeEditarDespacho}
-                            title={puedeEditarDespacho ? 'Modificar datos de salida' : 'Disponible solo en estado "Por despachar"'}
+                            className={`btn-tabla-accion btn-accion-wrench ${puedeEditarDespacho && !esExterno ? 'activo' : 'inactivo'}`}
+                            onClick={() => puedeEditarDespacho && !esExterno && abrirModalEditarDespacho(r)}
+                            disabled={!puedeEditarDespacho || esExterno}
+                            title={
+                              esExterno 
+                                ? 'Sin permisos de edición' 
+                                : puedeEditarDespacho 
+                                  ? 'Modificar datos de salida' 
+                                  : 'Disponible solo en estado "Por despachar"'
+                            }
                           >
                             <FaWrench />
                           </button>
 
-                          {esPorDespachar ? (
+                          {/* 2. BOTÓN DEVOLUCIÓN / DESPACHO (BLOQUEADO EN GRIS PARA EXTERNO) */}
+                          {esExterno ? (
+                            <button
+                              type="button"
+                              className="btn-tabla-accion btn-accion-bloqueado"
+                              disabled
+                              title="Acceso restringido para personal de garita / externo"
+                            >
+                              <FaEdit />
+                            </button>
+                          ) : esPorDespachar ? (
                             <button
                               type="button"
                               className="btn-tabla-accion btn-accion-despacho"
@@ -898,6 +973,46 @@ export default function TrackingPrestamos() {
                               <FaEdit />
                             </button>
                           )}
+
+                          {/* 3. BOTÓN GARITA (CONTROL DE SALIDA) */}
+                          {(() => {
+                            const esConforme = r.estado_garita === 'Conforme';
+                            const esNoConforme = r.estado_garita === 'No Conforme';
+
+                            // Permiso de clic:
+                            // SuperAdmin siempre puede editar
+                            // Externo solo puede interactuar si NO está Conforme (si ya está Conforme, queda bloqueado)
+                            // Admin, Supervisor y Usuario regular nunca pueden interactuar (solo lectura/bloqueado)
+                            const puedeEditarGarita = esSuperAdmin || (esExterno && !esConforme);
+
+                            let claseEstilo = 'btn-accion-garita inactivo';
+                            if (puedeEditarGarita) {
+                              if (esConforme) claseEstilo = 'btn-accion-garita ok';
+                              else if (esNoConforme) claseEstilo = 'btn-accion-garita alerta';
+                              else claseEstilo = 'btn-accion-garita pendiente';
+                            } else {
+                              // Bloqueado en gris
+                              claseEstilo = 'btn-accion-garita inactivo';
+                            }
+
+                            const textoTooltip = !esExterno && !esSuperAdmin
+                              ? 'Acceso exclusivo para Garita (Externo) y SuperAdmin'
+                              : esExterno && esConforme
+                                ? 'Camión con salida conforme (Bloqueado)'
+                                : 'Control de Salida de Garita';
+
+                            return (
+                              <button
+                                type="button"
+                                className={`btn-tabla-accion ${claseEstilo}`}
+                                onClick={() => puedeEditarGarita && abrirModalGarita(r)}
+                                disabled={!puedeEditarGarita}
+                                title={textoTooltip}
+                              >
+                                <FaShieldAlt />
+                              </button>
+                            );
+                          })()}
                         </div>
                       </td>
                     </tr>
@@ -1640,6 +1755,93 @@ export default function TrackingPrestamos() {
                 <FaSave /> <span>Guardar firma</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          MODAL CHECK DE SALIDA DE GARITA
+          ========================================================= */}
+      {modalGaritaVisible && prestamoSeleccionado && (
+        <div className="tp-modal-backdrop" onClick={() => setModalGaritaVisible(false)}>
+          <div className="tp-modal-card tp-modal-garita" onClick={e => e.stopPropagation()}>
+            <div className="tp-modal-header">
+              <div className="tp-modal-header-titles">
+                <span className="tp-badge-pill" style={{ background: '#fef3c7', color: '#b45309' }}>
+                  CONTROL DE VIGILANCIA
+                </span>
+                <h3 className="tp-modal-title">Salida de Garita ({prestamoSeleccionado.id_prestamo})</h3>
+                <small className="tp-modal-subinfo">
+                  Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> &nbsp;|&nbsp; Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong>
+                </small>
+              </div>
+              <button 
+                type="button" 
+                className="tp-btn-close" 
+                onClick={() => setModalGaritaVisible(false)}
+                title="Cerrar modal"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleGuardarGarita} className="tp-modal-body">
+              <div className="tp-garita-status-selector">
+                <button
+                  type="button"
+                  className={`btn-garita-option conforme ${garitaData.estado_garita === 'Conforme' ? 'selected' : ''}`}
+                  onClick={() => setGaritaData(prev => ({ ...prev, estado_garita: 'Conforme' }))}
+                >
+                  <span className="icon-circulo">✔</span>
+                  <div>
+                    <strong>Conforme</strong>
+                    <small>Salida autorizada sin novedades</small>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn-garita-option no-conforme ${garitaData.estado_garita === 'No Conforme' ? 'selected' : ''}`}
+                  onClick={() => setGaritaData(prev => ({ ...prev, estado_garita: 'No Conforme' }))}
+                >
+                  <span className="icon-circulo">✖</span>
+                  <div>
+                    <strong>No Conforme</strong>
+                    <small>Observado en garita</small>
+                  </div>
+                </button>
+              </div>
+
+              <div className="tp-form-group" style={{ marginTop: '12px' }}>
+                <div className="tp-label-row">
+                  <label className="tp-label-small">Comentario / Motivo de Garita</label>
+                  <span className={`tp-tag-pill ${garitaData.estado_garita === 'No Conforme' ? 'obligatorio' : 'opcional'}`}>
+                    {garitaData.estado_garita === 'No Conforme' ? 'OBLIGATORIO' : 'OPCIONAL'}
+                  </span>
+                </div>
+                <textarea
+                  className="tp-textarea-clean"
+                  value={garitaData.comentario_garita}
+                  onChange={e => setGaritaData({ ...garitaData, comentario_garita: e.target.value })}
+                  rows={3}
+                  placeholder={
+                    garitaData.estado_garita === 'No Conforme'
+                      ? 'Escriba obligatoriamente el motivo de la observación...'
+                      : 'Observaciones adicionales de garita (opcional)...'
+                  }
+                  required={garitaData.estado_garita === 'No Conforme'}
+                />
+              </div>
+
+              <div className="tp-actions-row-end" style={{ marginTop: '10px' }}>
+                <button type="button" className="tp-btn-secondary" onClick={() => setModalGaritaVisible(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="tp-btn-primary" disabled={loading}>
+                  <FaSave /> <span>Guardar Control</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

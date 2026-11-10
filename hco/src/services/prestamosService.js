@@ -894,3 +894,26 @@ export const obtenerAreaEmpleadoPorIdentificador = async (identificador) => {
   }
   return '';
 };
+
+
+// =========================================================================
+// REGISTRAR CHECK DE SALIDA EN GARITA (ROL EXTERNO / SEGURIDAD)
+// =========================================================================
+export const registrarControlGarita = async (uuidPrestamo, { estado_garita, comentario_garita, usuario_actualiza }) => {
+  const ahoraISO = obtenerFechaHoraPeruISO();
+
+  const { data, error } = await supabase
+    .from('prestamos')
+    .update({
+      estado_garita,
+      comentario_garita: comentario_garita ? String(comentario_garita).trim() : null,
+      usuario_actualiza,
+      fecha_actualiza: ahoraISO
+    })
+    .eq('uuid', uuidPrestamo)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Error en control de garita: ${error.message}`);
+  return data;
+};

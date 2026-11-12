@@ -267,10 +267,43 @@ export default function ModalPrestamo() {
   };
 
   const handleAgregarClienteChip = (cliNombre) => {
-    const limpio = cliNombre.trim().toUpperCase();
-    if (limpio && !clientesSeleccionados.includes(limpio)) {
-      setClientesSeleccionados([...clientesSeleccionados, limpio]);
+    const valorEscrito = String(cliNombre || '').trim();
+    if (!valorEscrito) return;
+
+    const normalizar = (str) =>
+      String(str || '')
+        .trim()
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    const buscado = normalizar(valorEscrito);
+
+    // Buscar coincidencia exacta en la lista de clientes de la base de datos
+    const clienteValido = clientes.find(
+      c => normalizar(c.nombre_cliente) === buscado
+    );
+
+    if (!clienteValido) {
+      return mostrarAviso(
+        'warning',
+        'Cliente no registrado',
+        'El cliente ingresado no existe en la base de datos. Seleccione un cliente válido de la lista.'
+      );
     }
+
+    const nombreOficial = String(clienteValido.nombre_cliente).trim().toUpperCase();
+
+    if (clientesSeleccionados.includes(nombreOficial)) {
+      setClienteInputTemporal('');
+      return mostrarAviso(
+        'warning',
+        'Cliente duplicado',
+        `El cliente "${nombreOficial}" ya fue agregado.`
+      );
+    }
+
+    setClientesSeleccionados(prev => [...prev, nombreOficial]);
     setClienteInputTemporal('');
   };
 
@@ -402,8 +435,16 @@ export default function ModalPrestamo() {
     if (esOutboundRetail && !formData.cliente_nombre.trim()) {
       return mostrarAviso('warning', 'Falta cliente', 'Indique el Cliente.');
     }
-    if (esOutboundPrincipal && clientesSeleccionados.length === 0) {
-      return mostrarAviso('warning', 'Falta cliente', 'Seleccione al menos un Cliente.');
+    if (esOutboundPrincipal) {
+      if (clientesSeleccionados.length === 0) {
+        return mostrarAviso('warning', 'Falta cliente', 'Seleccione al menos un Cliente válido de la lista.');
+      }
+      const catalogoValido = new Set(
+        clientes.map(c => String(c.nombre_cliente || '').trim().toUpperCase())
+      );
+      if (clientesSeleccionados.some(cli => !catalogoValido.has(cli))) {
+        return mostrarAviso('warning', 'Cliente no válido', 'Solo se permiten clientes registrados en la base de datos.');
+      }
     }
 
     if (esOutboundRetail) {
@@ -747,7 +788,7 @@ export default function ModalPrestamo() {
                         handleAgregarClienteChip(clienteInputTemporal);
                       }
                     }}
-                    placeholder="Escriba o seleccione..."
+                    placeholder="Seleccione un cliente de la lista..."
                   />
                   <button
                     type="button"

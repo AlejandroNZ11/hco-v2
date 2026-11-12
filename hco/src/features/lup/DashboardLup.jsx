@@ -339,7 +339,7 @@ export default function DashboardLup() {
           <div className="kpi-icon-box"><Leaf /></div>
           <div className="kpi-content">
             <span className="kpi-title">Impacto CO₂</span>
-            <div className="kpi-main-val">{totalCO2 || 102} kg CO₂e</div>
+            <div className="kpi-main-val">{totalCO2 || 0} kg CO₂e</div>
             <span className="kpi-subtext">Ahorro acumulado</span>
           </div>
         </div>

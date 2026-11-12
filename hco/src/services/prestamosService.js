@@ -434,7 +434,8 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
 export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
   const ahoraISO = obtenerFechaHoraPeruISO();
   const idPrestamo = prestamoActual.id_prestamo;
-  const retornaBool = payload.retorno === 'SI' || payload.retorno === true;
+  const nrPaletasNum = Number(payload.nr_paletas || 0);
+  const retornaBool = nrPaletasNum === 0 ? false : (payload.retorno === 'SI' || payload.retorno === true);
   const estadoFinal = retornaBool ? 'Pendiente' : 'NO RETORNO';
   const fechaRetornoISO = retornaBool ? calcularFechaRetornoPeru(ahoraISO, 7) : null;
 

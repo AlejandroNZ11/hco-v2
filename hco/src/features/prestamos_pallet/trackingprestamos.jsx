@@ -135,6 +135,11 @@ export default function TrackingPrestamos() {
   const esAdmin = ROLES_ADMIN.includes(rolUsuario);
   const esExterno = rolUsuario === 'EXTERNO';
 
+  const [esAreaOutbound, setEsAreaOutbound] = useState(() => {
+    const areaLocal = String(currentUser?.area_nombre || currentUser?.area || '').trim().toUpperCase();
+    return areaLocal.includes('OUTBOUND');
+  });
+
   const esSeguridadGarita = esExterno || cargoUsuario.includes('SEGURIDAD');
 
   // Estado del modal de garita
@@ -186,6 +191,7 @@ export default function TrackingPrestamos() {
     cargarDatos();
   }, [currentUser, navigate]);
 
+
   const cargarDatos = async () => {
     setLoading(true);
     try {
@@ -196,6 +202,25 @@ export default function TrackingPrestamos() {
       setPlacas(maestros.placas || []);
       setEmpresas(maestros.empresas || []);
       setClientes(maestros.clientes || []);
+
+      // Verificar en tablas empleados -> areas si pertenece a OUTBOUND
+      if (currentUser && maestros.empleados && maestros.areas) {
+        const dniUser = String(currentUser.dni || '').trim();
+        const userLogin = String(currentUser.usuario || '').trim().toLowerCase();
+        const nombreUser = String(currentUser.nombre || '').trim().toLowerCase();
+
+        const empEncontrado = maestros.empleados.find(emp =>
+          (dniUser && String(emp.dni || '').trim() === dniUser) ||
+          (userLogin && String(emp.usuario || '').trim().toLowerCase() === userLogin) ||
+          (nombreUser && String(emp.nombre || '').trim().toLowerCase() === nombreUser)
+        );
+
+        if (empEncontrado?.area_id) {
+          const areaObj = maestros.areas.find(a => String(a.id) === String(empEncontrado.area_id));
+          const nombreArea = String(areaObj?.nombre || '').trim().toUpperCase();
+          setEsAreaOutbound(nombreArea.includes('OUTBOUND'));
+        }
+      }
     } catch (err) {
       mostrarAviso('danger', 'Error al sincronizar datos', err.message);
     } finally {
@@ -425,8 +450,11 @@ export default function TrackingPrestamos() {
 
   const handleAbrirFirmaSalida = () => {
     const cant = Number(auxData.nr_paletas);
-    if (!auxData.nr_paletas.trim() || isNaN(cant) || cant <= 0) {
-      return mostrarAviso('warning', 'Cantidad obligatoria', 'Ingrese el número de paletas antes de firmar.');
+    if (auxData.nr_paletas.trim() === '' || isNaN(cant) || cant < 0) {
+      return mostrarAviso('warning', 'Cantidad obligatoria', 'Ingrese el número de paletas antes de firmar (puede ser 0).');
+    }
+    if (cant === 0 && !auxData.observacion_salida.trim()) {
+      return mostrarAviso('warning', 'Observación obligatoria', 'Cuando sale con 0 paletas, debe ingresar el motivo en la observación.');
     }
     if (prestamoSeleccionado?.area_proceso === 'OUTBOUND PRINCIPAL' && !auxData.foto_salida_base64) {
       return mostrarAviso('warning', 'Foto obligatoria', 'En OUTBOUND PRINCIPAL debe adjuntar la foto antes de firmar.');
@@ -614,10 +642,11 @@ export default function TrackingPrestamos() {
       setModalFirmaVisible(false);
       setLoading(true);
       try {
+        const sinPaletas = Number(auxData.nr_paletas) === 0;
         await completarDespachoAuxiliar(prestamoSeleccionado, {
           ...auxData,
           firma_conductor_base64: dataUrl,
-          retorno: prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno,
+          retorno: (prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' || sinPaletas) ? 'NO' : auxData.retorno,
           usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Auxiliar'
         });
         mostrarAviso('success', 'Despacho Completado', 'El registro se actualizó y ahora está activo en tracking.');
@@ -627,9 +656,6 @@ export default function TrackingPrestamos() {
       } finally {
         setLoading(false);
       }
-    } else {
-      setDevData(prev => ({ ...prev, firma_retorno_base64: dataUrl }));
-      setModalFirmaVisible(false);
     }
   };
 
@@ -767,8 +793,8 @@ export default function TrackingPrestamos() {
 
         {/* Acciones de los filtros */}
         <div className="filters-actions-row">
-          {/* VISIBLE SOLO PARA ROLES ADMINISTRATIVOS (OCULTO PARA USUARIO Y EXTERNO) */}
-          {esAdmin && (
+          {/* VISIBLE PARA ROLES ADMIN O PERSONAL DEL ÁREA OUTBOUND (SIN IMPORTAR EL ROL) */}
+          {(esAdmin || esAreaOutbound) && (
             <button type="button" className="btn-action-primary" onClick={() => navigate('/prestamos/nuevo')}>
               <FaPlus /> <span>Registrar</span>
             </button>
@@ -1272,38 +1298,52 @@ export default function TrackingPrestamos() {
             </div>
 
             <div className="tp-modal-body">
-              <div className="tp-form-group">
-                <div className="tp-label-row">
-                  <label>N° paletas prestadas</label>
-                  <span className="tp-tag-pill obligatorio">OBLIGATORIO</span>
-                </div>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  className="tp-input-clean"
-                  value={auxData.nr_paletas}
-                  onChange={e => setAuxData({ ...auxData, nr_paletas: e.target.value.replace(/\D/g, '').slice(0, 3) })}
-                  placeholder="Ej: 15"
-                  required
-                  autoFocus
-                />
-              </div>
+              {(() => {
+                const esAuxSinPaletas = auxData.nr_paletas.trim() !== '' && Number(auxData.nr_paletas) === 0;
 
-              <div className="tp-form-group">
-                <div className="tp-label-row">
-                  <label>¿Retorna?</label>
-                  <span className="tp-tag-pill obligatorio">OBLIGATORIO</span>
-                </div>
-                <select
-                  className="tp-select-clean"
-                  value={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' ? 'NO' : auxData.retorno}
-                  onChange={e => setAuxData({ ...auxData, retorno: e.target.value })}
-                  disabled={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE'}
-                >
-                  <option value="SI">SÍ</option>
-                  <option value="NO">NO</option>
-                </select>
-              </div>
+                return (
+                  <>
+                    <div className="tp-form-group">
+                      <div className="tp-label-row">
+                        <label>N° paletas prestadas</label>
+                        <span className="tp-tag-pill obligatorio">OBLIGATORIO</span>
+                      </div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        className="tp-input-clean"
+                        value={auxData.nr_paletas}
+                        onChange={e => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+                          setAuxData(prev => ({
+                            ...prev,
+                            nr_paletas: val,
+                            retorno: (prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' || val === '0')
+                              ? 'NO'
+                              : (val !== '' && Number(val) > 0 ? 'SI' : prev.retorno)
+                          }));
+                        }}
+                        placeholder="Ej: 15 (0 = sin pallet)"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="tp-form-group">
+                      <div className="tp-label-row">
+                        <label>¿Retorna?</label>
+                        <span className="tp-tag-pill obligatorio">OBLIGATORIO</span>
+                      </div>
+                      <select
+                        className="tp-select-clean"
+                        value={(prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' || esAuxSinPaletas) ? 'NO' : auxData.retorno}
+                        onChange={e => setAuxData({ ...auxData, retorno: e.target.value })}
+                        disabled={prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' || esAuxSinPaletas}
+                      >
+                        <option value="SI">SÍ</option>
+                        <option value="NO">NO</option>
+                      </select>
+                    </div>
 
               <div className="tp-form-group">
                 <div className="tp-label-row">
@@ -1369,18 +1409,24 @@ export default function TrackingPrestamos() {
               </div>
 
               <div className="tp-form-group">
-                <div className="tp-label-row">
-                  <label>Observación de salida</label>
-                  <span className="tp-tag-pill opcional">OPCIONAL</span>
-                </div>
-                <textarea
-                  className="tp-textarea-clean"
-                  value={auxData.observacion_salida}
-                  onChange={e => setAuxData({ ...auxData, observacion_salida: e.target.value })}
-                  rows={2}
-                  placeholder="Detalles del despacho físico..."
-                />
-              </div>
+                      <div className="tp-label-row">
+                        <label>Observación de salida</label>
+                        <span className={`tp-tag-pill ${esAuxSinPaletas ? 'obligatorio' : 'opcional'}`}>
+                          {esAuxSinPaletas ? 'OBLIGATORIO' : 'OPCIONAL'}
+                        </span>
+                      </div>
+                      <textarea
+                        className="tp-textarea-clean"
+                        value={auxData.observacion_salida}
+                        onChange={e => setAuxData({ ...auxData, observacion_salida: e.target.value })}
+                        rows={2}
+                        placeholder={esAuxSinPaletas ? 'Obligatorio cuando sale con 0 paletas...' : 'Detalles del despacho físico...'}
+                        required={esAuxSinPaletas}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
 
               <div style={{ marginTop: '10px' }}>
                 <button

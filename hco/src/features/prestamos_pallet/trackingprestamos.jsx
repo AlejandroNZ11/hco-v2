@@ -634,7 +634,7 @@ export default function TrackingPrestamos() {
     tieneTrazoRef.current = false;
   };
 
-const confirmarFirma = async () => {
+  const confirmarFirma = async () => {
     if (!tieneTrazoRef.current) return mostrarAviso('warning', 'Firma vacía', 'Debe firmar antes de guardar.');
     const dataUrl = canvasRef.current.toDataURL('image/png');
 

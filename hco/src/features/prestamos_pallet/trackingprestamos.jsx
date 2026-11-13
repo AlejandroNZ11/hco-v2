@@ -634,7 +634,7 @@ export default function TrackingPrestamos() {
     tieneTrazoRef.current = false;
   };
 
-  const confirmarFirma = async () => {
+const confirmarFirma = async () => {
     if (!tieneTrazoRef.current) return mostrarAviso('warning', 'Firma vacía', 'Debe firmar antes de guardar.');
     const dataUrl = canvasRef.current.toDataURL('image/png');
 
@@ -656,6 +656,10 @@ export default function TrackingPrestamos() {
       } finally {
         setLoading(false);
       }
+    } else {
+      // Guarda la firma en el formulario de devolución y cierra el modal de firma
+      setDevData(prev => ({ ...prev, firma_retorno_base64: dataUrl }));
+      setModalFirmaVisible(false);
     }
   };
 

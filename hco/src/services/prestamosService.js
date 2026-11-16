@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabaseClient';
+import { subirImagenDrive } from './driveService';
 
 const BOOT_CACHE_KEY = 'PRESTAMOS_SUPABASE_BOOT_V2';
 
@@ -43,104 +44,9 @@ export const calcularFechaRetornoPeru = (fechaInicioInput, diasHabiles = 7) => {
   return f.toISOString();
 };
 
-let tokenGoogleCache = { token: null, expira: 0 };
-
-const obtenerAccessTokenGoogleDrive = async () => {
-  const ahora = Date.now();
-  if (tokenGoogleCache.token && ahora < tokenGoogleCache.expira) {
-    return tokenGoogleCache.token;
-  }
-
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
-  const refreshToken = import.meta.env.VITE_GOOGLE_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Faltan credenciales VITE_GOOGLE_* en .env');
-  }
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token'
-    })
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.access_token) {
-    throw new Error(data.error_description || 'Error obteniendo token Drive');
-  }
-
-  tokenGoogleCache = {
-    token: data.access_token,
-    expira: Date.now() + 50 * 60 * 1000
-  };
-
-  return data.access_token;
-};
-
-const base64ABlob = (dataUrl) => {
-  const partes = dataUrl.split(',');
-  const byteString = atob(partes[1]);
-  const arrayBuffer = new ArrayBuffer(byteString.length);
-  const intArray = new Uint8Array(arrayBuffer);
-  for (let i = 0; i < byteString.length; i++) {
-    intArray[i] = byteString.charCodeAt(i);
-  }
-  return new Blob([intArray], { type: 'image/png' });
-};
-
-export const subirImagenADrive = async (dataUrlBase64, nombreArchivo, tokenPreviamenteObtenido = null) => {
-  if (!dataUrlBase64 || !String(dataUrlBase64).startsWith('data:image')) return '';
-
-  const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID;
-  const accessToken = tokenPreviamenteObtenido || await obtenerAccessTokenGoogleDrive();
-  const blobImagen = base64ABlob(dataUrlBase64);
-
-  const metadata = {
-    name: nombreArchivo,
-    mimeType: 'image/png',
-    ...(folderId ? { parents: [folderId] } : {})
-  };
-
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', blobImagen);
-
-  const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: form
-    }
-  );
-
-  const fileData = await res.json();
-  if (!res.ok || !fileData.id) {
-    throw new Error(fileData?.error?.message || 'Error al subir imagen a Google Drive.');
-  }
-
-  // Esperar a que el archivo sea público antes de devolver la URL
-  try {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ role: 'reader', type: 'anyone' })
-    });
-  } catch (e) {
-    console.warn("Error asignando permiso:", e);
-  }
-
-  return `https://drive.google.com/file/d/${fileData.id}/view`;
-};
+// Subida a Google Drive vía Edge Function `subir-drive` (los secretos viven en Supabase)
+export const subirImagenADrive = (dataUrlBase64, nombreArchivo) =>
+  subirImagenDrive(dataUrlBase64, nombreArchivo, { destino: 'prestamos' });
 
 const esRegistroActivo = (item) => {
   if (typeof item.activo === 'boolean') return item.activo;
@@ -313,14 +219,13 @@ export const crearPrestamoPallet = async (payload) => {
 
   const idPrestamo = prestamoCreado.id_prestamo;
   if (payload.firma_conductor_base64 || payload.foto_salida_base64) {
-    const token = await obtenerAccessTokenGoogleDrive();
 
     const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
       payload.firma_conductor_base64 
-        ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`, token)
+        ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`)
         : Promise.resolve(''),
       payload.foto_salida_base64 
-        ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`, token)
+        ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`)
         : Promise.resolve('')
     ]);
 
@@ -439,14 +344,13 @@ export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
   const estadoFinal = retornaBool ? 'Pendiente' : 'NO RETORNO';
   const fechaRetornoISO = retornaBool ? calcularFechaRetornoPeru(ahoraISO, 7) : null;
 
-  const token = await obtenerAccessTokenGoogleDrive();
 
   const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
     payload.firma_conductor_base64 
-      ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`, token)
+      ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`)
       : Promise.resolve(prestamoActual.firma_conductor || ''),
     payload.foto_salida_base64 
-      ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`, token)
+      ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`)
       : Promise.resolve(prestamoActual.foto_salida || '')
   ]);
 

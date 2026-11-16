@@ -1,106 +1,11 @@
 import { supabase } from '../config/supabaseClient';
+import { subirImagenDrive } from './driveService';
 
 // =========================================================================
-// LÓGICA DE SUBIDA A GOOGLE DRIVE API V3 (COMPARTIDA CON PRÉSTAMOS)
+// SUBIDA A GOOGLE DRIVE (vía Edge Function `subir-drive`)
 // =========================================================================
-let tokenGoogleCache = { token: null, expira: 0 };
-
-const obtenerAccessTokenGoogleDrive = async () => {
-  const ahora = Date.now();
-  if (tokenGoogleCache.token && ahora < tokenGoogleCache.expira) {
-    return tokenGoogleCache.token;
-  }
-
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  const clientSecret = import.meta.env.VITE_GOOGLE_CLIENT_SECRET;
-  const refreshToken = import.meta.env.VITE_GOOGLE_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Faltan credenciales VITE_GOOGLE_* en el archivo .env');
-  }
-
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token'
-    })
-  });
-
-  const data = await res.json();
-  if (!res.ok || !data.access_token) {
-    throw new Error(data.error_description || 'Error obteniendo token de Google Drive.');
-  }
-
-  tokenGoogleCache = {
-    token: data.access_token,
-    expira: Date.now() + 50 * 60 * 1000
-  };
-
-  return data.access_token;
-};
-
-const base64ABlob = (dataUrl) => {
-  const partes = dataUrl.split(',');
-  const byteString = atob(partes[1]);
-  const arrayBuffer = new ArrayBuffer(byteString.length);
-  const intArray = new Uint8Array(arrayBuffer);
-  for (let i = 0; i < byteString.length; i++) {
-    intArray[i] = byteString.charCodeAt(i);
-  }
-  return new Blob([intArray], { type: 'image/png' });
-};
-
-export const subirImagenADrive = async (dataUrlBase64, nombreArchivo) => {
-  if (!dataUrlBase64 || !String(dataUrlBase64).startsWith('data:image')) return '';
-
-  const folderId = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_LUP;
-  const accessToken = await obtenerAccessTokenGoogleDrive();
-  const blobImagen = base64ABlob(dataUrlBase64);
-
-  const metadata = {
-    name: nombreArchivo,
-    mimeType: 'image/png',
-    ...(folderId ? { parents: [folderId] } : {})
-  };
-
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', blobImagen);
-
-  const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: form
-    }
-  );
-
-  const fileData = await res.json();
-  if (!res.ok || !fileData.id) {
-    throw new Error(fileData?.error?.message || 'Error al subir imagen a Google Drive.');
-  }
-
-  // Asignar permiso público inmediato para que lh3 la cargue directo
-  try {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileData.id}/permissions`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ role: 'reader', type: 'anyone' })
-    });
-  } catch (e) {
-    console.warn("Aviso permiso público:", e);
-  }
-
-  return `https://drive.google.com/file/d/${fileData.id}/view`;
-};
+export const subirImagenADrive = (dataUrlBase64, nombreArchivo) =>
+  subirImagenDrive(dataUrlBase64, nombreArchivo, { destino: 'lup' });
 
 // =========================================================================
 // CONSULTAS A SUPABASE (TABLA 'lup')

@@ -203,11 +203,9 @@ function TrackingSugerenciasContenido() {
     return sugerenciasOrdenadas.filter((item) => {
       const estadoVis = obtenerEstadoVisual(item);
 
+      // 1. Filtro de Estado: compara estrictamente con lo que muestra la tabla
       if (filtrosActivos.estado !== 'Todos') {
-        if (
-          normalizar(estadoVis) !== normalizar(filtrosActivos.estado) &&
-          normalizar(item.estado) !== normalizar(filtrosActivos.estado)
-        ) {
+        if (normalizar(estadoVis) !== normalizar(filtrosActivos.estado)) {
           return false;
         }
       }

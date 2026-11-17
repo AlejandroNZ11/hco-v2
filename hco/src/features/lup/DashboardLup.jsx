@@ -22,6 +22,20 @@ const MESES = [
 
 const MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic'];
 
+// Extrae { anio, mes } (mes 0-11) sin que new Date("YYYY-MM-DD") reste horas por UTC
+const extraerAnioMes = (fechaRaw) => {
+  if (!fechaRaw) return null;
+  const match = String(fechaRaw).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    return {
+      anio: Number(match[1]),
+      mes: Number(match[2]) - 1 // 0 = Enero ... 11 = Diciembre
+    };
+  }
+  const d = new Date(fechaRaw);
+  return isNaN(d.getTime()) ? null : { anio: d.getFullYear(), mes: d.getMonth() };
+};
+
 function SvgDonut({ slices, totalCenter, subtitleCenter }) {
   let acumulado = 0;
   const radius = 15.9155;
@@ -96,37 +110,35 @@ function DashboardLupContenido() {
     }
   };
 
-  // 1. Extraer Años disponibles dinámicamente de 'fecha_lup'
+  // 1. Años disponibles desde fecha_lup
   const aniosDisponibles = useMemo(() => {
-    const aniosSet = new Set();
-    aniosSet.add(currentYear);
+    const aniosSet = new Set([currentYear]);
     lups.forEach(l => {
-      const f = l.fecha_lup || l.fecha_registro;
-      if (f) {
-        const y = new Date(f).getFullYear();
-        if (!isNaN(y)) aniosSet.add(y);
-      }
+      if (String(l.operatividad || '').toUpperCase() === 'INACTIVO') return;
+      const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
+      if (ym) aniosSet.add(ym.anio);
     });
     return Array.from(aniosSet).sort((a, b) => b - a);
   }, [lups, currentYear]);
 
-  // 2. Extraer Áreas disponibles dinámicamente de la columna 'area'
+  // 2. Áreas disponibles desde la columna 'area'
   const areasDisponibles = useMemo(() => {
     const areasSet = new Set();
     lups.forEach(l => {
+      if (String(l.operatividad || '').toUpperCase() === 'INACTIVO') return;
       const a = (l.area || '').trim();
       if (a) areasSet.add(a);
     });
     return Array.from(areasSet).sort((a, b) => a.localeCompare(b));
   }, [lups]);
 
-  // 3. Filtrado por Año y Área (Base para cálculos anuales y gráficos)
+  // 3. Filtrado por Operatividad, Año y Área
   const lupsFiltradasAnioYArea = useMemo(() => {
     return lups.filter(l => {
-      const fecha = l.fecha_lup || l.fecha_registro;
-      if (!fecha) return false;
-      const anioLup = new Date(fecha).getFullYear();
-      if (anioLup !== Number(anioSeleccionado)) return false;
+      if (String(l.operatividad || '').toUpperCase() === 'INACTIVO') return false;
+
+      const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
+      if (!ym || ym.anio !== Number(anioSeleccionado)) return false;
 
       if (areaSeleccionada !== 'TODAS') {
         const areaLup = (l.area || '').trim();
@@ -137,11 +149,11 @@ function DashboardLupContenido() {
     });
   }, [lups, anioSeleccionado, areaSeleccionada]);
 
-  // 4. Filtrado del Mes
+  // 4. Filtrado del Mes (coincide 100% con la barra del gráfico)
   const lupsDelMes = useMemo(() => {
     return lupsFiltradasAnioYArea.filter(l => {
-      const fecha = l.fecha_lup || l.fecha_registro;
-      return new Date(fecha).getMonth() === Number(mesSeleccionado);
+      const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
+      return ym && ym.mes === Number(mesSeleccionado);
     });
   }, [lupsFiltradasAnioYArea, mesSeleccionado]);
 
@@ -149,12 +161,16 @@ function DashboardLupContenido() {
   const totalLupAnio = lupsFiltradasAnioYArea.length;
   const totalLupMes = lupsDelMes.length;
 
-  const entrenados = lupsFiltradasAnioYArea.filter(l => String(l.entrenamiento).toUpperCase() === 'ENTRENADO').length;
+  const entrenados = lupsFiltradasAnioYArea.filter(
+    l => String(l.entrenamiento).toUpperCase() === 'ENTRENADO'
+  ).length;
   const noEntrenados = totalLupAnio - entrenados;
   const pctEntrenados = totalLupAnio > 0 ? Math.round((entrenados / totalLupAnio) * 100) : 0;
   const pctNoEntrenados = 100 - pctEntrenados;
 
-  const kaizenSi = lupsFiltradasAnioYArea.filter(l => String(l.realizo_kaizen).toUpperCase() === 'SI').length;
+  const kaizenSi = lupsFiltradasAnioYArea.filter(
+    l => String(l.realizo_kaizen).toUpperCase() === 'SI'
+  ).length;
   const kaizenNo = totalLupAnio - kaizenSi;
   const pctKaizen = totalLupAnio > 0 ? Math.round((kaizenSi / totalLupAnio) * 100) : 0;
 
@@ -165,13 +181,13 @@ function DashboardLupContenido() {
     }, 0);
   }, [lupsFiltradasAnioYArea]);
 
-  // Tendencia mensual (según año y área seleccionada)
+  // Tendencia mensual
   const mesesHasta = anioSeleccionado === currentYear ? currentMonth + 1 : 12;
   const tendenciaData = useMemo(() => {
     const counts = Array(12).fill(0);
     lupsFiltradasAnioYArea.forEach(l => {
-      const f = l.fecha_lup || l.fecha_registro;
-      if (f) counts[new Date(f).getMonth()]++;
+      const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
+      if (ym) counts[ym.mes]++;
     });
     return counts.slice(0, mesesHasta);
   }, [lupsFiltradasAnioYArea, mesesHasta]);
@@ -231,8 +247,9 @@ function DashboardLupContenido() {
     const baseLups = areaSeleccionada === 'TODAS'
       ? lupsFiltradasAnioYArea
       : lups.filter(l => {
-          const f = l.fecha_lup || l.fecha_registro;
-          return f && new Date(f).getFullYear() === Number(anioSeleccionado);
+          if (String(l.operatividad || '').toUpperCase() === 'INACTIVO') return false;
+          const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
+          return ym && ym.anio === Number(anioSeleccionado);
         });
 
     baseLups.forEach(l => {
@@ -249,7 +266,7 @@ function DashboardLupContenido() {
 
   return (
     <div className="dashboard-lup-container">
-      {/* HEADER CONTENIDO EN TARJETA BLANCA (IDÉNTICO A IMAGEN 2) */}
+      {/* HEADER */}
       <header className="dashboard-header-card">
         <div className="header-titles">
           <span className="badge-kpi-pill">INDICADORES OPERATIVOS</span>
@@ -364,7 +381,13 @@ function DashboardLupContenido() {
                   <div key={i} className="bar-col">
                     <span className="bar-val-top">{val}</span>
                     <div className="bar-track">
-                      <div className="bar-fill" style={{ height: `${heightPct}%` }} />
+                      <div
+                        className="bar-fill"
+                        style={{
+                          height: `${heightPct}%`,
+                          backgroundColor: i === Number(mesSeleccionado) ? '#0369a1' : undefined
+                        }}
+                      />
                     </div>
                     <span className="bar-label">{MESES_ABR[i]}</span>
                   </div>

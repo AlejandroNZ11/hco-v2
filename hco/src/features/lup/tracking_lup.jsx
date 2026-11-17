@@ -41,6 +41,11 @@ const IMPACTOS_LUP = [
   'COMPRAS'
 ];
 
+const fechaBase = (lup.fecha_lup || lup.fecha_registro || '').slice(0, 10); // "YYYY-MM-DD"
+
+if (fechaLupIni && fechaBase < fechaLupIni) return false;
+if (fechaLupFin && fechaBase > fechaLupFin) return false;
+
 function getStoredAuthUser() {
   const raw = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
   if (!raw) return null;

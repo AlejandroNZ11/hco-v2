@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import Loading from '../../layouts/Loading';
 import { localDb } from '../../services/localDb';
@@ -130,6 +130,11 @@ export default function PizarraSugerencias() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState(() => obtenerFechaHoraLima());
+
+  // Estados y referencia para arrastrar la pizarra con la mano
+  const boardWrapRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragData = useRef({ startX: 0, scrollLeft: 0 });
 
   const cargarDatos = useCallback(async (mostrarLoader = true) => {
     if (mostrarLoader && sugerencias.length === 0) {
@@ -280,6 +285,29 @@ export default function PizarraSugerencias() {
     setSelectedMonth('');
   };
 
+  // Manejadores de arrastre con el mouse
+  const handleMouseDown = (e) => {
+    const container = boardWrapRef.current;
+    if (!container) return;
+    setIsDragging(true);
+    dragData.current.startX = e.pageX - container.offsetLeft;
+    dragData.current.scrollLeft = container.scrollLeft;
+  };
+
+  const handleMouseUpOrLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    e.preventDefault();
+    const container = boardWrapRef.current;
+    if (!container) return;
+    const x = e.pageX - container.offsetLeft;
+    const walk = (x - dragData.current.startX) * 1.4;
+    container.scrollLeft = dragData.current.scrollLeft - walk;
+  };
+
   return (
     <div className="pizarra-sugerencias-wrapper">
       {loading && <Loading />}
@@ -358,7 +386,14 @@ export default function PizarraSugerencias() {
         </section>
 
         <section className="board-card">
-          <div className="board-wrap">
+          <div
+            ref={boardWrapRef}
+            className={`board-wrap ${isDragging ? 'dragging' : ''}`}
+            onMouseDown={handleMouseDown}
+            onMouseLeave={handleMouseUpOrLeave}
+            onMouseUp={handleMouseUpOrLeave}
+            onMouseMove={handleMouseMove}
+          >
             <table className="board-table">
               <colgroup>
                 <col className="col-year" />

@@ -8,7 +8,8 @@ import {
   FaUndo,
   FaChevronLeft,
   FaChartPie,
-  FaChevronRight
+  FaChevronRight,
+  FaColumns
 } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -502,15 +503,13 @@ function TrackingSugerenciasContenido() {
             <FaChartPie /> <span>Dashboard</span>
           </button>
 
-          <button 
-            type="button" 
-            className="btn-action-primary" 
+          <button
+            type="button"
+            className="btn-action-primary"
             onClick={() => navigate('/sugerencias/pizarra')}
-            >
-            <FaChartPie /> <span>Pizarra</span>
+          >
+            <FaColumns /> <span>Pizarra</span>
           </button>
-
-
 
         </div>
       </section>

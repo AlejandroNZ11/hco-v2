@@ -204,7 +204,7 @@ function guardarCachePopup(data) {
   );
 }
 
-export default function Menu() {
+function MenuContenido() {
   const navigate = useNavigate();
   const [authUser] = useState(() => getStoredAuthUser());
   const [now, setNow] = useState(() => new Date());
@@ -936,6 +936,15 @@ export default function Menu() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function Menu(props) {
+  return (
+    <div className="hco-scope hco-menu">
+      <MenuContenido {...props} />
     </div>
   );
 }

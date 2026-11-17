@@ -30,7 +30,7 @@ function isoADatetimeLocal(isoStr) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function RegistroCuadroQ() {
+function RegistroCuadroQContenido() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -1036,6 +1036,15 @@ export default function RegistroCuadroQ() {
           </div>
         </form>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function RegistroCuadroQ(props) {
+  return (
+    <div className="hco-scope hco-registro-cuadroq">
+      <RegistroCuadroQContenido {...props} />
     </div>
   );
 }

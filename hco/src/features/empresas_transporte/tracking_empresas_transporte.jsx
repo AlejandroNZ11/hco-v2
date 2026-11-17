@@ -31,7 +31,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export default function TrackingEmpresasTransporte() {
+function TrackingEmpresasTransporteContenido() {
   const [currentUser] = useState(() => getStoredAuthUser());
   const [empresas, setEmpresas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -473,6 +473,15 @@ export default function TrackingEmpresasTransporte() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingEmpresasTransporte(props) {
+  return (
+    <div className="hco-scope hco-tracking-empresas-transporte">
+      <TrackingEmpresasTransporteContenido {...props} />
     </div>
   );
 }

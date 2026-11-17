@@ -27,7 +27,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export default function TrackingCuadroQ() {
+function TrackingCuadroQContenido() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
 
@@ -604,6 +604,15 @@ export default function TrackingCuadroQ() {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingCuadroQ(props) {
+  return (
+    <div className="hco-scope hco-tracking-cuadroq">
+      <TrackingCuadroQContenido {...props} />
     </div>
   );
 }

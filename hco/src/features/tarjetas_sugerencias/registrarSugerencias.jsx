@@ -112,7 +112,7 @@ const sumarMesesFecha = (fechaStr, meses) => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function RegistrarSugerencias() {
+function RegistrarSugerenciasContenido() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -1250,6 +1250,15 @@ export default function RegistrarSugerencias() {
           </div>
         </form>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function RegistrarSugerencias(props) {
+  return (
+    <div className="hco-scope hco-registrar-sugerencias">
+      <RegistrarSugerenciasContenido {...props} />
     </div>
   );
 }

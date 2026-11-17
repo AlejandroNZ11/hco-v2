@@ -106,7 +106,7 @@ function formatearSoloFecha(fechaStr) {
   return `${dia}/${mes}/${anio}`;
 }
 
-export default function TrackingLup() {
+function TrackingLupContenido() {
     const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
 
@@ -1378,6 +1378,15 @@ export default function TrackingLup() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingLup(props) {
+  return (
+    <div className="hco-scope hco-tracking-lup">
+      <TrackingLupContenido {...props} />
     </div>
   );
 }

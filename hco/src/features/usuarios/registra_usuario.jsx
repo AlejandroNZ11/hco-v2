@@ -84,7 +84,7 @@ const parseId = (val) => {
   return /^\d+$/.test(String(val)) ? parseInt(val, 10) : val;
 };
 
-export default function RegistrarUsuario() {
+function RegistrarUsuarioContenido() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editingId = searchParams.get("id");
@@ -829,6 +829,15 @@ export default function RegistrarUsuario() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function RegistrarUsuario(props) {
+  return (
+    <div className="hco-scope hco-registra-usuario">
+      <RegistrarUsuarioContenido {...props} />
     </div>
   );
 }

@@ -31,7 +31,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export default function TrackingClientes() {
+function TrackingClientesContenido() {
   const [currentUser] = useState(() => getStoredAuthUser());
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -498,6 +498,15 @@ export default function TrackingClientes() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingClientes(props) {
+  return (
+    <div className="hco-scope hco-tracking-clientes">
+      <TrackingClientesContenido {...props} />
     </div>
   );
 }

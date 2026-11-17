@@ -35,7 +35,7 @@ const extraerIdDrive = (url) => {
   return match ? match[1] : (str.length > 20 && !str.includes('/') ? str : null);
 };
 
-export default function TrackingPrestamos() {
+function TrackingPrestamosContenido() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(false);
@@ -1978,6 +1978,15 @@ export default function TrackingPrestamos() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingPrestamos(props) {
+  return (
+    <div className="hco-scope hco-trackingprestamos">
+      <TrackingPrestamosContenido {...props} />
     </div>
   );
 }

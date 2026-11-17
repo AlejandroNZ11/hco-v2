@@ -32,7 +32,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export default function TrackingPlacas() {
+function TrackingPlacasContenido() {
   const [currentUser] = useState(() => getStoredAuthUser());
 
   const [placas, setPlacas] = useState([]);
@@ -733,6 +733,15 @@ export default function TrackingPlacas() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingPlacas(props) {
+  return (
+    <div className="hco-scope hco-tracking-placas">
+      <TrackingPlacasContenido {...props} />
     </div>
   );
 }

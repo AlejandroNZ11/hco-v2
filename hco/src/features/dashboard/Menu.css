@@ -1,1140 +1,1180 @@
-/* src/features/dashboard/Menu.css */
-html, body {
-  overscroll-behavior-y: none;
-}
-
-.dashboard-page {
-  width: 100%;
-  min-height: calc(100vh - var(--header-total-height));
-  font-family: "Segoe UI", Arial, sans-serif;
-  color: #0f172a;
-  background:
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 18%),
-    linear-gradient(180deg, #f8fbff 0%, #eef3f8 100%);
-}
-
-.contenedor-principal {
-  width: 100%;
-  max-width: 1420px;
-  margin: 0 auto;
-  padding: 22px 18px 34px;
-}
-
-/* HERO */
-.hero-panel {
-  display: grid;
-  grid-template-columns: 1.55fr 1fr;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.hero-left,
-.hero-right {
-  border-radius: 24px;
-  border: 1px solid #dbe5ef;
-  overflow: hidden;
-  position: relative;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-}
-
-.hero-left {
-  min-height: 220px;
-  padding: 24px 28px;
-}
-
-.hero-right {
-  min-height: 220px;
-  padding: 16px;
-}
-
-/* TEMAS */
-.hero-left.theme-dia {
-  background:
-    radial-gradient(circle at 82% 78%, rgba(249, 168, 37, 0.3) 0 42px, rgba(249, 168, 37, 0.1) 43px 88px, transparent 89px),
-    linear-gradient(135deg, #fff8e8 0%, #f2f8ef 50%, #e7f3fb 100%);
-}
-
-.hero-left.theme-tarde {
-  background:
-    radial-gradient(circle at 84% 78%, rgba(251, 146, 60, 0.22) 0 38px, rgba(251, 146, 60, 0.08) 39px 82px, transparent 83px),
-    linear-gradient(135deg, #fff3e9 0%, #f6eddc 42%, #e6f0fb 100%);
-}
-
-.hero-left.theme-noche {
-  background:
-    radial-gradient(circle at 16% 18%, rgba(255,255,255,0.55) 0 2px, transparent 3px),
-    radial-gradient(circle at 28% 10%, rgba(255,255,255,0.45) 0 2px, transparent 3px),
-    linear-gradient(135deg, #eef2ff 0%, #e8edff 52%, #dde5ff 100%);
-}
-
-.hero-right.theme-dia,
-.hero-right.theme-tarde,
-.hero-right.theme-noche {
-  background: linear-gradient(135deg, #d9ecff 0%, #b7d9ff 100%);
-  color: #13406d;
-}
-
-.hero-scene {
-  position: absolute;
-  right: 18px;
-  top: 14px;
-  font-size: 28px;
-  opacity: 0.28;
-  line-height: 1;
-}
-
-.hero-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.hero-tag {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  background: rgba(15, 76, 129, 0.08);
-  color: #0f4c81;
-}
-
-.hero-tag.soft {
-  background: rgba(255, 255, 255, 0.58);
-  color: #0f172a;
-}
-
-.hero-left h1 {
-  margin: 0 0 8px;
-  max-width: 92%;
-  font-size: 28px;
-  line-height: 1.15;
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.hero-left p {
-  margin: 0;
-  max-width: 88%;
-  font-size: 15px;
-  line-height: 1.6;
-  color: #334155;
-}
-
-.hero-mini-cards {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.hero-mini-card {
-  min-width: 150px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.42);
-  border: 1px solid rgba(255, 255, 255, 0.62);
-}
-
-.hero-mini-card small {
-  display: block;
-  margin-bottom: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: #475569;
-}
-
-.hero-mini-card strong {
-  display: block;
-  font-size: 15px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-/* RELOJ */
-.time-card {
-  height: 100%;
-  display: grid;
-  grid-template-columns: 1fr 118px;
-  grid-template-rows: auto auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.time-card-left {
-  min-height: 116px;
-  padding: 14px;
-  border-radius: 20px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.44);
-}
-
-.time-label {
-  display: inline-flex;
-  align-self: flex-start;
-  min-height: 26px;
-  padding: 4px 10px;
-  margin-bottom: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.48);
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.time-card-left strong {
-  display: block;
-  font-size: 18px;
-  font-weight: 900;
-}
-
-.time-card-left small {
-  display: block;
-  margin-top: 6px;
-  font-size: 13px;
-}
-
-.time-scene-mini {
-  position: absolute;
-  right: 12px;
-  top: 10px;
-  font-size: 18px;
-}
-
-.time-card-right {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.clock-face {
-  width: 112px;
-  height: 112px;
-  position: relative;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at center, rgba(255,255,255,0.85) 0 18px, rgba(255,255,255,0.24) 19px 56px, rgba(255,255,255,0.08) 57px 100%);
-  border: 4px solid rgba(255,255,255,0.52);
-  box-shadow: inset 0 0 14px rgba(255,255,255,0.25), 0 10px 22px rgba(15, 76, 129, 0.12);
-}
-
-.clock-face::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  border-radius: 50%;
-  background: repeating-conic-gradient(
-    from -90deg,
-    rgba(30, 64, 175, 0.78) 0deg 2deg,
-    transparent 2deg 30deg
-  );
-  -webkit-mask: radial-gradient(circle, transparent 0 33px, #000 34px);
-  mask: radial-gradient(circle, transparent 0 33px, #000 34px);
-}
-
-.clock-hand {
-  position: absolute;
-  left: 50%;
-  bottom: 50%;
-  transform-origin: bottom center;
-  border-radius: 999px;
-  z-index: 3;
-}
-
-.hour-hand {
-  width: 5px;
-  height: 24px;
-  background: #275d95;
-}
-
-.minute-hand {
-  width: 4px;
-  height: 37px;
-  background: #3d79bb;
-}
-
-.second-hand {
-  width: 2px;
-  height: 43px;
-  background: #f59e0b;
-}
-
-.clock-center {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: #ffffff;
-  border: 2px solid #3d79bb;
-  z-index: 4;
-}
-
-.time-card-footer {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.digital-time {
-  text-align: center;
-  font-size: 24px;
-  line-height: 1.1;
-  font-weight: 900;
-  letter-spacing: 0.4px;
-}
-
-.time-message {
-  text-align: center;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.22);
-  border: 1px solid rgba(255,255,255,0.32);
-  font-size: 12px;
-}
-
-/* SECCIÓN */
-.section-head {
-  margin-bottom: 14px;
-}
-
-.section-head h2 {
-  margin: 0 0 4px;
-  font-size: 22px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.section-head p {
-  margin: 0;
-  font-size: 14px;
-  color: #64748b;
-}
-
-/* GRID CORREGIDO */
-.apps-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-/* CARD CORREGIDA PARA QUE NO LA PISE CSS GLOBAL */
-.app-card {
-  all: unset;
-  box-sizing: border-box;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-  text-align: left !important;
-  cursor: pointer !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 20px !important;
-  background: #ffffff !important;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05) !important;
-  transition: all 0.25s ease !important;
-  width: 100% !important;
-  min-height: 0 !important;
-}
-
-.app-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 26px rgba(15, 76, 129, 0.1) !important;
-}
-
-.app-media {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  background: #e5e7eb;
-  display: block;
-}
-
-.app-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.app-card:hover .app-media img {
-  transform: scale(1.04);
-}
-
-.app-media-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(15,23,42,0.08) 0%, rgba(15,23,42,0.45) 100%);
-}
-
-.app-media-icon {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-size: 16px;
-  backdrop-filter: blur(4px);
-  background: rgba(255,255,255,0.16);
-}
-
-.app-card-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-}
-
-.app-pill {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  min-height: 28px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.app-card-body h3 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.app-card-body p {
-  margin: 0;
-  min-height: 58px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #64748b;
-}
-
-.app-card-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: auto;
-  color: #0f4c81;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.accent-blue .app-pill {
-  color: #0f4c81;
-}
-
-.accent-cyan .app-pill {
-  color: #0284c7;
-}
-
-.accent-slate .app-pill {
-  color: #475569;
-}
-
-.accent-violet .app-pill {
-  color: #5b21b6;
-}
-
-.accent-red .app-pill {
-  color: #dc2626;
-}
-
-/* RECORDATORIO */
-.recordatorio-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 99999;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-}
-
-.recordatorio-card {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  background: #ffffff;
-  border-radius: 18px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
-  padding: 22px 20px 20px;
-  text-align: center;
-}
-
-.recordatorio-close {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 50%;
-  background: #f1f5f9;
-  color: #334155;
-  font-size: 22px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.recordatorio-img {
-  width: 100%;
-  max-height: 220px;
-  object-fit: contain;
-  border-radius: 12px;
-  margin-bottom: 14px;
-}
-
-.recordatorio-title {
-  margin: 0 0 8px;
-  font-size: 22px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.recordatorio-text {
-  margin: 0 0 16px;
-  font-size: 15px;
-  color: #334155;
-}
-
-.recordatorio-btn {
-  width: 100%;
-  border: none;
-  border-radius: 12px;
-  background: #198754;
-  color: white;
-  font-size: 15px;
-  font-weight: 700;
-  padding: 12px 16px;
-  cursor: pointer;
-}
-
-.recordatorio-btn:hover {
-  background: #157347;
-}
-
-.tab-label-short {
-  display: none;
-}
-
-
-
-/* =========================================
-   PESTAÑAS - DISEÑO BOTONES (PILLS)
-   ========================================= */
-
-.apps-section-tabs {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 14px rgba(18, 56, 91, 0.04);
-}
-
-.app-category-tabs {
-  display: flex;
-  align-items: center;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0; 
-  padding: 14px 16px; /* Espacio para que respiren los botones */
-  gap: 10px; /* Separación entre cada botón */
-  overflow-x: auto;
-  scrollbar-width: none; /* Oculta scrollbar en Firefox */
-}
-
-.app-category-tabs::-webkit-scrollbar {
-  display: none; /* Oculta scrollbar en Chrome/Safari */
-}
-
-/* Diseño base de cada pestaña (Inactiva) */
-.app-category-tab {
-  all: unset;
-  box-sizing: border-box;
-  position: relative;
-  padding: 10px 22px; /* Damos forma de botón */
-  border-radius: 999px; /* Forma de píldora (totalmente curvo) */
-  cursor: pointer;
-  color: #64748b; /* Gris oscuro para las que no están seleccionadas */
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: all 0.25s ease;
-}
-
-/* Efecto al pasar el mouse por las pestañas inactivas */
-.app-category-tab:hover {
-  color: #0f172a;
-  background: #f1f5f9; /* Fondo gris muy suave */
-}
-
-/* ESTADO ACTIVO: AZUL CON LETRAS BLANCAS */
-.app-category-tab.active {
-  background: #0f4c81 !important; /* Azul corporativo */
-  color: #ffffff !important; /* Letras blancas */
-  box-shadow: 0 4px 12px rgba(15, 76, 129, 0.25); /* Sombra elegante azul */
-}
-
-/* Eliminamos la línea inferior antigua que teníamos */
-.app-category-tab::after {
-  display: none !important;
-}
-
-.tabs-section-head {
-  padding: 24px 24px 0;
-  margin-bottom: 16px;
-}
-
-
-/* 5 CARDS POR FILA */
-.apps-section-tabs .apps-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
-  padding: 0 20px 24px;
-}
-
-button, a, .app-category-tab, .app-card, .recordatorio-btn {
-  touch-action: manipulation !important;
-  -webkit-tap-highlight-color: transparent !important;
-}
-
-/* =========================================
-   DISEÑO MÓDULOS INACTIVOS (BLANCO Y NEGRO + BLOQUEADO)
-   ========================================= */
-
-.app-card.app-card-inactivo {
-  cursor: not-allowed !important;
-  background: #f8fafc !important;
-  border: 1px dashed #cbd5e1 !important;
-  box-shadow: none !important;
-  opacity: 0.82 !important;
-}
-
-/* Evitar que la tarjeta suba o haga zoom al pasar el mouse */
-.app-card.app-card-inactivo:hover {
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.app-card.app-card-inactivo:hover .app-media img {
-  transform: none !important;
-}
-
-/* Imagen en blanco y negro (escala de grises) */
-.app-card.app-card-inactivo .app-media img {
-  filter: grayscale(100%) contrast(0.9) brightness(0.85);
-}
-
-/* Oscurecer un poco más el fondo de la foto para que resalte el candado */
-.app-card.app-card-inactivo .app-media-overlay {
-  background: linear-gradient(
-    180deg,
-    rgba(15, 23, 42, 0.35) 0%,
-    rgba(15, 23, 42, 0.72) 100%
-  );
-}
-
-/* Sello central "PRÓXIMAMENTE" sobre la imagen */
-.app-badge-proximamente {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 4;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  backdrop-filter: blur(6px);
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  white-space: nowrap;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-}
-
-.badge-lock-icon {
-  font-size: 12px;
-  color: #cbd5e1;
-}
-
-/* Ícono de la esquina inferior derecha en tono gris */
-.app-card.app-card-inactivo .app-media-icon {
-  background: rgba(15, 23, 42, 0.55);
-  color: #cbd5e1;
-}
-
-/* Textos y etiquetas internas en tonos grises */
-.app-card.app-card-inactivo .app-pill {
-  background: #e2e8f0 !important;
-  color: #64748b !important;
-}
-
-.app-card.app-card-inactivo .app-card-body h3 {
-  color: #64748b !important;
-}
-
-.app-card.app-card-inactivo .app-card-body p {
-  color: #94a3b8 !important;
-}
-
-.app-card.app-card-inactivo .app-card-bottom {
-  color: #94a3b8 !important;
-}
-
-/* Ajuste del sello "Próximamente" en pantallas de celular */
-@media (max-width: 600px) {
-  .app-badge-proximamente {
-    padding: 5px 10px;
-    font-size: 9px;
-    gap: 5px;
+/* Estilos encapsulados: solo aplican dentro de <div class="hco-menu"> */
+
+.hco-menu {
+  /* src/features/dashboard/Menu.css */
+
+  .dashboard-page {
+    width: 100%;
+    min-height: calc(100vh - var(--header-total-height));
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #0f172a;
+    background:
+      radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 18%),
+      linear-gradient(180deg, #f8fbff 0%, #eef3f8 100%);
   }
 
-  .badge-lock-icon {
-    font-size: 10px;
-  }
-}
-
-/* =========================================
-   DISEÑO MÓDULOS "EN PROCESO" (EN DESARROLLO)
-   ========================================= */
-
-/* 1. Vista para usuarios normales (Bloqueado con tono Ámbar) */
-.app-card.app-card-proceso {
-  cursor: not-allowed !important;
-  background: #fffbeb !important; /* Fondo crema/ámbar muy suave */
-  border: 1px dashed #f59e0b !important;
-  box-shadow: none !important;
-  opacity: 0.92 !important;
-}
-
-.app-card.app-card-proceso:hover {
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.app-card.app-card-proceso:hover .app-media img {
-  transform: none !important;
-}
-
-/* Filtro semi-desaturado cálido (diferente al B&N total de Inactivo) */
-.app-card.app-card-proceso .app-media img {
-  filter: grayscale(45%) sepia(20%) contrast(0.95) brightness(0.9);
-}
-
-/* 2. Vista exclusiva para SUPERADMIN (Habilitado para entrar) */
-.app-card.app-card-proceso-admin {
-  cursor: pointer !important;
-  background: #ffffff !important;
-  border: 2px solid #f59e0b !important;
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.12) !important;
-}
-
-.app-card.app-card-proceso-admin:hover {
-  transform: translateY(-4px) !important;
-  box-shadow: 0 16px 26px rgba(245, 158, 11, 0.22) !important;
-}
-
-/* Overlay con matiz ámbar/oscuro para resaltar el sello */
-.app-card.app-card-proceso .app-media-overlay,
-.app-card.app-card-proceso-admin .app-media-overlay {
-  background: linear-gradient(
-    180deg,
-    rgba(120, 53, 15, 0.22) 0%,
-    rgba(15, 23, 42, 0.75) 100%
-  );
-}
-
-/* Sello central "EN DESARROLLO" sobre la imagen */
-.app-badge-desarrollo {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 4;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: rgba(217, 119, 6, 0.92); /* Naranja/Ámbar vibrante */
-  border: 1px solid rgba(254, 243, 199, 0.6);
-  backdrop-filter: blur(6px);
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  white-space: nowrap;
-  box-shadow: 0 8px 20px rgba(180, 83, 9, 0.35);
-}
-
-.badge-tools-icon {
-  font-size: 12px;
-  color: #fef3c7;
-}
-
-/* Ícono de la esquina inferior derecha en tono ámbar */
-.app-card.app-card-proceso .app-media-icon,
-.app-card.app-card-proceso-admin .app-media-icon {
-  background: rgba(217, 119, 6, 0.85);
-  color: #ffffff;
-}
-
-/* Etiquetas y textos internos */
-.app-card.app-card-proceso .app-pill,
-.app-card.app-card-proceso-admin .app-pill {
-  background: #fef3c7 !important;
-  color: #b45309 !important;
-  border: 1px solid #fde68a;
-}
-
-.app-card.app-card-proceso .app-card-body h3 {
-  color: #78350f !important;
-}
-
-.app-card.app-card-proceso .app-card-body p {
-  color: #92400e !important;
-}
-
-.app-card.app-card-proceso .app-card-bottom {
-  color: #b45309 !important;
-}
-
-.app-card.app-card-proceso-admin .app-card-bottom {
-  color: #d97706 !important;
-}
-
-
-
-
-/* =========================================
-Responsive  movil celular 
-========================================= */
-
-
-@media (max-width: 1200px) {
-  .apps-section-tabs .apps-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .apps-section-tabs .apps-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .contenedor-principal {
+    width: 100%;
+    max-width: 1420px;
+    margin: 0 auto;
+    padding: 22px 18px 34px;
   }
 
-  .app-category-tab {
-    padding: 15px 22px;
-    font-size: 15px;
-  }
-}
+  /* HERO */
 
-/* RESPONSIVE */
-@media (max-width: 1024px) {
   .hero-panel {
-    grid-template-columns: 1fr;
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
   }
 
-  .apps-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .hero-left,
+  .hero-right {
+    border-radius: 24px;
+    border: 1px solid #dbe5ef;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
   }
-}
 
-
-
-/* =========================================
-   NUEVO FIX CELULAR: ADELGAZAR TARJETAS 
-   ========================================= */
-@media (max-width: 768px) {
-  /* 1. Reducir el relleno interno para adelgazar la caja amarilla */
   .hero-left {
-    min-height: auto !important;
-    padding: 10px 12px !important; /* Menos espacio arriba y abajo */
+    min-height: 220px;
+    padding: 24px 28px;
   }
 
-
-  /* 2. Forzar el saludo a una sola línea y quitar margen inferior */
-  .hero-left h1 {
-    font-size: 14px !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    margin-bottom: 2px !important; /* Pegarlo más al texto de abajo */
+  .hero-right {
+    min-height: 220px;
+    padding: 16px;
   }
 
-  /* 3. MANTENER el texto "Continúe su jornada..." pero hacerlo compacto */
-  .hero-left p {
-    display: block !important; /* Lo mantenemos visible */
-    font-size: 11px !important; /* Letra ligeramente más pequeña */
-    line-height: 1.1 !important; /* Texto más junto */
-    margin: 0 !important;
+  /* TEMAS */
+
+  .hero-left.theme-dia {
+    background:
+      radial-gradient(circle at 82% 78%, rgba(249, 168, 37, 0.3) 0 42px, rgba(249, 168, 37, 0.1) 43px 88px, transparent 89px),
+      linear-gradient(135deg, #fff8e8 0%, #f2f8ef 50%, #e7f3fb 100%);
+  }
+
+  .hero-left.theme-tarde {
+    background:
+      radial-gradient(circle at 84% 78%, rgba(251, 146, 60, 0.22) 0 38px, rgba(251, 146, 60, 0.08) 39px 82px, transparent 83px),
+      linear-gradient(135deg, #fff3e9 0%, #f6eddc 42%, #e6f0fb 100%);
+  }
+
+  .hero-left.theme-noche {
+    background:
+      radial-gradient(circle at 16% 18%, rgba(255,255,255,0.55) 0 2px, transparent 3px),
+      radial-gradient(circle at 28% 10%, rgba(255,255,255,0.45) 0 2px, transparent 3px),
+      linear-gradient(135deg, #eef2ff 0%, #e8edff 52%, #dde5ff 100%);
+  }
+
+  .hero-right.theme-dia,
+  .hero-right.theme-tarde,
+  .hero-right.theme-noche {
+    background: linear-gradient(135deg, #d9ecff 0%, #b7d9ff 100%);
+    color: #13406d;
+  }
+
+  .hero-scene {
+    position: absolute;
+    right: 18px;
+    top: 14px;
+    font-size: 28px;
+    opacity: 0.28;
+    line-height: 1;
   }
 
   .hero-tags {
-    margin-bottom: 6px !important;
-    gap: 4px !important; /* Más juntas */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
   }
 
   .hero-tag {
-    min-height: 22px !important; /* Etiquetas más flaquitas */
-    padding: 3px 8px !important;
-    font-size: 9px !important;
-  }
-
-  /* ==============================================
-     NUEVO: ADELGAZAR LA TARJETA CELESTE (Reloj/Fecha)
-     ============================================== */
-  /* 1. Quitar la altura mínima obligatoria y reducir el relleno */
-  .hero-right {
-    min-height: auto !important;
-    padding: 8px 12px !important; /* Menos espacio arriba y abajo */
-  }
-
-  /* 2. Reducir el espacio entre la fila de arriba (fecha/reloj) y la hora digital */
-  .time-card {
-    gap: 1px !important; 
-    align-items: flex-start !important;
-    
-  }
-
-  /* 3. Achicar ligeramente el reloj analógico para que no empuje la caja hacia abajo */
-  .time-card-right {
-    transform: scale(0.90); /* Reduce el tamaño del reloj a un 85% */
-    transform-origin: top right !important;
-  }
-
-  /* Ocultar SOLO el texto sobrante debajo del reloj ("Continúe con sus operaciones.") */
-  .time-message {
-    display: none !important;
-  }
-
-  /* 4. Hacer la tarjeta de fecha celeste mucho más delgada */
-  .time-card-left {
-    min-height: auto !important;
-    padding: 9px 14px !important;
-  }
-  
-  /* 5. Poner 'HOY' y 'Lunes' en la misma línea */
-  .time-card-left .time-label {
-    display: inline-flex !important;
-    margin-bottom: 0 !important;
-    margin-right: 8px !important;
-    vertical-align: middle;
-  }
-  
-  .time-card-left strong {
-    display: inline-block !important;
-    font-size: 16px !important;
-    vertical-align: middle;
-    margin: 0 !important;
-  }
-  
-  .time-card-left small {
-    display: block !important;
-    margin-top: 2px !important;
-    font-size: 11px !important;
-  }
-
-  /* 6. Ajustar el reloj para que no ocupe tanto espacio abajo */
-  .time-card-footer {
-    gap: 0 !important;
-    margin-top: -9px !important;
-  }
-  
-  .digital-time {
-    font-size: 18px !important;
-  }
-
-  
-}
-
-@media (max-width: 600px) {
-  /* =========================================
-     1. CONTENEDOR DE PESTAÑAS (Más delgado)
-     ========================================= */
-  .app-category-tabs {
-    padding: 6px 4px; 
-    gap: 2px; 
-    flex-wrap: nowrap; 
-    justify-content: space-between;
-    overflow-x: hidden; 
-  }
-
-  /* =========================================
-     2. BOTONES DE PESTAÑAS (Cuadrados y compactos)
-     ========================================= */
-  .app-category-tab {
-    flex: 1 1 0; 
-    min-width: 0; 
-    padding: 10px 0; 
-    font-size: 13px !important; 
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 11px;
     font-weight: 800;
-    text-align: center;
-    border-radius: 6px !important; 
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: rgba(15, 76, 129, 0.08);
+    color: #0f4c81;
+  }
+
+  .hero-tag.soft {
+    background: rgba(255, 255, 255, 0.58);
+    color: #0f172a;
+  }
+
+  .hero-left h1 {
+    margin: 0 0 8px;
+    max-width: 92%;
+    font-size: 28px;
+    line-height: 1.15;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .hero-left p {
+    margin: 0;
+    max-width: 88%;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #334155;
+  }
+
+  .hero-mini-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .hero-mini-card {
+    min-width: 150px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.42);
+    border: 1px solid rgba(255, 255, 255, 0.62);
+  }
+
+  .hero-mini-card small {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #475569;
+  }
+
+  .hero-mini-card strong {
+    display: block;
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  /* RELOJ */
+
+  .time-card {
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 118px;
+    grid-template-rows: auto auto;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .time-card-left {
+    min-height: 116px;
+    padding: 14px;
+    border-radius: 20px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.44);
+  }
+
+  .time-label {
+    display: inline-flex;
+    align-self: flex-start;
+    min-height: 26px;
+    padding: 4px 10px;
+    margin-bottom: 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.48);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .time-card-left strong {
+    display: block;
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  .time-card-left small {
+    display: block;
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .time-scene-mini {
+    position: absolute;
+    right: 12px;
+    top: 10px;
+    font-size: 18px;
+  }
+
+  .time-card-right {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 38px;
-    letter-spacing: -0.2px; 
   }
 
-  .app-category-tab.active {
-    border-radius: 6px !important; 
+  .clock-face {
+    width: 112px;
+    height: 112px;
+    position: relative;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at center, rgba(255,255,255,0.85) 0 18px, rgba(255,255,255,0.24) 19px 56px, rgba(255,255,255,0.08) 57px 100%);
+    border: 4px solid rgba(255,255,255,0.52);
+    box-shadow: inset 0 0 14px rgba(255,255,255,0.25), 0 10px 22px rgba(15, 76, 129, 0.12);
   }
 
-  /* =========================================
-     3. OCULTAR TEXTO LARGO Y MOSTRAR CORTO
-     ========================================= */
-  .tab-label-full {
-    display: none !important;
+  .clock-face::before {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+      from -90deg,
+      rgba(30, 64, 175, 0.78) 0deg 2deg,
+      transparent 2deg 30deg
+    );
+    -webkit-mask: radial-gradient(circle, transparent 0 33px, #000 34px);
+    mask: radial-gradient(circle, transparent 0 33px, #000 34px);
   }
 
-  .tab-label-short {
-    display: inline-block !important;
+  .clock-hand {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    transform-origin: bottom center;
+    border-radius: 999px;
+    z-index: 3;
   }
 
-  /* =========================================
-     4. PEGAR MÁS A LOS BORDES (Márgenes laterales)
-     ========================================= */
-  .contenedor-principal {
-    padding: 16px 10px 24px !important; /* De 18px pasamos a 8px en los lados */
-  }
-  
-  .hero-left, .hero-right {
-    padding: 14px 10px !important; /* Tarjetas de saludo más pegadas al borde */
+  .hour-hand {
+    width: 5px;
+    height: 24px;
+    background: #275d95;
   }
 
-  .apps-section-tabs .apps-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px; /* Reducimos la separación entre tarjetas */
-    padding: 0 10px 16px !important; /* Grilla de tarjetas más pegada al borde */
+  .minute-hand {
+    width: 4px;
+    height: 37px;
+    background: #3d79bb;
   }
 
-  .tabs-section-head {
-    padding: 13px 13px 0 !important; /* Título más pegado al borde izquierdo */
+  .second-hand {
+    width: 2px;
+    height: 43px;
+    background: #f59e0b;
   }
 
-  /* =========================================
-     5. ACHICAR TÍTULOS GRANDES (Excelencia Operativa, etc.)
-     ========================================= */
+  .clock-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: #ffffff;
+    border: 2px solid #3d79bb;
+    z-index: 4;
+  }
+
+  .time-card-footer {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .digital-time {
+    text-align: center;
+    font-size: 24px;
+    line-height: 1.1;
+    font-weight: 900;
+    letter-spacing: 0.4px;
+  }
+
+  .time-message {
+    text-align: center;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid rgba(255,255,255,0.32);
+    font-size: 12px;
+  }
+
+  /* SECCIÓN */
+
+  .section-head {
+    margin-bottom: 14px;
+  }
+
   .section-head h2 {
-    font-size: 18px !important; /* Antes era 22px */
-    margin-bottom: 2px !important;
-  }
-  
-  .section-head p {
-    font-size: 12px !important; /* Antes era 14px */
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
   }
 
-  /* =========================================
-     6. ACHICAR TARJETAS (Iconos y Descripciones)
-     ========================================= */
+  .section-head p {
+    margin: 0;
+    font-size: 14px;
+    color: #64748b;
+  }
+
+  /* GRID CORREGIDO */
+
+  .apps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  /* CARD CORREGIDA PARA QUE NO LA PISE CSS GLOBAL */
+
+  .app-card {
+    all: unset;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    text-align: left !important;
+    cursor: pointer !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 20px !important;
+    background: #ffffff !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05) !important;
+    transition: all 0.25s ease !important;
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .app-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 26px rgba(15, 76, 129, 0.1) !important;
+  }
+
+  .app-media {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+    background: #e5e7eb;
+    display: block;
+  }
+
+  .app-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .app-card:hover .app-media img {
+    transform: scale(1.04);
+  }
+
+  .app-media-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(15,23,42,0.08) 0%, rgba(15,23,42,0.45) 100%);
+  }
+
   .app-media-icon {
-    width: 30px !important; /* Antes 42px */
-    height: 30px !important; 
-    font-size: 14px !important; /* Icono interno más chico */
-    right: 8px !important;
-    bottom: 8px !important;
-    border-radius: 8px !important;
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 16px;
+    backdrop-filter: blur(4px);
+    background: rgba(255,255,255,0.16);
   }
 
   .app-card-body {
-    padding: 10px !important; /* Menos espacio en blanco dentro de la tarjeta */
-    gap: 6px !important;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
   }
 
   .app-pill {
-    font-size: 9px !important; /* Etiqueta (Ej. INGRESAR) más pequeña */
-    padding: 3px 8px !important;
-    min-height: 22px !important;
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
   }
 
   .app-card-body h3 {
-    font-size: 14px !important; /* Título de la app (Ej. Tarjetas de Anomalía) */
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: #0f172a;
   }
 
   .app-card-body p {
-    font-size: 11px !important; /* Descripción más chica */
-    line-height: 1.3 !important;
-    min-height: 44px !important; /* Ajuste para que no quede tanto hueco blanco */
+    margin: 0;
+    min-height: 58px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #64748b;
   }
 
   .app-card-bottom {
-    font-size: 11px !important; /* Botón inferior (Abrir ->) más chico */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    color: #0f4c81;
+    font-size: 13px;
+    font-weight: 800;
   }
 
-  /* Ocultar elementos sobrantes en móvil */
-  .hero-mini-cards {
+  .accent-blue .app-pill {
+    color: #0f4c81;
+  }
+
+  .accent-cyan .app-pill {
+    color: #0284c7;
+  }
+
+  .accent-slate .app-pill {
+    color: #475569;
+  }
+
+  .accent-violet .app-pill {
+    color: #5b21b6;
+  }
+
+  .accent-red .app-pill {
+    color: #dc2626;
+  }
+
+  /* RECORDATORIO */
+
+  .recordatorio-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 99999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+
+  .recordatorio-card {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    padding: 22px 20px 20px;
+    text-align: center;
+  }
+
+  .recordatorio-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 22px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .recordatorio-img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+
+  .recordatorio-title {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .recordatorio-text {
+    margin: 0 0 16px;
+    font-size: 15px;
+    color: #334155;
+  }
+
+  .recordatorio-btn {
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    background: #198754;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+
+  .recordatorio-btn:hover {
+    background: #157347;
+  }
+
+  .tab-label-short {
     display: none;
   }
 
-    /* =========================================
-     7. ACHICAR ESPACIO ENTRE RELOJ Y PESTAÑAS
+  /* =========================================
+     PESTAÑAS - DISEÑO BOTONES (PILLS)
      ========================================= */
-  .hero-panel {
-    margin-bottom: 10px !important; /* Originalmente era 24px */
-    gap: 10px !important; /* También reduce el espacio entre el saludo y el reloj */
+
+  .apps-section-tabs {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(18, 56, 91, 0.04);
   }
 
+  .app-category-tabs {
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0; 
+    padding: 14px 16px; /* Espacio para que respiren los botones */
+    gap: 10px; /* Separación entre cada botón */
+    overflow-x: auto;
+    scrollbar-width: none; /* Oculta scrollbar en Firefox */
+  }
+
+  .app-category-tabs::-webkit-scrollbar {
+    display: none; /* Oculta scrollbar en Chrome/Safari */
+  }
+
+  /* Diseño base de cada pestaña (Inactiva) */
+
+  .app-category-tab {
+    all: unset;
+    box-sizing: border-box;
+    position: relative;
+    padding: 10px 22px; /* Damos forma de botón */
+    border-radius: 999px; /* Forma de píldora (totalmente curvo) */
+    cursor: pointer;
+    color: #64748b; /* Gris oscuro para las que no están seleccionadas */
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: all 0.25s ease;
+  }
+
+  /* Efecto al pasar el mouse por las pestañas inactivas */
+
+  .app-category-tab:hover {
+    color: #0f172a;
+    background: #f1f5f9; /* Fondo gris muy suave */
+  }
+
+  /* ESTADO ACTIVO: AZUL CON LETRAS BLANCAS */
+
+  .app-category-tab.active {
+    background: #0f4c81 !important; /* Azul corporativo */
+    color: #ffffff !important; /* Letras blancas */
+    box-shadow: 0 4px 12px rgba(15, 76, 129, 0.25); /* Sombra elegante azul */
+  }
+
+  /* Eliminamos la línea inferior antigua que teníamos */
+
+  .app-category-tab::after {
+    display: none !important;
+  }
+
+  .tabs-section-head {
+    padding: 24px 24px 0;
+    margin-bottom: 16px;
+  }
+
+  /* 5 CARDS POR FILA */
+
+  .apps-section-tabs .apps-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+    padding: 0 20px 24px;
+  }
+
+  & button,
+  & a,
+  .app-category-tab,
+  .app-card,
+  .recordatorio-btn {
+    touch-action: manipulation !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  /* =========================================
+     DISEÑO MÓDULOS INACTIVOS (BLANCO Y NEGRO + BLOQUEADO)
+     ========================================= */
+
+  .app-card.app-card-inactivo {
+    cursor: not-allowed !important;
+    background: #f8fafc !important;
+    border: 1px dashed #cbd5e1 !important;
+    box-shadow: none !important;
+    opacity: 0.82 !important;
+  }
+
+  /* Evitar que la tarjeta suba o haga zoom al pasar el mouse */
+
+  .app-card.app-card-inactivo:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .app-card.app-card-inactivo:hover .app-media img {
+    transform: none !important;
+  }
+
+  /* Imagen en blanco y negro (escala de grises) */
+
+  .app-card.app-card-inactivo .app-media img {
+    filter: grayscale(100%) contrast(0.9) brightness(0.85);
+  }
+
+  /* Oscurecer un poco más el fondo de la foto para que resalte el candado */
+
+  .app-card.app-card-inactivo .app-media-overlay {
+    background: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.35) 0%,
+      rgba(15, 23, 42, 0.72) 100%
+    );
+  }
+
+  /* Sello central "PRÓXIMAMENTE" sobre la imagen */
+
+  .app-badge-proximamente {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    backdrop-filter: blur(6px);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  }
+
+  .badge-lock-icon {
+    font-size: 12px;
+    color: #cbd5e1;
+  }
+
+  /* Ícono de la esquina inferior derecha en tono gris */
+
+  .app-card.app-card-inactivo .app-media-icon {
+    background: rgba(15, 23, 42, 0.55);
+    color: #cbd5e1;
+  }
+
+  /* Textos y etiquetas internas en tonos grises */
+
+  .app-card.app-card-inactivo .app-pill {
+    background: #e2e8f0 !important;
+    color: #64748b !important;
+  }
+
+  .app-card.app-card-inactivo .app-card-body h3 {
+    color: #64748b !important;
+  }
+
+  .app-card.app-card-inactivo .app-card-body p {
+    color: #94a3b8 !important;
+  }
+
+  .app-card.app-card-inactivo .app-card-bottom {
+    color: #94a3b8 !important;
+  }
+
+  /* Ajuste del sello "Próximamente" en pantallas de celular */
+
+  @media (max-width: 600px) {
+    .app-badge-proximamente {
+        padding: 5px 10px;
+        font-size: 9px;
+        gap: 5px;
+      }
+
+    .badge-lock-icon {
+        font-size: 10px;
+      }
+  }
+
+  /* =========================================
+     DISEÑO MÓDULOS "EN PROCESO" (EN DESARROLLO)
+     ========================================= */
+
+  /* 1. Vista para usuarios normales (Bloqueado con tono Ámbar) */
+
+  .app-card.app-card-proceso {
+    cursor: not-allowed !important;
+    background: #fffbeb !important; /* Fondo crema/ámbar muy suave */
+    border: 1px dashed #f59e0b !important;
+    box-shadow: none !important;
+    opacity: 0.92 !important;
+  }
+
+  .app-card.app-card-proceso:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  .app-card.app-card-proceso:hover .app-media img {
+    transform: none !important;
+  }
+
+  /* Filtro semi-desaturado cálido (diferente al B&N total de Inactivo) */
+
+  .app-card.app-card-proceso .app-media img {
+    filter: grayscale(45%) sepia(20%) contrast(0.95) brightness(0.9);
+  }
+
+  /* 2. Vista exclusiva para SUPERADMIN (Habilitado para entrar) */
+
+  .app-card.app-card-proceso-admin {
+    cursor: pointer !important;
+    background: #ffffff !important;
+    border: 2px solid #f59e0b !important;
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.12) !important;
+  }
+
+  .app-card.app-card-proceso-admin:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 16px 26px rgba(245, 158, 11, 0.22) !important;
+  }
+
+  /* Overlay con matiz ámbar/oscuro para resaltar el sello */
+
+  .app-card.app-card-proceso .app-media-overlay,
+  .app-card.app-card-proceso-admin .app-media-overlay {
+    background: linear-gradient(
+      180deg,
+      rgba(120, 53, 15, 0.22) 0%,
+      rgba(15, 23, 42, 0.75) 100%
+    );
+  }
+
+  /* Sello central "EN DESARROLLO" sobre la imagen */
+
   .app-badge-desarrollo {
-    padding: 5px 10px;
-    font-size: 9px;
-    gap: 5px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(217, 119, 6, 0.92); /* Naranja/Ámbar vibrante */
+    border: 1px solid rgba(254, 243, 199, 0.6);
+    backdrop-filter: blur(6px);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    box-shadow: 0 8px 20px rgba(180, 83, 9, 0.35);
   }
 
   .badge-tools-icon {
-    font-size: 10px;
-  }
-}
-
-
-@media (max-width: 480px) {
-  .apps-section-tabs .apps-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 420px) {
-  .hero-left h1 {
-    font-size: 22px;
+    font-size: 12px;
+    color: #fef3c7;
   }
 
-  .apps-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Ícono de la esquina inferior derecha en tono ámbar */
+
+  .app-card.app-card-proceso .app-media-icon,
+  .app-card.app-card-proceso-admin .app-media-icon {
+    background: rgba(217, 119, 6, 0.85);
+    color: #ffffff;
   }
 
-  .app-card-body h3 {
-    font-size: 14px;
+  /* Etiquetas y textos internos */
+
+  .app-card.app-card-proceso .app-pill,
+  .app-card.app-card-proceso-admin .app-pill {
+    background: #fef3c7 !important;
+    color: #b45309 !important;
+    border: 1px solid #fde68a;
+  }
+
+  .app-card.app-card-proceso .app-card-body h3 {
+    color: #78350f !important;
+  }
+
+  .app-card.app-card-proceso .app-card-body p {
+    color: #92400e !important;
+  }
+
+  .app-card.app-card-proceso .app-card-bottom {
+    color: #b45309 !important;
+  }
+
+  .app-card.app-card-proceso-admin .app-card-bottom {
+    color: #d97706 !important;
+  }
+
+  /* =========================================
+  Responsive  movil celular 
+  ========================================= */
+
+  @media (max-width: 1200px) {
+    .apps-section-tabs .apps-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+  }
+
+  @media (max-width: 900px) {
+    .apps-section-tabs .apps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+    .app-category-tab {
+        padding: 15px 22px;
+        font-size: 15px;
+      }
+  }
+
+  /* RESPONSIVE */
+
+  @media (max-width: 1024px) {
+    .hero-panel {
+        grid-template-columns: 1fr;
+      }
+
+    .apps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+  }
+
+  /* =========================================
+     NUEVO FIX CELULAR: ADELGAZAR TARJETAS 
+     ========================================= */
+
+  @media (max-width: 768px) {
+    /* 1. Reducir el relleno interno para adelgazar la caja amarilla */
+
+    .hero-left {
+        min-height: auto !important;
+        padding: 10px 12px !important; /* Menos espacio arriba y abajo */
+      }
+
+    /* 2. Forzar el saludo a una sola línea y quitar margen inferior */
+
+    .hero-left h1 {
+        font-size: 14px !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin-bottom: 2px !important; /* Pegarlo más al texto de abajo */
+      }
+
+    /* 3. MANTENER el texto "Continúe su jornada..." pero hacerlo compacto */
+
+    .hero-left p {
+        display: block !important; /* Lo mantenemos visible */
+        font-size: 11px !important; /* Letra ligeramente más pequeña */
+        line-height: 1.1 !important; /* Texto más junto */
+        margin: 0 !important;
+      }
+
+    .hero-tags {
+        margin-bottom: 6px !important;
+        gap: 4px !important; /* Más juntas */
+      }
+
+    .hero-tag {
+        min-height: 22px !important; /* Etiquetas más flaquitas */
+        padding: 3px 8px !important;
+        font-size: 9px !important;
+      }
+
+    /* ==============================================
+         NUEVO: ADELGAZAR LA TARJETA CELESTE (Reloj/Fecha)
+         ============================================== */
+
+    /* 1. Quitar la altura mínima obligatoria y reducir el relleno */
+
+    .hero-right {
+        min-height: auto !important;
+        padding: 8px 12px !important; /* Menos espacio arriba y abajo */
+      }
+
+    /* 2. Reducir el espacio entre la fila de arriba (fecha/reloj) y la hora digital */
+
+    .time-card {
+        gap: 1px !important; 
+        align-items: flex-start !important;
+
+      }
+
+    /* 3. Achicar ligeramente el reloj analógico para que no empuje la caja hacia abajo */
+
+    .time-card-right {
+        transform: scale(0.90); /* Reduce el tamaño del reloj a un 85% */
+        transform-origin: top right !important;
+      }
+
+    /* Ocultar SOLO el texto sobrante debajo del reloj ("Continúe con sus operaciones.") */
+
+    .time-message {
+        display: none !important;
+      }
+
+    /* 4. Hacer la tarjeta de fecha celeste mucho más delgada */
+
+    .time-card-left {
+        min-height: auto !important;
+        padding: 9px 14px !important;
+      }
+
+    /* 5. Poner 'HOY' y 'Lunes' en la misma línea */
+
+    .time-card-left .time-label {
+        display: inline-flex !important;
+        margin-bottom: 0 !important;
+        margin-right: 8px !important;
+        vertical-align: middle;
+      }
+
+    .time-card-left strong {
+        display: inline-block !important;
+        font-size: 16px !important;
+        vertical-align: middle;
+        margin: 0 !important;
+      }
+
+    .time-card-left small {
+        display: block !important;
+        margin-top: 2px !important;
+        font-size: 11px !important;
+      }
+
+    /* 6. Ajustar el reloj para que no ocupe tanto espacio abajo */
+
+    .time-card-footer {
+        gap: 0 !important;
+        margin-top: -9px !important;
+      }
+
+    .digital-time {
+        font-size: 18px !important;
+      }
+  }
+
+  @media (max-width: 600px) {
+    /* =========================================
+         1. CONTENEDOR DE PESTAÑAS (Más delgado)
+         ========================================= */
+
+    .app-category-tabs {
+        padding: 6px 4px; 
+        gap: 2px; 
+        flex-wrap: nowrap; 
+        justify-content: space-between;
+        overflow-x: hidden; 
+      }
+
+    /* =========================================
+         2. BOTONES DE PESTAÑAS (Cuadrados y compactos)
+         ========================================= */
+
+    .app-category-tab {
+        flex: 1 1 0; 
+        min-width: 0; 
+        padding: 10px 0; 
+        font-size: 13px !important; 
+        font-weight: 800;
+        text-align: center;
+        border-radius: 6px !important; 
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+        letter-spacing: -0.2px; 
+      }
+
+    .app-category-tab.active {
+        border-radius: 6px !important; 
+      }
+
+    /* =========================================
+         3. OCULTAR TEXTO LARGO Y MOSTRAR CORTO
+         ========================================= */
+
+    .tab-label-full {
+        display: none !important;
+      }
+
+    .tab-label-short {
+        display: inline-block !important;
+      }
+
+    /* =========================================
+         4. PEGAR MÁS A LOS BORDES (Márgenes laterales)
+         ========================================= */
+
+    .contenedor-principal {
+        padding: 16px 10px 24px !important; /* De 18px pasamos a 8px en los lados */
+      }
+
+    .hero-left,
+    .hero-right {
+        padding: 14px 10px !important; /* Tarjetas de saludo más pegadas al borde */
+      }
+
+    .apps-section-tabs .apps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px; /* Reducimos la separación entre tarjetas */
+        padding: 0 10px 16px !important; /* Grilla de tarjetas más pegada al borde */
+      }
+
+    .tabs-section-head {
+        padding: 13px 13px 0 !important; /* Título más pegado al borde izquierdo */
+      }
+
+    /* =========================================
+         5. ACHICAR TÍTULOS GRANDES (Excelencia Operativa, etc.)
+         ========================================= */
+
+    .section-head h2 {
+        font-size: 18px !important; /* Antes era 22px */
+        margin-bottom: 2px !important;
+      }
+
+    .section-head p {
+        font-size: 12px !important; /* Antes era 14px */
+      }
+
+    /* =========================================
+         6. ACHICAR TARJETAS (Iconos y Descripciones)
+         ========================================= */
+
+    .app-media-icon {
+        width: 30px !important; /* Antes 42px */
+        height: 30px !important; 
+        font-size: 14px !important; /* Icono interno más chico */
+        right: 8px !important;
+        bottom: 8px !important;
+        border-radius: 8px !important;
+      }
+
+    .app-card-body {
+        padding: 10px !important; /* Menos espacio en blanco dentro de la tarjeta */
+        gap: 6px !important;
+      }
+
+    .app-pill {
+        font-size: 9px !important; /* Etiqueta (Ej. INGRESAR) más pequeña */
+        padding: 3px 8px !important;
+        min-height: 22px !important;
+      }
+
+    .app-card-body h3 {
+        font-size: 14px !important; /* Título de la app (Ej. Tarjetas de Anomalía) */
+      }
+
+    .app-card-body p {
+        font-size: 11px !important; /* Descripción más chica */
+        line-height: 1.3 !important;
+        min-height: 44px !important; /* Ajuste para que no quede tanto hueco blanco */
+      }
+
+    .app-card-bottom {
+        font-size: 11px !important; /* Botón inferior (Abrir ->) más chico */
+      }
+
+    /* Ocultar elementos sobrantes en móvil */
+
+    .hero-mini-cards {
+        display: none;
+      }
+
+    /* =========================================
+         7. ACHICAR ESPACIO ENTRE RELOJ Y PESTAÑAS
+         ========================================= */
+
+    .hero-panel {
+        margin-bottom: 10px !important; /* Originalmente era 24px */
+        gap: 10px !important; /* También reduce el espacio entre el saludo y el reloj */
+      }
+
+    .app-badge-desarrollo {
+        padding: 5px 10px;
+        font-size: 9px;
+        gap: 5px;
+      }
+
+    .badge-tools-icon {
+        font-size: 10px;
+      }
+  }
+
+  @media (max-width: 480px) {
+    .apps-section-tabs .apps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+  }
+
+  @media (max-width: 420px) {
+    .hero-left h1 {
+        font-size: 22px;
+      }
+
+    .apps-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+    .app-card-body h3 {
+        font-size: 14px;
+      }
   }
 }

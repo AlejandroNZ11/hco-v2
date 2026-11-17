@@ -32,7 +32,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export default function TrackingMHE() {
+function TrackingMHEContenido() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
 
@@ -834,6 +834,15 @@ export default function TrackingMHE() {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingMHE(props) {
+  return (
+    <div className="hco-scope hco-tracking-mhe">
+      <TrackingMHEContenido {...props} />
     </div>
   );
 }

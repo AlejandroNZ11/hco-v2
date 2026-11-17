@@ -61,7 +61,7 @@ function SvgDonut({ slices, totalCenter, subtitleCenter }) {
   );
 }
 
-export default function DashboardLup() {
+function DashboardLupContenido() {
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
 
@@ -542,6 +542,15 @@ export default function DashboardLup() {
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function DashboardLup(props) {
+  return (
+    <div className="hco-scope hco-dashboard-lup">
+      <DashboardLupContenido {...props} />
     </div>
   );
 }

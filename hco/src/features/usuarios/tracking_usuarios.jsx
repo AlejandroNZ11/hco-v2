@@ -27,7 +27,7 @@ const normalize = (text) =>
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
 
-export default function TrackingUsuarios() {
+function TrackingUsuariosContenido() {
   const navigate = useNavigate();
   const isOnline = useNetwork();
 
@@ -478,6 +478,15 @@ export default function TrackingUsuarios() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingUsuarios(props) {
+  return (
+    <div className="hco-scope hco-tracking-usuarios">
+      <TrackingUsuariosContenido {...props} />
     </div>
   );
 }

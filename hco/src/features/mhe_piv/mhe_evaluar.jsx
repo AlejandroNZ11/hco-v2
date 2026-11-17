@@ -40,7 +40,7 @@ const normalizarTexto = (txt) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-export default function MheEvaluar() {
+function MheEvaluarContenido() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -1354,6 +1354,15 @@ export default function MheEvaluar() {
 
         </form>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function MheEvaluar(props) {
+  return (
+    <div className="hco-scope hco-mhe-evaluar hco-registra-usuario">
+      <MheEvaluarContenido {...props} />
     </div>
   );
 }

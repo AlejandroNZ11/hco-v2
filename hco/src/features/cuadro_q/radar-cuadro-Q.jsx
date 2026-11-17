@@ -27,7 +27,7 @@ const Q_POSITIONS = {
   31: [2, 6]
 };
 
-export default function RadarCuadroQ() {
+function RadarCuadroQContenido() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(true);
@@ -517,6 +517,15 @@ export default function RadarCuadroQ() {
         })}
       </section>
       
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function RadarCuadroQ(props) {
+  return (
+    <div className="hco-scope hco-radar-cuadroq">
+      <RadarCuadroQContenido {...props} />
     </div>
   );
 }

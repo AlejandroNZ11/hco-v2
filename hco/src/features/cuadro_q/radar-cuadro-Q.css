@@ -1,526 +1,555 @@
-/* =========================================
-   ESTILOS - RADAR DE CUADRO Q
-   ========================================= */
+/* Estilos encapsulados: solo aplican dentro de <div class="hco-radar-cuadroq"> */
 
-:root {
-  --blue: #072B5C;
-  --red: #ff0000;
-  --green: #4cff28;
-  --yellow: #fff200;
-  --gray: #bfbfbf;
-  --bg: #f4f7fb;
-  --card: #ffffff;
-  --text: #102033;
-  --muted: #64748b;
-  --border: #111111;
-}
+.hco-radar-cuadroq {
+  /* =========================================
+     ESTILOS - RADAR DE CUADRO Q
+     ========================================= */
 
-.radar-page {
-  width: 100%;
-  padding: 16px 22px 40px;
-  color: var(--text);
-  background-color: var(--bg);
-  min-height: calc(100vh - 110px);
-  box-sizing: border-box;
-}
-
-/* =========================================
-   CABECERA COMPACTA (ESTILO REGISTRO CUADRO Q)
-   ========================================= */
-.radar-header-card {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  padding: 14px 20px;
-  margin-bottom: 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04);
-}
-
-.radar-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 2px;
-}
-
-.field-badge.auto {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 6px;
-  letter-spacing: 0.3px;
-  background: #e0f2fe;
-  color: #0369a1;
-}
-
-.radar-header-card h1 {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 800;
-  color: #0b2239;
-}
-
-.radar-header-card p {
-  margin: 0;
-  color: #64748b;
-  font-size: 12.5px;
-}
-
-.radar-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.radar-actions select {
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  background-color: #f8fafc;
-  color: #0f172a;
-  font-size: 12.5px;
-  font-weight: 700;
-  outline: none;
-  cursor: pointer;
-  transition: border-color 0.2s, background-color 0.2s;
-}
-
-.radar-actions select:focus {
-  border-color: #0f4c81;
-  background-color: #ffffff;
-}
-
-.radar-actions .primary-btn {
-  height: 36px;
-  background: #0f4c81;
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  padding: 0 16px;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.radar-actions .primary-btn:hover {
-  background: #145d9b;
-}
-
-.radar-actions .secondary-btn {
-  height: 36px;
-  background: #eef2f7;
-  color: #1e3a6d;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 0 14px;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.radar-actions .secondary-btn:hover {
-  background: #e2e8f0;
-}
-
-/* =========================================
-   PANEL DE RESUMEN DELGADO Y CON COLORES
-   ========================================= */
-.summary-panel {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(130px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.summary-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-left-width: 5px;
-  border-radius: 12px;
-  padding: 10px 14px;
-  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.summary-card.quality { border-left-color: #16a34a; }
-.summary-card.internal { border-left-color: #eab308; }
-.summary-card.rejection { border-left-color: #dc2626; }
-.summary-card.stop { border-left-color: #64748b; }
-
-.summary-card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.summary-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.summary-tag.quality {
-  background: #dcfce7;
-  color: #166534;
-  border: 1px solid #bbf7d0;
-}
-
-.summary-tag.internal {
-  background: #fef08a;
-  color: #854d0e;
-  border: 1px solid #fde047;
-}
-
-.summary-tag.rejection {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
-}
-
-.summary-tag.stop {
-  background: #e2e8f0;
-  color: #334155;
-  border: 1px solid #cbd5e1;
-}
-
-.summary-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  border: 1px solid #111;
-}
-
-.summary-dot.quality { background: var(--green); }
-.summary-dot.internal { background: var(--yellow); }
-.summary-dot.rejection { background: var(--red); }
-.summary-dot.stop { background: var(--gray); }
-
-.summary-card strong {
-  display: block;
-  font-size: 21px;
-  font-weight: 900;
-  color: #0b2239;
-  line-height: 1.1;
-}
-
-/* =========================================
-   GRILLA DE MESES Y TABLERO "Q" UNIDO (SIN GAP)
-   ========================================= */
-.radar-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  align-items: start;
-}
-
-.month-card {
-  background: var(--card);
-  border: 1px solid #cbd5e1;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
-}
-
-.month-title {
-  background: var(--blue);
-  color: #fff;
-  text-align: center;
-  font-weight: 900;
-  font-size: 16px;
-  padding: 9px 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.month-body {
-  position: relative;
-  min-height: 365px;
-  padding: 16px 8px 100px;
-  overflow: hidden;
-  background: #ffffff;
-}
-
-/* Tablero con forma de Q: cuadraditos unidos sin separación como Imagen 4 */
-/* Tablero con forma de Q */
-.q-board {
-  --q-cell-w: clamp(23px, 1.95vw, 33px);
-  --q-cell-h: clamp(16px, 1.3vw, 21px);
-
-  width: max-content;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(13, var(--q-cell-w));
-  grid-template-rows: repeat(16, var(--q-cell-h));
-  gap: 0 !important;
-  padding: 1px 0 0 1px; /* Da espacio para que el borde exterior no se corte */
-}
-
-/* Celdas de los días */
-.q-day {
-  /* ESTA ES LA MAGIA: 100% del tamaño + 1px extra para que superponga exactamente */
-  width: calc(100% + 1px) !important;
-  height: calc(100% + 1px) !important;
-  margin: -1px 0 0 -1px !important;
-  
-  border: 1px solid #111 !important;
-  border-radius: 0 !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(10px, 0.85vw, 13px);
-  font-weight: 700;
-  color: #000;
-  background: #fff;
-  line-height: 1;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-  z-index: 1;
-}
-
-/* Cuadro vacío de relleno */
-.q-day.empty-box {
-  background: #ffffff;
-  color: transparent;
-  pointer-events: none; /* Hace que no sea clickeable ni interactivo */
-}
-
-
-
-/* Estados de los días */
-.q-day.quality {
-  background: var(--green);
-}
-
-.q-day.internal {
-  background: var(--yellow);
-}
-
-.q-day.rejection {
-  background: var(--red);
-  color: #fff;
-}
-
-.q-day.stop {
-  background: var(--gray);
-}
-
-.q-day.future {
-  background: #ffffff;
-  color: #000;
-}
-
-/* Cursor interactivo y resaltado al tocar/clickear un día */
-.q-day:not(.empty-box) {
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.q-day.active-day {
-  z-index: 5 !important;
-  outline: 2.5px solid #072B5C !important;
-  box-shadow: 0 0 8px rgba(7, 43, 92, 0.45);
-  transform: scale(1.08);
-}
-
-/* Tooltip flotante al hacer clic o tocar en móvil */
-.q-touch-tooltip {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(38, 38, 38, 0.96);
-  color: #ffffff;
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid #555;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  z-index: 20;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-/* Se ubica abajo si tocas un día de arriba, y arriba si tocas un día de abajo */
-.q-touch-tooltip.pos-bottom {
-  top: 165px;
-}
-
-.q-touch-tooltip.pos-top {
-  top: 85px;
-}
-
-
-/* Leyenda inferior de cada mes (con espacio entre ítems) */
-.month-legend {
-  position: absolute;
-  left: 16px;
-  bottom: 14px;
-  display: grid;
-  grid-template-columns: 24px auto; /* Ancho ajustado para la cajita */
-  align-items: center;
-  row-gap: 1px; /* ESPACIO de separación entre cada fila */
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.legend-box {
-  width: 24px;
-  height: 16px;
-  border: 1px solid #111; /* Borde fino de 1px */
-  border-radius: 3px; /* Curva ligera para que luzca mejor */
-  margin-top: 0; /* Quitamos el margen negativo para que no se peguen */
-}
-
-
-.legend-box.quality { background: var(--green); }
-.legend-box.internal { background: var(--yellow); }
-.legend-box.rejection { background: var(--red); }
-.legend-box.stop { background: var(--gray); }
-
-.legend-label {
-  padding-left: 6px;
-  white-space: nowrap;
-  color: #111;
-}
-
-/* =========================================
-   ADAPTACIÓN RESPONSIVA PARA MÓVILES (360px)
-   ========================================= */
-
-@media (max-width: 1024px) {
-  .radar-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  & {
+    --blue: #072B5C;
+    --red: #ff0000;
+    --green: #4cff28;
+    --yellow: #fff200;
+    --gray: #bfbfbf;
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --text: #102033;
+    --muted: #64748b;
+    --border: #111111;
   }
-}
 
-@media (max-width: 760px) {
   .radar-page {
-    padding: 12px 10px 32px;
+    width: 100%;
+    padding: 16px 22px 40px;
+    color: var(--text);
+    background-color: var(--bg);
+    min-height: calc(100vh - 110px);
+    box-sizing: border-box;
   }
+
+  /* =========================================
+     CABECERA COMPACTA (ESTILO REGISTRO CUADRO Q)
+     ========================================= */
 
   .radar-header-card {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 14px;
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 14px 20px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04);
+  }
+
+  .radar-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+
+  .field-badge.auto {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.3px;
+    background: #e0f2fe;
+    color: #0369a1;
+  }
+
+  .radar-header-card h1 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
+    color: #0b2239;
+  }
+
+  .radar-header-card p {
+    margin: 0;
+    color: #64748b;
+    font-size: 12.5px;
   }
 
   .radar-actions {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
     gap: 8px;
-  }
-
-  .radar-actions select:first-child {
-    grid-column: 1 / -1;
-  }
-
-  .radar-actions select,
-  .radar-actions button {
-    width: 100%;
-  }
-
-  .summary-panel {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-
-  .summary-panel {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-
-  /* 1. Ajustar el relleno y centrar todo en la tarjeta */
-  .summary-card {
-    padding: 10px 6px;
+    flex-wrap: wrap;
     align-items: center;
-    text-align: center;
   }
 
-  /* 2. Centrar la zona de la etiqueta */
+  .radar-actions select {
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-size: 12.5px;
+    font-weight: 700;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .radar-actions select:focus {
+    border-color: #0f4c81;
+    background-color: #ffffff;
+  }
+
+  .radar-actions .primary-btn {
+    height: 36px;
+    background: #0f4c81;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0 16px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .radar-actions .primary-btn:hover {
+    background: #145d9b;
+  }
+
+  .radar-actions .secondary-btn {
+    height: 36px;
+    background: #eef2f7;
+    color: #1e3a6d;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .radar-actions .secondary-btn:hover {
+    background: #e2e8f0;
+  }
+
+  /* =========================================
+     PANEL DE RESUMEN DELGADO Y CON COLORES
+     ========================================= */
+
+  .summary-panel {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(130px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .summary-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left-width: 5px;
+    border-radius: 12px;
+    padding: 10px 14px;
+    box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .summary-card.quality { border-left-color: #16a34a; }
+
+  .summary-card.internal { border-left-color: #eab308; }
+
+  .summary-card.rejection { border-left-color: #dc2626; }
+
+  .summary-card.stop { border-left-color: #64748b; }
+
   .summary-card-top {
-    justify-content: left;
-    width: 100%;
-    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
   }
 
-  /* 3. Estilizar la etiqueta para que no se deforme si baja a 2 líneas */
   .summary-tag {
-    font-size: 9px; /* Reducimos la letra ligeramente */
-    padding: 4px 8px;
-    line-height: 1.15;
-    text-align: center;
-    letter-spacing: 0;
-    white-space: normal; /* Permite 2 líneas ordenadas si es necesario */
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
 
-  /* 4. Ocultar el punto lateral para ganar espacio vital en celulares */
+  .summary-tag.quality {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
+
+  .summary-tag.internal {
+    background: #fef08a;
+    color: #854d0e;
+    border: 1px solid #fde047;
+  }
+
+  .summary-tag.rejection {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+  }
+
+  .summary-tag.stop {
+    background: #e2e8f0;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+  }
+
   .summary-dot {
-    display: none !important;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    border: 1px solid #111;
   }
 
-  /* 5. Centrar y ajustar el tamaño del número */
+  .summary-dot.quality { background: var(--green); }
+
+  .summary-dot.internal { background: var(--yellow); }
+
+  .summary-dot.rejection { background: var(--red); }
+
+  .summary-dot.stop { background: var(--gray); }
+
   .summary-card strong {
-    font-size: 20px;
-    text-align: center;
-    width: 100%;
+    display: block;
+    font-size: 21px;
+    font-weight: 900;
+    color: #0b2239;
+    line-height: 1.1;
   }
-  
+
+  /* =========================================
+     GRILLA DE MESES Y TABLERO "Q" UNIDO (SIN GAP)
+     ========================================= */
+
   .radar-grid {
-    grid-template-columns: 1fr;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    align-items: start;
   }
 
-  /* AJUSTE DEL CONTENEDOR DEL MES */
+  .month-card {
+    background: var(--card);
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
+  }
+
+  .month-title {
+    background: var(--blue);
+    color: #fff;
+    text-align: center;
+    font-weight: 900;
+    font-size: 16px;
+    padding: 9px 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
   .month-body {
-    padding-top: 20px;
-    padding-left: 0;
-    padding-right: 0;
-    padding-bottom: 95px; /* Espacio exacto reservado para la leyenda abajo */
-    min-height: auto; /* Permite que el contenedor se ajuste al tamaño real de la Q */
+    position: relative;
+    min-height: 365px;
+    padding: 16px 8px 100px;
+    overflow: hidden;
+    background: #ffffff;
   }
 
-  /* CENTRAR Y RESTAURAR EL TAMAÑO DE LA Q */
+  /* Tablero con forma de Q: cuadraditos unidos sin separación como Imagen 4 */
+
+  /* Tablero con forma de Q */
+
   .q-board {
-    margin: 0 auto; 
-    transform: scale(1); /* Restaura el tamaño al 100% para llenar mejor la pantalla */
-    transform-origin: center top;
+    --q-cell-w: clamp(23px, 1.95vw, 33px);
+    --q-cell-h: clamp(16px, 1.3vw, 21px);
+
+    width: max-content;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(13, var(--q-cell-w));
+    grid-template-rows: repeat(16, var(--q-cell-h));
+    gap: 0 !important;
+    padding: 1px 0 0 1px; /* Da espacio para que el borde exterior no se corte */
   }
 
-  /* AJUSTE FINO DE LA LEYENDA PARA MÓVIL */
+  /* Celdas de los días */
+
+  .q-day {
+    /* ESTA ES LA MAGIA: 100% del tamaño + 1px extra para que superponga exactamente */
+    width: calc(100% + 1px) !important;
+    height: calc(100% + 1px) !important;
+    margin: -1px 0 0 -1px !important;
+
+    border: 1px solid #111 !important;
+    border-radius: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(10px, 0.85vw, 13px);
+    font-weight: 700;
+    color: #000;
+    background: #fff;
+    line-height: 1;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    z-index: 1;
+  }
+
+  /* Cuadro vacío de relleno */
+
+  .q-day.empty-box {
+    background: #ffffff;
+    color: transparent;
+    pointer-events: none; /* Hace que no sea clickeable ni interactivo */
+  }
+
+  /* Estados de los días */
+
+  .q-day.quality {
+    background: var(--green);
+  }
+
+  .q-day.internal {
+    background: var(--yellow);
+  }
+
+  .q-day.rejection {
+    background: var(--red);
+    color: #fff;
+  }
+
+  .q-day.stop {
+    background: var(--gray);
+  }
+
+  .q-day.future {
+    background: #ffffff;
+    color: #000;
+  }
+
+  /* Cursor interactivo y resaltado al tocar/clickear un día */
+
+  .q-day:not(.empty-box) {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .q-day.active-day {
+    z-index: 5 !important;
+    outline: 2.5px solid #072B5C !important;
+    box-shadow: 0 0 8px rgba(7, 43, 92, 0.45);
+    transform: scale(1.08);
+  }
+
+  /* Tooltip flotante al hacer clic o tocar en móvil */
+
+  .q-touch-tooltip {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(38, 38, 38, 0.96);
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid #555;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    z-index: 20;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  /* Se ubica abajo si tocas un día de arriba, y arriba si tocas un día de abajo */
+
+  .q-touch-tooltip.pos-bottom {
+    top: 165px;
+  }
+
+  .q-touch-tooltip.pos-top {
+    top: 85px;
+  }
+
+  /* Leyenda inferior de cada mes (con espacio entre ítems) */
+
   .month-legend {
+    position: absolute;
     left: 16px;
     bottom: 14px;
-    grid-template-columns: 24px auto; 
-    row-gap: 5px; 
-    font-size: 11px; 
+    display: grid;
+    grid-template-columns: 24px auto; /* Ancho ajustado para la cajita */
+    align-items: center;
+    row-gap: 1px; /* ESPACIO de separación entre cada fila */
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .legend-box {
-    width: 24px; 
-    height: 14px; 
-    border-radius: 2px;
+    width: 24px;
+    height: 16px;
+    border: 1px solid #111; /* Borde fino de 1px */
+    border-radius: 3px; /* Curva ligera para que luzca mejor */
+    margin-top: 0; /* Quitamos el margen negativo para que no se peguen */
   }
 
+  .legend-box.quality { background: var(--green); }
+
+  .legend-box.internal { background: var(--yellow); }
+
+  .legend-box.rejection { background: var(--red); }
+
+  .legend-box.stop { background: var(--gray); }
+
   .legend-label {
-    padding-left: 6px; 
+    padding-left: 6px;
+    white-space: nowrap;
+    color: #111;
+  }
+
+  /* =========================================
+     ADAPTACIÓN RESPONSIVA PARA MÓVILES (360px)
+     ========================================= */
+
+  @media (max-width: 1024px) {
+    .radar-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+  }
+
+  @media (max-width: 760px) {
+    .radar-page {
+        padding: 12px 10px 32px;
+      }
+
+    .radar-header-card {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 14px;
+      }
+
+    .radar-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+    .radar-actions select:first-child {
+        grid-column: 1 / -1;
+      }
+
+    .radar-actions select,
+    .radar-actions button {
+        width: 100%;
+      }
+
+    .summary-panel {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+    .summary-panel {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+
+    /* 1. Ajustar el relleno y centrar todo en la tarjeta */
+
+    .summary-card {
+        padding: 10px 6px;
+        align-items: center;
+        text-align: center;
+      }
+
+    /* 2. Centrar la zona de la etiqueta */
+
+    .summary-card-top {
+        justify-content: left;
+        width: 100%;
+        margin-bottom: 4px;
+      }
+
+    /* 3. Estilizar la etiqueta para que no se deforme si baja a 2 líneas */
+
+    .summary-tag {
+        font-size: 9px; /* Reducimos la letra ligeramente */
+        padding: 4px 8px;
+        line-height: 1.15;
+        text-align: center;
+        letter-spacing: 0;
+        white-space: normal; /* Permite 2 líneas ordenadas si es necesario */
+      }
+
+    /* 4. Ocultar el punto lateral para ganar espacio vital en celulares */
+
+    .summary-dot {
+        display: none !important;
+      }
+
+    /* 5. Centrar y ajustar el tamaño del número */
+
+    .summary-card strong {
+        font-size: 20px;
+        text-align: center;
+        width: 100%;
+      }
+
+    .radar-grid {
+        grid-template-columns: 1fr;
+      }
+
+    /* AJUSTE DEL CONTENEDOR DEL MES */
+
+    .month-body {
+        padding-top: 20px;
+        padding-left: 0;
+        padding-right: 0;
+        padding-bottom: 95px; /* Espacio exacto reservado para la leyenda abajo */
+        min-height: auto; /* Permite que el contenedor se ajuste al tamaño real de la Q */
+      }
+
+    /* CENTRAR Y RESTAURAR EL TAMAÑO DE LA Q */
+
+    .q-board {
+        margin: 0 auto; 
+        transform: scale(1); /* Restaura el tamaño al 100% para llenar mejor la pantalla */
+        transform-origin: center top;
+      }
+
+    /* AJUSTE FINO DE LA LEYENDA PARA MÓVIL */
+
+    .month-legend {
+        left: 16px;
+        bottom: 14px;
+        grid-template-columns: 24px auto; 
+        row-gap: 5px; 
+        font-size: 11px; 
+      }
+
+    .legend-box {
+        width: 24px; 
+        height: 14px; 
+        border-radius: 2px;
+      }
+
+    .legend-label {
+        padding-left: 6px; 
+      }
   }
 }

@@ -39,7 +39,7 @@ const normalizar = (txt) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
-export default function TrackingSugerencias() {
+function TrackingSugerenciasContenido() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(true);
@@ -640,6 +640,15 @@ export default function TrackingSugerencias() {
           </table>
         </div>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingSugerencias(props) {
+  return (
+    <div className="hco-scope hco-tracking-sugerencias">
+      <TrackingSugerenciasContenido {...props} />
     </div>
   );
 }

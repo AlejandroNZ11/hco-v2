@@ -562,7 +562,7 @@ function Dona({ segmentos, total }) {
    COMPONENTE PRINCIPAL
    ========================================= */
 
-export default function DashboardSugerencias() {
+function DashboardSugerenciasContenido() {
   const [sugerencias, setSugerencias] = useState([]);
   const [empleados, setEmpleados] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -944,6 +944,15 @@ export default function DashboardSugerencias() {
         </div>
         </article>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function DashboardSugerencias(props) {
+  return (
+    <div className="hco-scope hco-dashboard-sugerencias">
+      <DashboardSugerenciasContenido {...props} />
     </div>
   );
 }

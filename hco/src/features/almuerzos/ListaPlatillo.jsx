@@ -11,7 +11,7 @@ const ESTRUCTURA_FILAS = [
     { id: "dieta", label: "DIETA", calId: "calDieta" }
 ];
 
-export default function ListaPlatillo() {
+function ListaPlatilloContenido() {
     const navigate = useNavigate();
     const [menu, setMenu] = useState({});
     const [loading, setLoading] = useState(false);
@@ -235,4 +235,13 @@ export default function ListaPlatillo() {
         </main>
     );
 
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function ListaPlatillo(props) {
+  return (
+    <div className="hco-scope hco-almuerzos-lista-platillo">
+      <ListaPlatilloContenido {...props} />
+    </div>
+  );
 }

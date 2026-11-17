@@ -21,3 +21,11 @@ body {
 #root {
   min-height: 100%;
 }
+
+/* 4. ENVOLTORIO DE ESTILOS POR MÓDULO
+   Cada pantalla se envuelve en <div class="hco-scope hco-<modulo>">.
+   Sus estilos van anidados dentro de esa clase, así no afectan a otros módulos.
+   display: contents → el div no altera el diseño (no crea una caja). */
+.hco-scope {
+  display: contents;
+}

@@ -95,7 +95,7 @@ function cargarCacheLocal(user) {
   }
 }
 
-export default function Pedidos() {
+function PedidosContenido() {
   const [usuarioLogueado] = useState(() => getAuthUser());
 
   // CARGA INSTANTÁNEA DESDE LA CACHÉ LOCAL AL INICIAR (0ms de espera visual si hay caché)
@@ -538,6 +538,15 @@ export default function Pedidos() {
           <p className="text-muted text-size">{overlay.mensaje}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function Pedidos(props) {
+  return (
+    <div className="hco-scope hco-almuerzos-pedidos">
+      <PedidosContenido {...props} />
     </div>
   );
 }

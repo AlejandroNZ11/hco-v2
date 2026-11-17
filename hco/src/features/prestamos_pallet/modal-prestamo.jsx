@@ -23,7 +23,7 @@ function getStoredAuthUser() {
 
 const ROLES_GESTION = ['ADMIN', 'SUPERVISOR', 'SUPERADMIN', 'SUPER_ADMIN'];
 
-export default function ModalPrestamo() {
+function ModalPrestamoContenido() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(false);
@@ -1134,6 +1134,15 @@ export default function ModalPrestamo() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function ModalPrestamo(props) {
+  return (
+    <div className="hco-scope hco-modal-prestamo">
+      <ModalPrestamoContenido {...props} />
     </div>
   );
 }

@@ -32,7 +32,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export default function TrackingConductores() {
+function TrackingConductoresContenido() {
   const [currentUser] = useState(() => getStoredAuthUser());
 
   const [conductores, setConductores] = useState([]);
@@ -860,6 +860,15 @@ export default function TrackingConductores() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function TrackingConductores(props) {
+  return (
+    <div className="hco-scope hco-tracking-conductores">
+      <TrackingConductoresContenido {...props} />
     </div>
   );
 }

@@ -223,7 +223,7 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
-export default function Admin() {
+function AdminContenido() {
   const navigate = useNavigate();
 
   const [usuario] = useState(() => getAuthUser());
@@ -1124,6 +1124,15 @@ export default function Admin() {
           <span>{toast.mensaje}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function Admin(props) {
+  return (
+    <div className="hco-scope hco-almuerzos-admin">
+      <AdminContenido {...props} />
     </div>
   );
 }

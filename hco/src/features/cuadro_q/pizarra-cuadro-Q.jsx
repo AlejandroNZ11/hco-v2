@@ -14,7 +14,7 @@ function getStoredAuthUser() {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-export default function PizarraCuadroQ() {
+function PizarraCuadroQContenido() {
   const navigate = useNavigate();
   const [currentUser] = useState(() => getStoredAuthUser());
   const [loading, setLoading] = useState(true);
@@ -393,6 +393,15 @@ export default function PizarraCuadroQ() {
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+// Envoltorio: los estilos de este módulo solo aplican dentro de este div
+export default function PizarraCuadroQ(props) {
+  return (
+    <div className="hco-scope hco-pizarra-cuadroq">
+      <PizarraCuadroQContenido {...props} />
     </div>
   );
 }

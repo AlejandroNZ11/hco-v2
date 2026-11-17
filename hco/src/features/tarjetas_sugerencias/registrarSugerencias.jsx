@@ -34,7 +34,8 @@ const RECONOCIDO_OPCIONES = [
   'LUP',
   'Kaizen',
   'PDCA',
-  'Proyecto Lean'
+  'Proyecto Lean',
+  'Cambio Menor'
 ];
 
 const IMPACTO_OPCIONES = [

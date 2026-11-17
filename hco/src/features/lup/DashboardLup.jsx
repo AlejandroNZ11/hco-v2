@@ -14,6 +14,7 @@ import {
 } from 'react-icons/fa';
 import { supabase } from '../../config/supabaseClient';
 import './DashboardLup.css';
+import Loading from '../../layouts/Loading';
 
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -76,6 +77,7 @@ function SvgDonut({ slices, totalCenter, subtitleCenter }) {
 }
 
 function DashboardLupContenido() {
+  const [loading, setLoading] = useState(true);
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth();
 
@@ -91,6 +93,7 @@ function DashboardLupContenido() {
   }, []);
 
   const cargarDatos = async () => {
+    setLoading(true);
     try {
       const [resLup, resEmp] = await Promise.all([
         supabase.from('lup').select('*'),
@@ -107,6 +110,8 @@ function DashboardLupContenido() {
       setEmpleadosMap(empMap);
     } catch (err) {
       console.error('Error cargando datos del dashboard:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -266,6 +271,7 @@ function DashboardLupContenido() {
 
   return (
     <div className="dashboard-lup-container">
+      {loading && <Loading />}
       {/* HEADER */}
       <header className="dashboard-header-card">
         <div className="header-titles">

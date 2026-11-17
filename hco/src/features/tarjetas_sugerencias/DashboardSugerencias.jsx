@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { obtenerSugerencias, obtenerCatalogosSugerencias } from '../../services/sugerenciasService';
 import './DashboardSugerencias.css';
+import Loading from '../../layouts/Loading';
 
 const MESES = [
   { id: 1, nombre: 'Enero', corto: 'Ene' },
@@ -761,6 +762,7 @@ function DashboardSugerenciasContenido() {
 
   return (
     <div className="dashboard-sugerencias-wrapper">
+      {cargando && <Loading />}
       {/* FILTROS */}
       <header className="dash-header-filter">
         <div className="dash-header-titles">

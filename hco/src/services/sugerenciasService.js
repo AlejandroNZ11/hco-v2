@@ -132,7 +132,7 @@ export const obtenerSugerencias = async () => {
         .from('tarjetas_sugerencias')
         .select('*')
         .order('fecha_registro', { ascending: false })
-        .limit(300);
+        .limit(3000);
 
       if (!error && data) {
         const todasLocales = await localDb.tarjetas_sugerencias.toArray();

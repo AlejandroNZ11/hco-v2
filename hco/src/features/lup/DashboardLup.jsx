@@ -23,6 +23,15 @@ const MESES = [
 
 const MESES_ABR = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Set', 'Oct', 'Nov', 'Dic'];
 
+const COLORES_AREA = [
+  'linear-gradient(90deg, #0055a5 0%, #0277bd 100%)', // 1° Azul profundo
+  'linear-gradient(90deg, #0284c7 0%, #0ea5e9 100%)', // 2° Azul intenso
+  'linear-gradient(90deg, #0ea5e9 0%, #38bdf8 100%)', // 3° Celeste medio
+  'linear-gradient(90deg, #38bdf8 0%, #7dd3fc 100%)', // 4° Celeste suave
+  'linear-gradient(90deg, #7dd3fc 0%, #bae6fd 100%)', // 5° Celeste claro
+  'linear-gradient(90deg, #bae6fd 0%, #d8f0fe 100%)'  // 6° Celeste tenue
+];
+
 // Extrae { anio, mes } (mes 0-11) sin que new Date("YYYY-MM-DD") reste horas por UTC
 const extraerAnioMes = (fechaRaw) => {
   if (!fechaRaw) return null;
@@ -30,21 +39,54 @@ const extraerAnioMes = (fechaRaw) => {
   if (match) {
     return {
       anio: Number(match[1]),
-      mes: Number(match[2]) - 1 // 0 = Enero ... 11 = Diciembre
+      mes: Number(match[2]) - 1
     };
   }
   const d = new Date(fechaRaw);
   return isNaN(d.getTime()) ? null : { anio: d.getFullYear(), mes: d.getMonth() };
 };
 
-function SvgDonut({ slices, totalCenter, subtitleCenter }) {
+function SvgDonut({
+  slices,
+  totalCenter,
+  subtitleCenter,
+  activeIdx = null,
+  onHoverSlice,
+  onSelectSlice,
+  sizeClass = '',
+  strokeWidth = 6.8
+}) {
   let acumulado = 0;
   const radius = 15.9155;
+  const activeSlice = activeIdx !== null ? slices[activeIdx] : null;
+  const activeStroke = Number(strokeWidth) + 1;
 
   return (
-    <div className="donut-chart-container">
+    <div className={`donut-chart-container ${sizeClass}`}>
+      {activeSlice && (
+        <div className="donut-hover-tooltip">
+          <div className="d-tt-head">
+            <span className="dot" style={{ backgroundColor: activeSlice.color }} />
+            <strong>{activeSlice.label}</strong>
+          </div>
+          <div className="d-tt-body">
+            <span>Cantidad: <b>{activeSlice.count ?? 0} LUP</b></span>
+            <span>Participación: <b>{activeSlice.pct}%</b></span>
+          </div>
+        </div>
+      )}
+
       <svg viewBox="0 0 42 42" className="donut-svg">
         <circle cx="21" cy="21" r={radius} fill="#ffffff" />
+        <circle
+          cx="21"
+          cy="21"
+          r={radius}
+          fill="none"
+          stroke="#f1f5f9"
+          strokeWidth={strokeWidth}
+        />
+
         {slices.map((slice, idx) => {
           const valPct = Math.max(0, Math.min(100, Number(slice.pct) || 0));
           if (valPct === 0) return null;
@@ -52,6 +94,9 @@ function SvgDonut({ slices, totalCenter, subtitleCenter }) {
           const dashArray = `${valPct} ${100 - valPct}`;
           const dashOffset = 25 - acumulado;
           acumulado += valPct;
+
+          const isSelected = activeIdx === idx;
+          const isDimmed = activeIdx !== null && !isSelected;
 
           return (
             <circle
@@ -61,16 +106,34 @@ function SvgDonut({ slices, totalCenter, subtitleCenter }) {
               r={radius}
               fill="none"
               stroke={slice.color}
-              strokeWidth="5"
+              strokeWidth={isSelected ? activeStroke : strokeWidth}
               strokeDasharray={dashArray}
               strokeDashoffset={dashOffset}
+              className="donut-slice-circle"
+              style={{
+                opacity: isDimmed ? 0.35 : 1,
+                pointerEvents: 'stroke'
+              }}
+              onMouseEnter={() => onHoverSlice && onHoverSlice(idx)}
+              onMouseLeave={() => onHoverSlice && onHoverSlice(null)}
+              onClick={() => onSelectSlice && onSelectSlice(idx)}
             />
           );
         })}
       </svg>
+
       <div className="donut-center-label">
-        <span className="center-num">{totalCenter}</span>
-        <span className="center-sub">{subtitleCenter}</span>
+        <span className="center-num">
+          {activeSlice ? activeSlice.count : totalCenter}
+        </span>
+        <span className="center-sub">
+          {activeSlice ? activeSlice.shortLabel || activeSlice.label : subtitleCenter}
+        </span>
+        {activeSlice && (
+          <span className="center-pct-pill" style={{ color: activeSlice.color }}>
+            {activeSlice.pct}%
+          </span>
+        )}
       </div>
     </div>
   );
@@ -87,6 +150,22 @@ function DashboardLupContenido() {
 
   const [lups, setLups] = useState([]);
   const [empleadosMap, setEmpleadosMap] = useState({});
+
+  const [hoveredTipoIdx, setHoveredTipoIdx] = useState(null);
+  const [selectedTipoIdx, setSelectedTipoIdx] = useState(null);
+  const activeTipoIdx = hoveredTipoIdx !== null ? hoveredTipoIdx : selectedTipoIdx;
+
+  const [hoveredEstadoIdx, setHoveredEstadoIdx] = useState(null);
+  const [selectedEstadoIdx, setSelectedEstadoIdx] = useState(null);
+  const activeEstadoIdx = hoveredEstadoIdx !== null ? hoveredEstadoIdx : selectedEstadoIdx;
+
+  const [hoveredKaizenIdx, setHoveredKaizenIdx] = useState(null);
+  const [selectedKaizenIdx, setSelectedKaizenIdx] = useState(null);
+  const activeKaizenIdx = hoveredKaizenIdx !== null ? hoveredKaizenIdx : selectedKaizenIdx;
+
+  const toggleSelectTipo = (idx) => {
+    setSelectedTipoIdx((prev) => (prev === idx ? null : idx));
+  };
 
   useEffect(() => {
     cargarDatos();
@@ -119,7 +198,6 @@ function DashboardLupContenido() {
   const aniosDisponibles = useMemo(() => {
     const aniosSet = new Set([currentYear]);
     lups.forEach(l => {
-      if (String(l.operatividad || '').toUpperCase() === 'INACTIVO') return;
       const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
       if (ym) aniosSet.add(ym.anio);
     });
@@ -137,11 +215,9 @@ function DashboardLupContenido() {
     return Array.from(areasSet).sort((a, b) => a.localeCompare(b));
   }, [lups]);
 
-  // 3. Filtrado por Operatividad, Año y Área
-  const lupsFiltradasAnioYArea = useMemo(() => {
+  // 3A. Filtrado por Año y Área incluyendo ACTIVOS e INACTIVOS (para el gráfico de Tendencia)
+  const lupsAnioYAreaTodos = useMemo(() => {
     return lups.filter(l => {
-      if (String(l.operatividad || '').toUpperCase() === 'INACTIVO') return false;
-
       const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
       if (!ym || ym.anio !== Number(anioSeleccionado)) return false;
 
@@ -154,13 +230,24 @@ function DashboardLupContenido() {
     });
   }, [lups, anioSeleccionado, areaSeleccionada]);
 
-  // 4. Filtrado del Mes (coincide 100% con la barra del gráfico)
+  // 3B. Filtrado por Operatividad ACTIVO, Año y Área (para KPIs operativos)
+  const lupsFiltradasAnioYArea = useMemo(() => {
+    return lupsAnioYAreaTodos.filter(
+      l => String(l.operatividad || '').toUpperCase().trim() !== 'INACTIVO'
+    );
+  }, [lupsAnioYAreaTodos]);
+
+  // 4. Filtrado del Mes (Activos)
   const lupsDelMes = useMemo(() => {
     return lupsFiltradasAnioYArea.filter(l => {
       const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
       return ym && ym.mes === Number(mesSeleccionado);
     });
   }, [lupsFiltradasAnioYArea, mesSeleccionado]);
+
+  const totalGeneralAnio = lupsAnioYAreaTodos.length;
+  const totalActivosAnio = lupsFiltradasAnioYArea.length;
+  const totalInactivosAnio = totalGeneralAnio - totalActivosAnio;
 
   // KPIs
   const totalLupAnio = lupsFiltradasAnioYArea.length;
@@ -179,6 +266,40 @@ function DashboardLupContenido() {
   const kaizenNo = totalLupAnio - kaizenSi;
   const pctKaizen = totalLupAnio > 0 ? Math.round((kaizenSi / totalLupAnio) * 100) : 0;
 
+  const estadoSlices = [
+    {
+      label: 'Entrenado',
+      shortLabel: 'Entrenado',
+      count: entrenados,
+      pct: pctEntrenados,
+      color: '#0284c7'
+    },
+    {
+      label: 'No Entrenado',
+      shortLabel: 'Sin entrenar',
+      count: noEntrenados,
+      pct: pctNoEntrenados,
+      color: '#bae6fd'
+    }
+  ];
+
+  const kaizenSlices = [
+    {
+      label: 'Convirtió a Kaizen',
+      shortLabel: 'Con Kaizen',
+      count: kaizenSi,
+      pct: pctKaizen,
+      color: '#0284c7'
+    },
+    {
+      label: 'Sin conversión',
+      shortLabel: 'Sin Kaizen',
+      count: kaizenNo,
+      pct: 100 - pctKaizen,
+      color: '#bae6fd'
+    }
+  ];
+
   const totalCO2 = useMemo(() => {
     return lupsFiltradasAnioYArea.reduce((acc, curr) => {
       const num = parseFloat(curr.impacto_co2);
@@ -186,18 +307,58 @@ function DashboardLupContenido() {
     }, 0);
   }, [lupsFiltradasAnioYArea]);
 
-  // Tendencia mensual
+  // Tendencia mensual (Activos + Inactivos + Total)
   const mesesHasta = anioSeleccionado === currentYear ? currentMonth + 1 : 12;
   const tendenciaData = useMemo(() => {
-    const counts = Array(12).fill(0);
-    lupsFiltradasAnioYArea.forEach(l => {
-      const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
-      if (ym) counts[ym.mes]++;
-    });
-    return counts.slice(0, mesesHasta);
-  }, [lupsFiltradasAnioYArea, mesesHasta]);
+    const items = Array.from({ length: 12 }, (_, idx) => ({
+      mesIdx: idx,
+      mesCorto: MESES_ABR[idx],
+      mesNombre: MESES[idx],
+      activos: 0,
+      inactivos: 0,
+      total: 0
+    }));
 
-  const maxValTendencia = Math.max(...tendenciaData, 5);
+    lupsAnioYAreaTodos.forEach(l => {
+      const ym = extraerAnioMes(l.fecha_lup || l.fecha_registro);
+      if (!ym) return;
+      const esInactivo = String(l.operatividad || '').toUpperCase().trim() === 'INACTIVO';
+      if (esInactivo) {
+        items[ym.mes].inactivos += 1;
+      } else {
+        items[ym.mes].activos += 1;
+      }
+      items[ym.mes].total += 1;
+    });
+
+    return items.slice(0, mesesHasta);
+  }, [lupsAnioYAreaTodos, mesesHasta]);
+
+  const resumenTendencia = useMemo(() => {
+    return tendenciaData.reduce(
+      (acc, d) => ({
+        activos: acc.activos + d.activos,
+        inactivos: acc.inactivos + d.inactivos,
+        total: acc.total + d.total
+      }),
+      { activos: 0, inactivos: 0, total: 0 }
+    );
+  }, [tendenciaData]);
+
+  const maxValTendencia = Math.max(...tendenciaData.map(d => d.total), 5);
+
+  // Puntos SVG normalizados (0..1000) para la línea de tendencia sobre las barras
+  const trendPolylinePoints = useMemo(() => {
+    const n = tendenciaData.length;
+    if (n === 0) return '';
+    return tendenciaData
+      .map((d, i) => {
+        const x = ((i + 0.5) / n) * 1000;
+        const y = (1 - d.total / maxValTendencia) * 1000;
+        return `${x},${y}`;
+      })
+      .join(' ');
+  }, [tendenciaData, maxValTendencia]);
 
   // LUP por Tipo
   const tiposCount = useMemo(() => {
@@ -216,6 +377,30 @@ function DashboardLupContenido() {
   const pctMejora = totalLupAnio ? Math.round((tiposCount.mejora / totalLupAnio) * 100) : 0;
   const pctProblema = totalLupAnio ? Math.round((tiposCount.problema / totalLupAnio) * 100) : 0;
   const pctBasica = totalLupAnio ? 100 - pctMejora - pctProblema : 0;
+
+  const tiposSlices = [
+    {
+      label: 'Mejora',
+      shortLabel: 'Mejora',
+      count: tiposCount.mejora,
+      pct: pctMejora,
+      color: '#0369a1'
+    },
+    {
+      label: 'Problema',
+      shortLabel: 'Problema',
+      count: tiposCount.problema,
+      pct: pctProblema,
+      color: '#0ea5e9'
+    },
+    {
+      label: 'Condición Básica',
+      shortLabel: 'Cond. Básica',
+      count: tiposCount.basica,
+      pct: pctBasica,
+      color: '#38bdf8'
+    }
+  ];
 
   // Top 5 Colaboradores
   const topColaboradores = useMemo(() => {
@@ -246,7 +431,7 @@ function DashboardLupContenido() {
       });
   }, [lupsFiltradasAnioYArea, empleadosMap]);
 
-  // LUP por Área (Muestra distribución de áreas del año)
+  // LUP por Área
   const lupPorArea = useMemo(() => {
     const mapa = {};
     const baseLups = areaSeleccionada === 'TODAS'
@@ -272,6 +457,7 @@ function DashboardLupContenido() {
   return (
     <div className="dashboard-lup-container">
       {loading && <Loading />}
+
       {/* HEADER */}
       <header className="dashboard-header-card">
         <div className="header-titles">
@@ -280,7 +466,6 @@ function DashboardLupContenido() {
         </div>
 
         <div className="header-filters">
-          {/* Filtro Área */}
           <div className="filter-group">
             <label>ÁREA</label>
             <select
@@ -294,7 +479,6 @@ function DashboardLupContenido() {
             </select>
           </div>
 
-          {/* Filtro Año */}
           <div className="filter-group">
             <label>AÑO</label>
             <select
@@ -307,7 +491,6 @@ function DashboardLupContenido() {
             </select>
           </div>
 
-          {/* Filtro Mes */}
           <div className="filter-group">
             <label>MES</label>
             <select
@@ -328,7 +511,15 @@ function DashboardLupContenido() {
           <div className="kpi-icon-box"><FileText /></div>
           <div className="kpi-content">
             <span className="kpi-title">Total de LUP</span>
-            <div className="kpi-main-val">{totalLupAnio}</div>
+            <div className="kpi-main-val">{totalGeneralAnio}</div>
+            <div className="kpi-desglose-pills">
+              <span className="kpi-mini-pill activo">
+                Activos: <strong>{totalActivosAnio}</strong>
+              </span>
+              <span className="kpi-mini-pill inactivo">
+                Inactivos: <strong>{totalInactivosAnio}</strong>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -370,72 +561,214 @@ function DashboardLupContenido() {
 
       {/* FILA MEDIA */}
       <section className="dashboard-grid-row middle-row">
-        {/* Tendencia */}
+        {/* Tendencia de LUP (Activos + Inactivos + Total + Línea Tendencia) */}
         <div className="dash-card tendencia-card">
-          <div className="card-header-line">
-            <TrendingUp className="icon-sec" />
-            <div>
-              <h3>Tendencia de LUP</h3>
-              <p>Evolución mensual de registros</p>
+          <div className="tendencia-header-top">
+            <div className="card-header-line" style={{ marginBottom: 0 }}>
+              <TrendingUp className="icon-sec" />
+              <div>
+                <h3>Tendencia de LUP</h3>
+                <p>Evolución mensual: Activos, Inactivos y Total</p>
+              </div>
+            </div>
+
+            <div className="tendencia-resumen-pills">
+              <span className="t-pill total">
+                Total: <strong>{resumenTendencia.total}</strong>
+              </span>
+              <span className="t-pill activo">
+                Activos: <strong>{resumenTendencia.activos}</strong>
+              </span>
+              <span className="t-pill inactivo">
+                Inactivos: <strong>{resumenTendencia.inactivos}</strong>
+              </span>
             </div>
           </div>
+
           <div className="native-chart-box">
-            <div className="native-bars-container">
-              {tendenciaData.map((val, i) => {
-                const heightPct = Math.round((val / maxValTendencia) * 100);
-                return (
-                  <div key={i} className="bar-col">
-                    <span className="bar-val-top">{val}</span>
-                    <div className="bar-track">
-                      <div
-                        className="bar-fill"
-                        style={{
-                          height: `${heightPct}%`,
-                          backgroundColor: i === Number(mesSeleccionado) ? '#0369a1' : undefined
-                        }}
+            <div className="bars-plot-area">
+              {/* Líneas guía horizontales */}
+              <div className="chart-gridlines" aria-hidden="true">
+                <span style={{ bottom: '25%' }} />
+                <span style={{ bottom: '50%' }} />
+                <span style={{ bottom: '75%' }} />
+                <span style={{ bottom: '100%' }} />
+              </div>
+
+              {/* Línea SVG de tendencia que une los totales mensuales */}
+              {tendenciaData.length > 1 && (
+                <svg
+                  className="trend-line-svg"
+                  viewBox="0 0 1000 1000"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <polyline
+                    fill="none"
+                    stroke="#0369a1"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                    points={trendPolylinePoints}
+                  />
+                </svg>
+              )}
+
+              {/* Columnas mensuales */}
+              <div className="native-bars-container">
+                {tendenciaData.map((item, i) => {
+                  const totalPct = (item.total / maxValTendencia) * 100;
+                  const esMesActual = i === Number(mesSeleccionado);
+
+                  return (
+                    <div
+                      key={item.mesIdx}
+                      className={`bar-col ${esMesActual ? 'is-selected' : ''}`}
+                      onClick={() => setMesSeleccionado(item.mesIdx)}
+                      title={`${item.mesNombre}: Total ${item.total} (Activos: ${item.activos} | Inactivos: ${item.inactivos})`}
+                    >
+                      {/* Tooltip flotante al pasar el mouse */}
+                      <div className="bar-hover-tooltip">
+                        <strong>{item.mesNombre}</strong>
+                        <span>Total: <b>{item.total}</b></span>
+                        <span className="tt-act">Activos: <b>{item.activos}</b></span>
+                        <span className="tt-ina">Inactivos: <b>{item.inactivos}</b></span>
+                      </div>
+
+                      {/* Valor Total sobre el nodo de tendencia */}
+                      <span
+                        className="bar-val-top"
+                        style={{ bottom: `calc(${totalPct}% + 10px)` }}
+                      >
+                        {item.total}
+                      </span>
+
+                      {/* Nodo circular de la línea de tendencia */}
+                      <span
+                        className="trend-dot-node"
+                        style={{ bottom: `${totalPct}%` }}
                       />
+
+                      {/* Barra apilada (Inactivos arriba, Activos abajo) */}
+                      <div
+                        className={`bar-stack-wrapper ${esMesActual ? 'selected-bar' : ''}`}
+                        style={{
+                          height: `${totalPct}%`,
+                          minHeight: item.total > 0 ? '8px' : '0px'
+                        }}
+                      >
+                        {item.inactivos > 0 && (
+                          <div
+                            className="bar-seg-inactivo"
+                            style={{
+                              height: `${(item.inactivos / item.total) * 100}%`
+                            }}
+                          >
+                            <span>{item.inactivos}</span>
+                          </div>
+                        )}
+
+                        {item.activos > 0 && (
+                          <div className="bar-seg-activo">
+                            {totalPct >= 14 && <span>{item.activos}</span>}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <span className="bar-label">{MESES_ABR[i]}</span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
+
+            {/* Eje X de meses */}
+            <div className="bars-xaxis-row">
+              {tendenciaData.map((item, i) => (
+                <span
+                  key={item.mesIdx}
+                  className={`bar-label ${i === Number(mesSeleccionado) ? 'active-month' : ''}`}
+                  onClick={() => setMesSeleccionado(item.mesIdx)}
+                >
+                  {item.mesCorto}
+                </span>
+              ))}
+            </div>
+
+            {/* Leyenda inferior */}
             <div className="chart-legend-bottom">
-              <span><span className="legend-box-bar"></span> N° de LUP</span>
-              <span><span className="legend-line-dot"></span> Tendencia</span>
+              <span>
+                <span className="legend-box-activo"></span> Activos ({resumenTendencia.activos})
+              </span>
+              <span>
+                <span className="legend-box-inactivo"></span> Inactivos ({resumenTendencia.inactivos})
+              </span>
+              <span className="legend-trend-item">
+                <svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true">
+                  <line x1="1" y1="6" x2="23" y2="6" stroke="#0369a1" strokeWidth="2.5" strokeLinecap="round" />
+                  <circle cx="12" cy="6" r="3.8" fill="#ffffff" stroke="#0369a1" strokeWidth="2.3" />
+                </svg>
+                Tendencia Total ({resumenTendencia.total})
+              </span>
             </div>
           </div>
         </div>
 
         {/* LUP por Tipo */}
-        <div className="dash-card donut-card">
+        <div className="dash-card donut-card tipo-donut-card">
           <div className="card-header-line">
             <Tag className="icon-sec" />
-            <h3>LUP por Tipo</h3>
+            <div>
+              <h3>LUP por Tipo</h3>
+              <p>Distribución por clasificación (clic para fijar)</p>
+            </div>
           </div>
-          <div className="donut-content-layout">
+
+          <div className="donut-content-layout tipo-layout">
             <SvgDonut
-              slices={[
-                { pct: pctMejora, color: '#0369a1' },
-                { pct: pctProblema, color: '#0ea5e9' },
-                { pct: pctBasica, color: '#38bdf8' }
-              ]}
+              sizeClass="donut-lg"
+              slices={tiposSlices}
               totalCenter={totalLupAnio}
-              subtitleCenter="LUP"
+              subtitleCenter="TOTAL LUP"
+              activeIdx={activeTipoIdx}
+              onHoverSlice={setHoveredTipoIdx}
+              onSelectSlice={toggleSelectTipo}
             />
-            <div className="custom-legend">
-              <div className="legend-row">
-                <span className="dot" style={{ backgroundColor: '#0369a1' }}></span>
-                <span>Mejora ({pctMejora}%)</span>
-              </div>
-              <div className="legend-row">
-                <span className="dot" style={{ backgroundColor: '#0ea5e9' }}></span>
-                <span>Problema ({pctProblema}%)</span>
-              </div>
-              <div className="legend-row">
-                <span className="dot" style={{ backgroundColor: '#38bdf8' }}></span>
-                <span>Condición Básica ({pctBasica}%)</span>
-              </div>
+
+            <div className="custom-legend tipo-legend-cards">
+              {tiposSlices.map((item, idx) => {
+                const isSelected = activeTipoIdx === idx;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    className={`tipo-legend-item ${isSelected ? 'is-selected' : ''}`}
+                    onMouseEnter={() => setHoveredTipoIdx(idx)}
+                    onMouseLeave={() => setHoveredTipoIdx(null)}
+                    onClick={() => toggleSelectTipo(idx)}
+                  >
+                    <div className="tipo-leg-top">
+                      <div className="legend-row">
+                        <span className="dot" style={{ backgroundColor: item.color }} />
+                        <span className="tipo-leg-name">{item.label}</span>
+                      </div>
+                      <div className="tipo-leg-nums">
+                        <strong>{item.count}</strong>
+                        <span className="tipo-pct-badge">{item.pct}%</span>
+                      </div>
+                    </div>
+
+                    <div className="tipo-mini-track">
+                      <div
+                        className="tipo-mini-fill"
+                        style={{
+                          width: `${item.pct}%`,
+                          backgroundColor: item.color
+                        }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -452,7 +785,7 @@ function DashboardLupContenido() {
               return (
                 <div key={idx} className="top-item-row">
                   <div className="top-rank">
-                    {idx < 3 ? medallas[idx] : idx + 1}
+                    {idx < 3 ? medallas[idx] : <span className="top-rank-num">{idx + 1}</span>}
                   </div>
                   <div className="top-avatar">
                     {colab.foto_url ? (
@@ -481,30 +814,61 @@ function DashboardLupContenido() {
             <CheckSquare className="icon-sec" />
             <h3>Estado de LUP</h3>
           </div>
-          <div className="donut-content-layout">
+          <div className="donut-content-layout bottom-donut-layout">
             <SvgDonut
-              slices={[
-                { pct: pctEntrenados, color: '#0284c7' },
-                { pct: pctNoEntrenados, color: '#bae6fd' }
-              ]}
+              sizeClass="donut-lg"
+              strokeWidth={6.8}
+              slices={estadoSlices}
               totalCenter={totalLupAnio}
               subtitleCenter="LUP"
+              activeIdx={activeEstadoIdx}
+              onHoverSlice={setHoveredEstadoIdx}
+              onSelectSlice={(idx) => setSelectedEstadoIdx(prev => (prev === idx ? null : idx))}
             />
-            <div className="custom-legend metrics-legend">
-              <div className="legend-metric">
-                <div className="legend-row">
-                  <span className="dot" style={{ backgroundColor: '#0284c7' }}></span>
-                  <span>Entrenado ({pctEntrenados}%)</span>
-                </div>
-                <strong className="metric-val">{entrenados}</strong>
-              </div>
-              <div className="legend-metric">
-                <div className="legend-row">
-                  <span className="dot" style={{ backgroundColor: '#bae6fd' }}></span>
-                  <span>No Entrenado ({pctNoEntrenados}%)</span>
-                </div>
-                <strong className="metric-val">{noEntrenados}</strong>
-              </div>
+
+            <div className="custom-legend metrics-legend-cards">
+              {estadoSlices.map((item, idx) => {
+                const isSelected = activeEstadoIdx === idx;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    className={`estado-metric-card ${isSelected ? 'is-selected' : ''}`}
+                    onMouseEnter={() => setHoveredEstadoIdx(idx)}
+                    onMouseLeave={() => setHoveredEstadoIdx(null)}
+                    onClick={() => setSelectedEstadoIdx(prev => (prev === idx ? null : idx))}
+                  >
+                    <div className="em-card-top">
+                      <div className="legend-row">
+                        <span
+                          className="dot"
+                          style={{
+                            backgroundColor: item.color,
+                            border: idx === 1 ? '1px solid #7dd3fc' : 'none'
+                          }}
+                        />
+                        <span className="em-card-label">{item.label}</span>
+                      </div>
+                      <span className="em-pct-pill">{item.pct}%</span>
+                    </div>
+
+                    <div className="em-card-bottom">
+                      <strong className="em-card-val">{item.count}</strong>
+                      <span className="em-card-unit">LUP</span>
+                    </div>
+
+                    <div className="tipo-mini-track">
+                      <div
+                        className="tipo-mini-fill"
+                        style={{
+                          width: `${item.pct}%`,
+                          backgroundColor: idx === 0 ? '#0284c7' : '#7dd3fc'
+                        }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -515,30 +879,61 @@ function DashboardLupContenido() {
             <Cog className="icon-sec" />
             <h3>Conversión a Kaizen</h3>
           </div>
-          <div className="donut-content-layout">
+          <div className="donut-content-layout bottom-donut-layout">
             <SvgDonut
-              slices={[
-                { pct: pctKaizen, color: '#0284c7' },
-                { pct: 100 - pctKaizen, color: '#bae6fd' }
-              ]}
+              sizeClass="donut-lg"
+              strokeWidth={6.8}
+              slices={kaizenSlices}
               totalCenter={totalLupAnio}
               subtitleCenter="LUP"
+              activeIdx={activeKaizenIdx}
+              onHoverSlice={setHoveredKaizenIdx}
+              onSelectSlice={(idx) => setSelectedKaizenIdx(prev => (prev === idx ? null : idx))}
             />
-            <div className="custom-legend metrics-legend">
-              <div className="legend-metric">
-                <div className="legend-row">
-                  <span className="dot" style={{ backgroundColor: '#0284c7' }}></span>
-                  <span>Convirtió a Kaizen</span>
-                </div>
-                <strong className="metric-val">{kaizenSi} LUP</strong>
-              </div>
-              <div className="legend-metric">
-                <div className="legend-row">
-                  <span className="dot" style={{ backgroundColor: '#bae6fd' }}></span>
-                  <span>Sin conversión</span>
-                </div>
-                <strong className="metric-val">{kaizenNo} LUP</strong>
-              </div>
+
+            <div className="custom-legend metrics-legend-cards">
+              {kaizenSlices.map((item, idx) => {
+                const isSelected = activeKaizenIdx === idx;
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    className={`estado-metric-card ${isSelected ? 'is-selected' : ''}`}
+                    onMouseEnter={() => setHoveredKaizenIdx(idx)}
+                    onMouseLeave={() => setHoveredKaizenIdx(null)}
+                    onClick={() => setSelectedKaizenIdx(prev => (prev === idx ? null : idx))}
+                  >
+                    <div className="em-card-top">
+                      <div className="legend-row">
+                        <span
+                          className="dot"
+                          style={{
+                            backgroundColor: item.color,
+                            border: idx === 1 ? '1px solid #7dd3fc' : 'none'
+                          }}
+                        />
+                        <span className="em-card-label">{item.label}</span>
+                      </div>
+                      <span className="em-pct-pill">{item.pct}%</span>
+                    </div>
+
+                    <div className="em-card-bottom">
+                      <strong className="em-card-val">{item.count}</strong>
+                      <span className="em-card-unit">LUP</span>
+                    </div>
+
+                    <div className="tipo-mini-track">
+                      <div
+                        className="tipo-mini-fill"
+                        style={{
+                          width: `${item.pct}%`,
+                          backgroundColor: idx === 0 ? '#0284c7' : '#7dd3fc'
+                        }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -552,30 +947,46 @@ function DashboardLupContenido() {
           <div className="horizontal-bars-native">
             {lupPorArea.map(([nombre, cant], idx) => {
               const ancho = Math.round((cant / maxValArea) * 100);
+              const esSeleccionada =
+                areaSeleccionada !== 'TODAS' &&
+                areaSeleccionada.toLowerCase() === nombre.toLowerCase();
+              const opaca = areaSeleccionada !== 'TODAS' && !esSeleccionada;
+
               return (
-                <div key={idx} className="h-bar-item">
-                  <span className="h-bar-title" title={nombre}>{nombre}</span>
-                  <div className="h-bar-track">
+                <div
+                  key={nombre}
+                  className={`h-bar-item ${esSeleccionada ? 'is-selected' : ''}`}
+                  style={{ opacity: opaca ? 0.45 : 1 }}
+                  onClick={() =>
+                    setAreaSeleccionada((prev) => (prev === nombre ? 'TODAS' : nombre))
+                  }
+                  title={`Clic para ${esSeleccionada ? 'ver todas las áreas' : `filtrar por ${nombre}`}`}
+                >
+                  <span className="h-bar-title" title={nombre}>
+                    {nombre}
+                  </span>
+
+                  <div className="h-bar-track-inline">
                     <div
                       className="h-bar-fill"
                       style={{
                         width: `${ancho}%`,
-                        backgroundColor: idx === 0 ? '#0369a1' : idx === 1 ? '#0284c7' : '#38bdf8'
+                        background: COLORES_AREA[idx] || COLORES_AREA[COLORES_AREA.length - 1]
                       }}
                     />
+                    <span className="h-bar-count">{cant}</span>
                   </div>
-                  <span className="h-bar-count">{cant}</span>
                 </div>
               );
             })}
           </div>
         </div>
+
       </section>
     </div>
   );
 }
 
-// Envoltorio: los estilos de este módulo solo aplican dentro de este div
 export default function DashboardLup(props) {
   return (
     <div className="hco-scope hco-dashboard-lup">

@@ -284,21 +284,32 @@ function PizarraCuadroQContenido() {
             <div className="area-chart-card" key={area}>
               <div className="area-title">{area}</div>
               <div className="mini-chart">
-                {top5.map((item, idx) => {
-                  const val = item.cantidad;
-                  const heightPct = val > 0 ? Math.max(12, Math.round((val / maxVal) * 100)) : 6;
-                  return (
-                    <div
-                      key={idx}
-                      className="bar-wrap"
-                      title={`${item.error}: ${val}`}
-                    >
-                      <div className="bar-value">{val}</div>
-                      <div className="bar" style={{ height: `${heightPct}%` }}></div>
-                      <div className="bar-label">{idx + 1}</div>
-                    </div>
-                  );
-                })}
+                <div className="mini-chart-plot">
+                  <div className="mini-chart-grid" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span>
+                  </div>
+                  {top5.map((item, idx) => {
+                    const val = item.cantidad;
+                    // Altura estrictamente proporcional al valor máximo del área
+                    const heightPct = (val / maxVal) * 100;
+                    return (
+                      <div
+                        key={idx}
+                        className={`bar-wrap${val === 0 ? ' is-zero' : ''}${idx === 0 && val > 0 ? ' is-top' : ''}`}
+                        title={`${item.error}: ${val}`}
+                      >
+                        <div className="bar" style={{ height: `${heightPct}%` }}>
+                          <span className="bar-value">{val}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mini-chart-labels">
+                  {top5.map((_, idx) => (
+                    <div key={idx} className="bar-label">{idx + 1}</div>
+                  ))}
+                </div>
               </div>
 
               <div className="legend-mini no-scroll">
@@ -377,15 +388,20 @@ function PizarraCuadroQContenido() {
             <div className="empty">Sin errores registrados.</div>
           ) : (
             rankingGeneral.map((item, idx) => {
-              const pct = Math.round((item.cantidad / maxRankingCantidad) * 100);
+              // Ancho estrictamente proporcional (sin mínimos que igualen barras pequeñas)
+              const pct = (item.cantidad / maxRankingCantidad) * 100;
               return (
                 <div className="ranking-row" key={idx}>
-                  <div className="ranking-error">{item.error}</div>
+                  <div className="ranking-error">
+                    <span className="ranking-pos">{idx + 1}</span>
+                    {item.error}
+                  </div>
                   <div className="ranking-area">{item.area}</div>
-                  <div className="ranking-bar-track">
-                    <div className="ranking-bar" style={{ width: `${Math.max(pct, 8)}%` }}>
-                      <span>{item.cantidad}</span>
+                  <div className="ranking-bar-cell">
+                    <div className="ranking-bar-track">
+                      <div className="ranking-bar" style={{ width: `${pct}%` }}></div>
                     </div>
+                    <span className="ranking-count">{item.cantidad}</span>
                   </div>
                 </div>
               );

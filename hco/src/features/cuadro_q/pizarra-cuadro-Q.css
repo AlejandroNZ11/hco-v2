@@ -140,49 +140,92 @@
   }
 
   .mini-chart {
+    padding: 26px 14px 10px;
+    background: linear-gradient(180deg, #fafcfe 0%, #f3f7fb 100%);
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  /* Área de dibujo: la altura de cada barra es % de este contenedor */
+  .mini-chart-plot {
+    position: relative;
     display: flex;
     align-items: flex-end;
-    justify-content: space-around;
-    height: 130px;
-    padding: 16px 10px 8px;
-    background: #fafbfc;
-    border-bottom: 1px solid #e2e8f0;
-    gap: 6px;
+    gap: 10px;
+    height: 120px;
+    border-bottom: 2px solid #cbd5e1;
+  }
+
+  .mini-chart-grid {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+  }
+
+  .mini-chart-grid span {
+    display: block;
+    border-top: 1px dashed #e2e8f0;
   }
 
   .bar-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    position: relative;
+    z-index: 1;
     flex: 1;
     height: 100%;
-    justify-content: flex-end;
-  }
-
-  .bar-value {
-    font-size: 11px;
-    font-weight: 800;
-    color: #334155;
-    margin-bottom: 4px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    cursor: default;
   }
 
   .bar {
+    position: relative;
     width: 100%;
-    max-width: 24px;
-    background: #0284c7;
-    border-radius: 4px 4px 0 0;
-    transition: height 0.3s ease;
+    max-width: 30px;
+    background: linear-gradient(180deg, #0ea5e9 0%, #0369a1 100%);
+    border-radius: 6px 6px 0 0;
+    transition: height 0.4s ease, filter 0.2s ease;
   }
 
-  .bar:hover {
-    background: #0369a1;
+  .bar-wrap.is-top .bar {
+    background: linear-gradient(180deg, #1e6fb8 0%, #0b3a66 100%);
+  }
+
+  .bar-wrap:hover .bar {
+    filter: brightness(1.12);
+  }
+
+  .bar-value {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 4px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0b2239;
+    white-space: nowrap;
+  }
+
+  .bar-wrap.is-zero .bar-value {
+    color: #94a3b8;
+    font-weight: 700;
+  }
+
+  .mini-chart-labels {
+    display: flex;
+    gap: 10px;
+    margin-top: 6px;
   }
 
   .bar-label {
+    flex: 1;
+    text-align: center;
     font-size: 11px;
     font-weight: 700;
     color: #64748b;
-    margin-top: 6px;
   }
 
   .legend-mini {
@@ -250,9 +293,46 @@
   }
 
   .ranking-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-size: 12.5px;
     font-weight: 700;
     color: #0f4c81;
+  }
+
+  .ranking-pos {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 11px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ranking-row:nth-child(-n+3) .ranking-pos {
+    background: #0f4c81;
+    color: #ffffff;
+  }
+
+  .ranking-bar-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ranking-count {
+    flex: 0 0 auto;
+    min-width: 32px;
+    text-align: right;
+    font-size: 13px;
+    font-weight: 800;
+    color: #0b2239;
   }
 
   .ranking-area {
@@ -268,31 +348,19 @@
   }
 
   .ranking-bar-track {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     background: #e2e8f0;
-    border-radius: 8px;
+    border-radius: 999px;
     overflow: hidden;
-    height: 24px;
-    display: flex;
-    align-items: center;
+    height: 14px;
   }
 
   .ranking-bar {
-    background: #0284c7;
+    background: linear-gradient(90deg, #0369a1 0%, #0ea5e9 100%);
     height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding-right: 10px;
-    border-radius: 8px;
-    transition: width 0.3s ease;
-    min-width: 32px;
-  }
-
-  .ranking-bar span {
-    color: #ffffff;
-    font-size: 11.5px;
-    font-weight: 800;
+    border-radius: 999px;
+    transition: width 0.4s ease;
   }
 
   .empty {

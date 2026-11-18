@@ -32,42 +32,64 @@ export function useSupabaseRealtime(tabla, onCambio, { enabled = true, onReconec
   useEffect(() => {
     if (!enabled || !claveTablas) return undefined;
 
+    let activo = true; // evita que avisos de un canal ya cerrado (p. ej. StrictMode) pisen el estado
     let huboCaida = false;
+    let canal = null;
     const tablas = claveTablas.split(',');
-    // Nombre único: dos pantallas abiertas sobre la misma tabla no comparten (ni rompen) el canal
-    const canal = supabase.channel(`rt-${tablas.join('-')}-${++contadorCanales}`);
 
-    tablas.forEach((nombreTabla) => {
-      canal.on('postgres_changes', { event: '*', schema: 'public', table: nombreTabla }, (payload) => {
-        const cambio = {
-          tabla: nombreTabla,
-          tipo: payload.eventType, // 'INSERT' | 'UPDATE' | 'DELETE'
-          nuevo: payload.new && Object.keys(payload.new).length ? payload.new : null,
-          anterior: payload.old && Object.keys(payload.old).length ? payload.old : null,
-        };
-        // Un error procesando un evento nunca debe tumbar la pantalla (incluye errores async)
-        Promise.resolve()
-          .then(() => onCambioRef.current?.(cambio))
-          .catch((err) => console.error(`[realtime:${nombreTabla}] Error procesando evento`, err));
-        emitir(EVENTOS.CAMBIO_REMOTO, cambio);
-      });
-    });
-
-    canal.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        setEstado('en_vivo');
-        if (huboCaida) {
-          huboCaida = false;
-          onReconectarRef.current?.();
-        }
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-        huboCaida = true;
-        setEstado('desconectado');
+    const iniciar = async () => {
+      // Asegura que el canal se una con el token vigente del usuario (refresca si venció).
+      // Con un token vencido Supabase rechaza la suscripción y quedaría "Sin tiempo real".
+      try {
+        await supabase.auth.getSession();
+        // Sin argumento: toma el token de la sesión y lo sigue renovando solo
+        await supabase.realtime.setAuth();
+      } catch (err) {
+        console.warn('[realtime] No se pudo preparar el token', err);
       }
-    });
+      if (!activo) return;
+
+      // Nombre único: dos pantallas abiertas sobre la misma tabla no comparten (ni rompen) el canal
+      canal = supabase.channel(`rt-${tablas.join('-')}-${++contadorCanales}`);
+
+      tablas.forEach((nombreTabla) => {
+        canal.on('postgres_changes', { event: '*', schema: 'public', table: nombreTabla }, (payload) => {
+          if (!activo) return;
+          const cambio = {
+            tabla: nombreTabla,
+            tipo: payload.eventType, // 'INSERT' | 'UPDATE' | 'DELETE'
+            nuevo: payload.new && Object.keys(payload.new).length ? payload.new : null,
+            anterior: payload.old && Object.keys(payload.old).length ? payload.old : null,
+          };
+          // Un error procesando un evento nunca debe tumbar la pantalla (incluye errores async)
+          Promise.resolve()
+            .then(() => onCambioRef.current?.(cambio))
+            .catch((err) => console.error(`[realtime:${nombreTabla}] Error procesando evento`, err));
+          emitir(EVENTOS.CAMBIO_REMOTO, cambio);
+        });
+      });
+
+      canal.subscribe((status, err) => {
+        if (!activo) return;
+        if (status === 'SUBSCRIBED') {
+          setEstado('en_vivo');
+          if (huboCaida) {
+            huboCaida = false;
+            onReconectarRef.current?.();
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          huboCaida = true;
+          setEstado('desconectado');
+          console.warn(`[realtime:${claveTablas}] ${status}`, err?.message || err || '');
+        }
+      });
+    };
+
+    iniciar();
 
     return () => {
-      supabase.removeChannel(canal);
+      activo = false;
+      if (canal) supabase.removeChannel(canal);
     };
   }, [claveTablas, enabled]);
 

@@ -4,6 +4,17 @@ import { localDb } from '../services/localDb';
 import { supabase } from '../config/supabaseClient';
 import { sincronizarInspeccionesPendientes } from '../services/mheService';
 import { sincronizarSugerenciasPendientes } from '../services/sugerenciasService';
+import { sincronizarPrestamosPendientes } from '../services/prestamosService';
+import { emitir, EVENTOS } from '../services/eventBus';
+
+// Módulos con su propia lógica de sincronización. Cada uno corre aislado:
+// si uno falla, los demás igual suben sus pendientes.
+const SINCRONIZADORES = [
+  { tabla: 'inspecciones', nombre: 'MHE', fn: sincronizarInspeccionesPendientes },
+  { tabla: 'tarjetas_sugerencias', nombre: 'Sugerencias', fn: sincronizarSugerenciasPendientes },
+  { tabla: 'prestamos', nombre: 'Préstamos', fn: sincronizarPrestamosPendientes },
+];
+const TABLAS_CON_SINCRONIZADOR = new Set(SINCRONIZADORES.map(s => s.tabla));
 
 export function useSync(authUser) {
   const [syncLoading, setSyncLoading] = useState(false);
@@ -37,27 +48,25 @@ export function useSync(authUser) {
     let totalFailed = 0;
 
     try {
-      // 1. Sincronizar inspecciones MHE (Cabecera + Respuestas)
-      const resMhe = await sincronizarInspeccionesPendientes();
-      totalSynced += resMhe?.synced || 0;
-      totalFailed += resMhe?.failed || 0;
+      // 1. Módulos con sincronizador propio (MHE, Sugerencias, Préstamos), cada uno aislado
+      for (const { nombre, fn } of SINCRONIZADORES) {
+        if (window.__IS_CLEARING_CACHE__) return;
+        try {
+          const res = await fn();
+          totalSynced += res?.synced || 0;
+          totalFailed += res?.failed || 0;
+        } catch (err) {
+          if (err?.name === 'DatabaseClosedError') return;
+          console.error(`Error sincronizando ${nombre}:`, err);
+          totalFailed++;
+        }
+      }
 
       if (window.__IS_CLEARING_CACHE__) return;
 
-      // 2. Sincronizar tarjetas de sugerencias
-      const resSug = await sincronizarSugerenciasPendientes();
-      totalSynced += resSug?.synced || 0;
-      totalFailed += resSug?.failed || 0;
-
-      if (window.__IS_CLEARING_CACHE__) return;
-
-      // 3. Sincronizar cualquier otra tabla en sync_queue (ej. usuarios / empleados)
+      // 2. Sincronizar cualquier otra tabla en sync_queue (ej. usuarios / empleados)
       const otrosPendientes = await localDb.sync_queue
-        .filter(
-          item =>
-            item.tabla !== 'inspecciones' &&
-            item.tabla !== 'tarjetas_sugerencias'
-        )
+        .filter(item => !TABLAS_CON_SINCRONIZADOR.has(item.tabla))
         .toArray();
 
       for (const item of otrosPendientes) {
@@ -84,7 +93,7 @@ export function useSync(authUser) {
       }
 
       // Avisamos a las pantallas abiertas que ya se sincronizó
-      window.dispatchEvent(new CustomEvent('hco-sync-completed'));
+      emitir(EVENTOS.SYNC_COMPLETADO, { synced: totalSynced, failed: totalFailed });
 
       if (!esAutomatico) {
         if (totalSynced > 0 && totalFailed === 0) {

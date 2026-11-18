@@ -1,7 +1,37 @@
 import { supabase } from '../config/supabaseClient';
 import { subirImagenDrive } from './driveService';
+import { localDb } from './localDb';
 
 const BOOT_CACHE_KEY = 'PRESTAMOS_SUPABASE_BOOT_V2';
+const TABLA_COLA = 'prestamos';
+
+/**
+ * true si el error se debe a falta de internet / red caída (y no a una validación o permiso).
+ * Solo en esos casos se guarda la operación en la cola offline.
+ */
+export const esErrorDeRed = (err) => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  const msg = String(err?.message || err || '').toLowerCase();
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('network request failed') ||
+    msg.includes('load failed') ||
+    msg.includes('fetch failed') ||
+    msg.includes('failed to send a request')
+  );
+};
+
+const esPrestamoLocal = (p) => String(p?.uuid || '').startsWith('local_');
+
+// Guarda filas crudas de 'prestamos' en Dexie sin romper el flujo si IndexedDB falla
+const guardarPrestamosLocal = async (filas) => {
+  try {
+    if (filas.length) await localDb.prestamos.bulkPut(filas);
+  } catch (err) {
+    console.warn('No se pudo actualizar la caché local de préstamos:', err);
+  }
+};
 
 export const obtenerFechaHoraPeruISO = () => {
   const ahora = new Date();
@@ -58,6 +88,16 @@ const esRegistroActivo = (item) => {
 // 1. OBTENER DATOS MAESTROS (INCLUYE EMPLEADOS Y ÁREAS)
 // =========================================================================
 export const obtenerDatosMaestrosPrestamos = async () => {
+  // Sin internet: ir directo a la caché, sin esperar a que fallen 7 peticiones
+  if (!navigator.onLine) {
+    try {
+      const cache = localStorage.getItem(BOOT_CACHE_KEY);
+      if (cache) return JSON.parse(cache);
+    } catch {
+      // caché corrupta: se intenta online abajo
+    }
+  }
+
   try {
     const [resEmp, resCond, resPlac, resCli, resTip, resEmpleados, resAreas] = await Promise.all([
       supabase.from('empresas_transporte').select('*'),
@@ -136,30 +176,31 @@ export const obtenerDatosMaestrosPrestamos = async () => {
 // =========================================
 // 2. CREAR PRÉSTAMO PALLET
 // =========================================
-export const crearPrestamoPallet = async (payload) => {
-  const ahoraISO = obtenerFechaHoraPeruISO();
+const AREAS_INVALIDAS = ['OUTBOUND PRINCIPAL', 'OUTBOUND RETAIL', 'CLIENTE RECOGE', 'OPERACIONES', 'OUTBOUND', 'EMPTY', ''];
+
+/**
+ * Arma la fila a insertar en 'prestamos' (parte síncrona, sin consultas a la BD).
+ * La usan tanto el registro online como el registro offline (fila provisional en Dexie).
+ */
+const construirDatosPrestamo = (payload, ahoraISO, { empresaId, areaFinal }) => {
   const esClienteRecoge = payload.area_proceso === 'CLIENTE RECOGE';
   const esOutboundPrincipal = payload.area_proceso === 'OUTBOUND PRINCIPAL';
   const esRegistroParcial = esClienteRecoge || esOutboundPrincipal;
 
   const retornaBool = payload.retorno === 'SI' || payload.retorno === true;
-  const estadoInicial = esRegistroParcial 
-    ? 'Por despachar' 
+  const estadoInicial = esRegistroParcial
+    ? 'Por despachar'
     : (retornaBool ? 'Pendiente' : 'NO RETORNO');
 
-  const fechaRetornoISO = (!esRegistroParcial && retornaBool) 
-    ? calcularFechaRetornoPeru(ahoraISO, 7) 
+  const fechaRetornoISO = (!esRegistroParcial && retornaBool)
+    ? calcularFechaRetornoPeru(ahoraISO, 7)
     : null;
 
-  let empresaIdFinal = payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null;
   let dniConductorFinal = payload.dni_conductor || null;
   let nroPlacaFinal = String(payload.nro_placa || '').trim().toUpperCase();
   let observacionFinal = payload.observacion_salida || '';
 
   if (esClienteRecoge) {
-    if (!empresaIdFinal) {
-      empresaIdFinal = await obtenerOcrearEmpresaOther(payload.usuario_registra);
-    }
     dniConductorFinal = null;
     const metaRecoge = [];
     if (payload.conductor_nombre) metaRecoge.push(`[CONDUCTOR RECOGE: ${payload.conductor_nombre.trim().toUpperCase()}]`);
@@ -177,18 +218,10 @@ export const crearPrestamoPallet = async (payload) => {
       : `[CLIENTES: ${listadoTexto}]`;
   }
 
-  // RESOLVER EL ÁREA REAL DESDE LA TABLA 'areas' (NUNCA USAR AREA_PROCESO)
-  let areaFinal = String(payload.area_registrador || '').trim();
-  const valoresInvalidos = ['OUTBOUND PRINCIPAL', 'OUTBOUND RETAIL', 'CLIENTE RECOGE', 'OPERACIONES', 'OUTBOUND', 'EMPTY', ''];
-  if (valoresInvalidos.includes(areaFinal.toUpperCase())) {
-    const areaDetectada = await obtenerAreaEmpleadoPorIdentificador(payload.usuario_registra);
-    areaFinal = areaDetectada || '';
-  }
-
-  const datosInsertar = {
+  return {
     fecha_entrega: ahoraISO,
     fecha_retorno: fechaRetornoISO,
-    empresa_transporte_id: empresaIdFinal,
+    empresa_transporte_id: empresaId,
     dni_conductor: dniConductorFinal,
     nr_ruta: String(payload.nr_ruta || '').trim(),
     nro_placa: nroPlacaFinal,
@@ -206,6 +239,46 @@ export const crearPrestamoPallet = async (payload) => {
     usuario_registra: payload.usuario_registra,
     usuario_actualiza: null
   };
+};
+
+/**
+ * Sube firma/foto de salida a Drive y las guarda en el préstamo ya creado.
+ * Si falla por red, encola la subida para más tarde: el préstamo YA existe y no se duplica.
+ */
+const subirImagenesSalida = async (prestamo, { firma_conductor_base64, foto_salida_base64 }) => {
+  if (!firma_conductor_base64 && !foto_salida_base64) return prestamo;
+  try {
+    return await subirImagenesSalidaEstricto(prestamo, { firma_conductor_base64, foto_salida_base64 });
+  } catch (err) {
+    // El préstamo ya está guardado: NO lanzamos el error (el usuario reintentaría y se duplicaría).
+    // La subida queda en cola y se reintenta en la próxima sincronización.
+    console.warn('No se pudieron subir las imágenes de salida; quedan en cola.', err);
+    await localDb.sync_queue.add({
+      tabla: TABLA_COLA,
+      operacion: 'ACCION',
+      payload: { tipo: 'imagenes_salida', uuid: prestamo.uuid, datos: { firma_conductor_base64, foto_salida_base64 } }
+    });
+    return prestamo;
+  }
+};
+
+// Registro directo en Supabase (lo usa el flujo online y la sincronización de la cola)
+const crearPrestamoPalletOnline = async (payload, { fechaEntregaISO } = {}) => {
+  const ahoraISO = fechaEntregaISO || obtenerFechaHoraPeruISO();
+
+  let empresaIdFinal = payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null;
+  if (payload.area_proceso === 'CLIENTE RECOGE' && !empresaIdFinal) {
+    empresaIdFinal = await obtenerOcrearEmpresaOther(payload.usuario_registra);
+  }
+
+  // RESOLVER EL ÁREA REAL DESDE LA TABLA 'areas' (NUNCA USAR AREA_PROCESO)
+  let areaFinal = String(payload.area_registrador || '').trim();
+  if (AREAS_INVALIDAS.includes(areaFinal.toUpperCase())) {
+    const areaDetectada = await obtenerAreaEmpleadoPorIdentificador(payload.usuario_registra);
+    areaFinal = areaDetectada || '';
+  }
+
+  const datosInsertar = construirDatosPrestamo(payload, ahoraISO, { empresaId: empresaIdFinal, areaFinal });
 
   const { data: prestamoCreado, error: errorInsert } = await supabase
     .from('prestamos')
@@ -217,47 +290,104 @@ export const crearPrestamoPallet = async (payload) => {
     throw new Error(`Error en Supabase: ${errorInsert.message}`);
   }
 
-  const idPrestamo = prestamoCreado.id_prestamo;
-  if (payload.firma_conductor_base64 || payload.foto_salida_base64) {
+  const final = await subirImagenesSalida(prestamoCreado, payload);
+  await guardarPrestamosLocal([{ ...final, _sincronizado: true }]);
+  return final;
+};
 
-    const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
-      payload.firma_conductor_base64 
-        ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`)
-        : Promise.resolve(''),
-      payload.foto_salida_base64 
-        ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`)
-        : Promise.resolve('')
-    ]);
-
-    if (urlFirmaSalida || urlFotoSalida) {
-      const { data: prestamoActualizado } = await supabase
-        .from('prestamos')
-        .update({
-          firma_conductor: urlFirmaSalida || null,
-          foto_salida: urlFotoSalida || null
-        })
-        .eq('uuid', prestamoCreado.uuid)
-        .select()
-        .single();
-
-      return prestamoActualizado || prestamoCreado;
+/**
+ * Crea un préstamo. Con internet va directo a Supabase; si no hay red (o se cae a mitad),
+ * lo guarda en Dexie + sync_queue y se sube solo al volver la conexión.
+ * El objeto devuelto trae `_sincronizado: false` cuando quedó pendiente.
+ */
+export const crearPrestamoPallet = async (payload) => {
+  if (navigator.onLine) {
+    try {
+      return await crearPrestamoPalletOnline(payload);
+    } catch (err) {
+      if (!esErrorDeRed(err)) throw err;
+      console.warn('Fallo de red al crear préstamo, guardando en modo offline...', err);
     }
   }
 
-  return prestamoCreado;
+  const ahoraISO = obtenerFechaHoraPeruISO();
+  const idLocal = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const filaLocal = {
+    ...construirDatosPrestamo(payload, ahoraISO, {
+      empresaId: payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null,
+      areaFinal: String(payload.area_registrador || '').trim()
+    }),
+    uuid: idLocal,
+    id_prestamo: 'PENDIENTE',
+    _sincronizado: false
+  };
+
+  await localDb.prestamos.put(filaLocal);
+  await localDb.sync_queue.add({
+    tabla: TABLA_COLA,
+    operacion: 'INSERT',
+    payload: { idLocal, fechaEntregaISO: ahoraISO, datos: payload }
+  });
+
+  return filaLocal;
 };
 
 // =========================================================================
 // 3. OBTENER TRACKING (EXTRAE CONDUCTOR Y PLACA DE CLIENTE RECOGE)
 // =========================================================================
-export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
-  const [resPrest, maestros] = await Promise.all([
-    supabase.from('prestamos').select('*').order('fecha_entrega', { ascending: false }),
-    maestrosPreCargados ? Promise.resolve(maestrosPreCargados) : obtenerDatosMaestrosPrestamos()
-  ]);
+const ordenarPorFechaEntrega = (filas) =>
+  filas.sort((a, b) => new Date(b.fecha_entrega || 0) - new Date(a.fecha_entrega || 0));
 
-  if (resPrest.error) throw new Error(`Error al cargar tracking: ${resPrest.error.message}`);
+/**
+ * Filas crudas de 'prestamos'. Online: Supabase + caché en Dexie.
+ * Offline o red caída: lo último guardado en Dexie (incluye los pendientes de subir).
+ */
+export const obtenerFilasPrestamos = async () => {
+  if (navigator.onLine) {
+    try {
+      const { data, error } = await supabase
+        .from('prestamos')
+        .select('*')
+        .order('fecha_entrega', { ascending: false });
 
+      if (error) throw new Error(`Error al cargar tracking: ${error.message}`);
+
+      let pendientes = [];
+      try {
+        pendientes = await localDb.prestamos.filter(p => p._sincronizado === false).toArray();
+      } catch {
+        // Dexie no disponible: se muestran solo los datos del servidor
+      }
+      const uuidsPendientes = new Set(pendientes.map(p => p.uuid));
+
+      const remotas = (data || [])
+        .filter(r => !uuidsPendientes.has(r.uuid))
+        .map(r => ({ ...r, _sincronizado: true }));
+
+      try {
+        await localDb.transaction('rw', localDb.prestamos, async () => {
+          await localDb.prestamos.clear();
+          await localDb.prestamos.bulkPut([...remotas, ...pendientes]);
+        });
+      } catch (err) {
+        console.warn('No se pudo refrescar la caché local de préstamos:', err);
+      }
+
+      return ordenarPorFechaEntrega([...pendientes, ...remotas]);
+    } catch (err) {
+      if (!esErrorDeRed(err)) throw err;
+      console.warn('Sin conexión estable, leyendo préstamos desde Dexie local...', err);
+    }
+  }
+
+  return ordenarPorFechaEntrega(await localDb.prestamos.toArray());
+};
+
+/**
+ * Prepara los mapas de catálogos una sola vez para formatear muchas filas
+ * (o una sola fila que llega por tiempo real).
+ */
+export const crearFormateadorPrestamos = (maestros = {}) => {
   const empMap = Object.fromEntries((maestros.empresas || []).map(e => [String(e.id), e.nombre_empresa]));
   const condMap = Object.fromEntries((maestros.conductores || []).map(c => [String(c.dni_conductor), c.nombre_conductor]));
   const cliMap = Object.fromEntries((maestros.clientes || []).map(c => [String(c.id), c.nombre_cliente]));
@@ -277,9 +407,8 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
     if (emp.nombre) empAreaMap[String(emp.nombre).toLowerCase().trim()] = areaNombre;
   });
 
-  const hoy = new Date();
-
-  const listaFormateada = (resPrest.data || []).map(row => {
+  return (row) => {
+    const hoy = new Date();
     const noRetornoAcumulado = Number(row.nr_paletas_noretorno || 0);
     const devueltasAcumuladas = Number(row.nr_paletas_devueltas || 0);
     const prestadas = Number(row.nr_paletas || 0);
@@ -326,9 +455,39 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
       fecha_retorno_calculada: fechaRetornoDate ? fechaRetornoDate.toISOString() : null,
       atrasado
     };
-  });
+  };
+};
 
-  return listaFormateada;
+export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
+  const [filas, maestros] = await Promise.all([
+    obtenerFilasPrestamos(),
+    maestrosPreCargados ? Promise.resolve(maestrosPreCargados) : obtenerDatosMaestrosPrestamos()
+  ]);
+
+  return filas.map(crearFormateadorPrestamos(maestros));
+};
+
+/**
+ * Procesa un evento de tiempo real de la tabla 'prestamos': actualiza la caché de Dexie.
+ * Devuelve false si el préstamo tiene cambios offline sin subir (la pantalla debe
+ * conservar la versión local hasta que se sincronice).
+ */
+export const registrarCambioRemotoPrestamo = async (cambio) => {
+  try {
+    if (cambio.tipo === 'DELETE') {
+      if (cambio.anterior?.uuid) await localDb.prestamos.delete(cambio.anterior.uuid);
+      return true;
+    }
+    if (!cambio.nuevo?.uuid) return true;
+
+    const local = await localDb.prestamos.get(cambio.nuevo.uuid);
+    if (local && local._sincronizado === false) return false;
+
+    await localDb.prestamos.put({ ...cambio.nuevo, _sincronizado: true });
+  } catch (err) {
+    console.warn('No se pudo aplicar el cambio remoto en Dexie:', err);
+  }
+  return true;
 };
 
 
@@ -336,23 +495,11 @@ export const obtenerTrackingPrestamos = async (maestrosPreCargados = null) => {
 // =========================================================================
 // 2.1 COMPLETAR DESPACHO AUXILIAR (FASE 2)
 // =========================================================================
-export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
-  const ahoraISO = obtenerFechaHoraPeruISO();
-  const idPrestamo = prestamoActual.id_prestamo;
+const calcularDespachoAuxiliar = (prestamoActual, payload, ahoraISO, { urlFirmaSalida, urlFotoSalida }) => {
   const nrPaletasNum = Number(payload.nr_paletas || 0);
   const retornaBool = nrPaletasNum === 0 ? false : (payload.retorno === 'SI' || payload.retorno === true);
   const estadoFinal = retornaBool ? 'Pendiente' : 'NO RETORNO';
   const fechaRetornoISO = retornaBool ? calcularFechaRetornoPeru(ahoraISO, 7) : null;
-
-
-  const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
-    payload.firma_conductor_base64 
-      ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`)
-      : Promise.resolve(prestamoActual.firma_conductor || ''),
-    payload.foto_salida_base64 
-      ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`)
-      : Promise.resolve(prestamoActual.foto_salida || '')
-  ]);
 
   const obsPrevia = String(prestamoActual.observacion_salida || '').trim();
   const obsNueva = String(payload.observacion_salida || '').trim();
@@ -360,7 +507,7 @@ export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
     ? `${obsPrevia} | ${obsNueva}`
     : (obsNueva || obsPrevia);
 
-  const camposActualizar = {
+  return {
     despachador: payload.usuario_actualiza || prestamoActual.despachador, // <-- AHORA SE ACTUALIZA EL DESPACHADOR CON EL AUXILIAR
     nr_paletas: Number(payload.nr_paletas || 0),
     retorno: retornaBool,
@@ -373,6 +520,22 @@ export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
     usuario_actualiza: payload.usuario_actualiza,
     fecha_actualiza: ahoraISO
   };
+};
+
+const completarDespachoAuxiliarOnline = async (prestamoActual, payload) => {
+  const ahoraISO = obtenerFechaHoraPeruISO();
+  const idPrestamo = prestamoActual.id_prestamo;
+
+  const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
+    payload.firma_conductor_base64
+      ? subirImagenADrive(payload.firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`)
+      : Promise.resolve(prestamoActual.firma_conductor || ''),
+    payload.foto_salida_base64
+      ? subirImagenADrive(payload.foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`)
+      : Promise.resolve(prestamoActual.foto_salida || '')
+  ]);
+
+  const camposActualizar = calcularDespachoAuxiliar(prestamoActual, payload, ahoraISO, { urlFirmaSalida, urlFotoSalida });
 
   const { data, error } = await supabase
     .from('prestamos')
@@ -385,10 +548,7 @@ export const completarDespachoAuxiliar = async (prestamoActual, payload) => {
   return data;
 };
 
-export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {
-  const ahoraISO = obtenerFechaHoraPeruISO();
-  const idPrestamo = prestamoActual.id_prestamo;
-
+const calcularDevolucion = (prestamoActual, payload, ahoraISO, { urlFirmaRetorno }) => {
   const nrPaletasPrestadas = Number(prestamoActual.nr_paletas || 0);
   const devueltasAnteriores = Number(prestamoActual.nr_paletas_devueltas || 0);
   const noRetornoAnteriores = Number(prestamoActual.nr_paletas_noretorno || 0);
@@ -427,13 +587,7 @@ export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {
     fechaDevolucion = null;
   }
 
-  let urlFirmaRetorno = prestamoActual.firma_retorno || null;
-  if (payload.firma_retorno_base64) {
-    const nombreFirmaRegreso = `firma_${idPrestamo}_regreso_${Date.now()}.png`;
-    urlFirmaRetorno = await subirImagenADrive(payload.firma_retorno_base64, nombreFirmaRegreso);
-  }
-
-  const camposActualizar = {
+  return {
     estado: nuevoEstado,
     nr_paletas_devueltas: totalDevueltas,
     nr_paletas_noretorno: totalNoRetorno,
@@ -445,6 +599,19 @@ export const registrarDevolucionPrestamo = async (prestamoActual, payload) => {
     usuario_actualiza: payload.usuario_actualiza,
     fecha_actualiza: ahoraISO
   };
+};
+
+const registrarDevolucionOnline = async (prestamoActual, payload) => {
+  const ahoraISO = obtenerFechaHoraPeruISO();
+  const idPrestamo = prestamoActual.id_prestamo;
+
+  let urlFirmaRetorno = prestamoActual.firma_retorno || null;
+  if (payload.firma_retorno_base64) {
+    const nombreFirmaRegreso = `firma_${idPrestamo}_regreso_${Date.now()}.png`;
+    urlFirmaRetorno = await subirImagenADrive(payload.firma_retorno_base64, nombreFirmaRegreso);
+  }
+
+  const camposActualizar = calcularDevolucion(prestamoActual, payload, ahoraISO, { urlFirmaRetorno });
 
   const { data, error } = await supabase
     .from('prestamos')
@@ -630,19 +797,15 @@ export const asegurarPlacaExiste = async (nroPlaca, empresaId, usuario) => {
 // =========================================================================
 // ACTUALIZAR REGISTRO CUANDO ESTÁ 'Por despachar' (ADMIN / SUPERVISOR / SUPERADMIN)
 // =========================================================================
-export const actualizarRegistroPorDespachar = async (prestamoActual, payload) => {
-  const ahoraISO = obtenerFechaHoraPeruISO();
+const calcularPorDespachar = (prestamoActual, payload, ahoraISO, { empresaId }) => {
   const esClienteRecoge = prestamoActual.area_proceso === 'CLIENTE RECOGE';
 
-  let empresaIdFinal = payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null;
+  const empresaIdFinal = empresaId;
   let dniConductorFinal = payload.dni_conductor || null;
   let nroPlacaFinal = String(payload.nro_placa || '').trim().toUpperCase();
   let observacionFinal = payload.observacion_salida || '';
 
   if (esClienteRecoge) {
-    if (!empresaIdFinal) {
-      empresaIdFinal = await obtenerOcrearEmpresaOther(payload.usuario_actualiza);
-    }
     dniConductorFinal = null;
 
     const metaRecoge = [];
@@ -659,11 +822,6 @@ export const actualizarRegistroPorDespachar = async (prestamoActual, payload) =>
     const prefixRecoge = metaRecoge.join(' ');
     observacionFinal = obsLimpia ? `${prefixRecoge} - ${obsLimpia}` : prefixRecoge;
   } else {
-    // OUTBOUND PRINCIPAL: asegurar placa en catálogo
-    if (nroPlacaFinal && empresaIdFinal) {
-      await asegurarPlacaExiste(nroPlacaFinal, empresaIdFinal, payload.usuario_actualiza);
-    }
-
     if (Array.isArray(payload.clientes_multiples) && payload.clientes_multiples.length > 0) {
       let obsSinClientes = (observacionFinal || '').replace(/\[CLIENTES:\s*[^\]]+\]\s*-?\s*/gi, '').trim();
       const listadoTexto = payload.clientes_multiples.join(', ');
@@ -671,7 +829,7 @@ export const actualizarRegistroPorDespachar = async (prestamoActual, payload) =>
     }
   }
 
-  const camposActualizar = {
+  return {
     empresa_transporte_id: empresaIdFinal,
     dni_conductor: dniConductorFinal,
     nr_ruta: esClienteRecoge ? prestamoActual.nr_ruta : String(payload.nr_ruta || '').trim(),
@@ -680,6 +838,22 @@ export const actualizarRegistroPorDespachar = async (prestamoActual, payload) =>
     usuario_actualiza: payload.usuario_actualiza,
     fecha_actualiza: ahoraISO
   };
+};
+
+const actualizarPorDespacharOnline = async (prestamoActual, payload) => {
+  const ahoraISO = obtenerFechaHoraPeruISO();
+  const esClienteRecoge = prestamoActual.area_proceso === 'CLIENTE RECOGE';
+  let empresaId = payload.empresa_transporte_id ? Number(payload.empresa_transporte_id) : null;
+  const nroPlaca = String(payload.nro_placa || '').trim().toUpperCase();
+
+  if (esClienteRecoge) {
+    if (!empresaId) empresaId = await obtenerOcrearEmpresaOther(payload.usuario_actualiza);
+  } else if (nroPlaca && empresaId) {
+    // OUTBOUND PRINCIPAL: asegurar placa en catálogo
+    await asegurarPlacaExiste(nroPlaca, empresaId, payload.usuario_actualiza);
+  }
+
+  const camposActualizar = calcularPorDespachar(prestamoActual, payload, ahoraISO, { empresaId });
 
   const { data, error } = await supabase
     .from('prestamos')
@@ -804,8 +978,7 @@ export const obtenerAreaEmpleadoPorIdentificador = async (identificador) => {
 // =========================================================================
 // REGISTRAR CHECK DE SALIDA EN GARITA (CONCATENA HISTORIAL DE EVIDENCIA)
 // =========================================================================
-export const registrarControlGarita = async (uuidPrestamo, { estado_garita, comentario_garita, comentario_anterior, usuario_actualiza }) => {
-  const ahoraISO = obtenerFechaHoraPeruISO();
+const calcularGarita = (ahoraISO, { estado_garita, comentario_garita, comentario_anterior, usuario_actualiza }) => {
   const fechaPeruLegible = new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' });
 
   let comentarioFinal = '';
@@ -826,18 +999,205 @@ export const registrarControlGarita = async (uuidPrestamo, { estado_garita, come
     comentarioFinal = obsNueva ? `[${fechaPeruLegible} - ${usuario_actualiza}]: ${obsNueva}` : '';
   }
 
+  return {
+    estado_garita,
+    comentario_garita: comentarioFinal || null,
+    usuario_actualiza,
+    fecha_actualiza: ahoraISO
+  };
+};
+
+const registrarGaritaOnline = async (prestamoActual, payload) => {
+  const ahoraISO = obtenerFechaHoraPeruISO();
   const { data, error } = await supabase
     .from('prestamos')
-    .update({
-      estado_garita,
-      comentario_garita: comentarioFinal || null,
-      usuario_actualiza,
-      fecha_actualiza: ahoraISO
-    })
-    .eq('uuid', uuidPrestamo)
+    .update(calcularGarita(ahoraISO, payload))
+    .eq('uuid', prestamoActual.uuid)
     .select()
     .single();
 
   if (error) throw new Error(`Error en control de garita: ${error.message}`);
   return data;
+};
+
+// =========================================================================
+// CAPA OFFLINE + EVENTOS: cada acción sobre un préstamo existente pasa por aquí
+// =========================================================================
+// - online:  escribe en Supabase usando la versión MÁS RECIENTE del préstamo (evita pisar
+//            cambios que otro usuario hizo mientras tenías el modal abierto).
+// - local:   calcula el cambio sin red para mostrarlo al instante (optimista) y lo encola.
+// Las acciones guardan "deltas" (ej. paletas devueltas AHORA), así que al sincronizar
+// se recalculan sobre los datos frescos del servidor y nada se suma dos veces.
+const ACCIONES_PRESTAMO = {
+  despacho_auxiliar: {
+    online: completarDespachoAuxiliarOnline,
+    local: (p, datos, ahora) => calcularDespachoAuxiliar(p, datos, ahora, {
+      urlFirmaSalida: p.firma_conductor || '',
+      urlFotoSalida: p.foto_salida || ''
+    })
+  },
+  devolucion: {
+    online: registrarDevolucionOnline,
+    local: (p, datos, ahora) => calcularDevolucion(p, datos, ahora, { urlFirmaRetorno: p.firma_retorno || null })
+  },
+  por_despachar: {
+    online: actualizarPorDespacharOnline,
+    local: (p, datos, ahora) => calcularPorDespachar(p, datos, ahora, {
+      empresaId: datos.empresa_transporte_id ? Number(datos.empresa_transporte_id) : (p.empresa_transporte_id ?? null)
+    })
+  },
+  garita: {
+    // El historial de garita se concatena sobre el comentario vigente en el servidor
+    online: (p, datos) => registrarGaritaOnline(p, { ...datos, comentario_anterior: p.comentario_garita }),
+    local: (p, datos, ahora) => calcularGarita(ahora, { ...datos, comentario_anterior: p.comentario_garita })
+  },
+  imagenes_salida: {
+    online: (p, datos) => subirImagenesSalidaEstricto(p, datos),
+    local: null
+  }
+};
+
+// Variante que SÍ lanza el error (para que la cola sepa que falló y lo reintente)
+const subirImagenesSalidaEstricto = async (prestamo, { firma_conductor_base64, foto_salida_base64 }) => {
+  const idPrestamo = prestamo.id_prestamo;
+  const [urlFirmaSalida, urlFotoSalida] = await Promise.all([
+    firma_conductor_base64
+      ? subirImagenADrive(firma_conductor_base64, `firma_${idPrestamo}_salida_${Date.now()}.png`)
+      : Promise.resolve(''),
+    foto_salida_base64
+      ? subirImagenADrive(foto_salida_base64, `foto_${idPrestamo}_salida_${Date.now()}.png`)
+      : Promise.resolve('')
+  ]);
+
+  const { data, error } = await supabase
+    .from('prestamos')
+    .update({
+      firma_conductor: urlFirmaSalida || prestamo.firma_conductor || null,
+      foto_salida: urlFotoSalida || prestamo.foto_salida || null
+    })
+    .eq('uuid', prestamo.uuid)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+const obtenerPrestamoRemoto = async (uuid) => {
+  const { data, error } = await supabase.from('prestamos').select('*').eq('uuid', uuid).single();
+  if (error) throw new Error(`No se pudo leer el préstamo actualizado: ${error.message}`);
+  return data;
+};
+
+const ejecutarAccionPrestamo = async (tipo, prestamoActual, datos) => {
+  const accion = ACCIONES_PRESTAMO[tipo];
+  const uuid = prestamoActual?.uuid;
+  if (!uuid) throw new Error('Préstamo sin identificador.');
+
+  if (esPrestamoLocal(prestamoActual)) {
+    throw new Error('Este préstamo se registró sin internet y aún no se sincroniza. Sincroniza los pendientes y vuelve a intentarlo.');
+  }
+
+  if (navigator.onLine) {
+    try {
+      const fresco = await obtenerPrestamoRemoto(uuid);
+      const resultado = await accion.online(fresco, datos);
+      await guardarPrestamosLocal([{ ...resultado, _sincronizado: true }]);
+      return resultado;
+    } catch (err) {
+      if (!esErrorDeRed(err)) throw err;
+      console.warn(`Fallo de red en acción "${tipo}", guardando en modo offline...`, err);
+    }
+  }
+
+  // ---- Modo offline: cambio optimista en Dexie + cola ----
+  let base = null;
+  try {
+    base = await localDb.prestamos.get(uuid);
+  } catch {
+    // sin Dexie: se usa la copia que tiene la pantalla
+  }
+  base = base || prestamoActual;
+
+  const ahoraISO = obtenerFechaHoraPeruISO();
+  const actualizado = { ...base, ...accion.local(base, datos, ahoraISO), _sincronizado: false };
+
+  await localDb.prestamos.put(actualizado);
+  await localDb.sync_queue.add({
+    tabla: TABLA_COLA,
+    operacion: 'ACCION',
+    payload: { tipo, uuid, datos }
+  });
+
+  return actualizado;
+};
+
+// API pública (misma firma que antes: las pantallas no cambian)
+export const completarDespachoAuxiliar = (prestamoActual, payload) =>
+  ejecutarAccionPrestamo('despacho_auxiliar', prestamoActual, payload);
+
+export const registrarDevolucionPrestamo = (prestamoActual, payload) =>
+  ejecutarAccionPrestamo('devolucion', prestamoActual, payload);
+
+export const actualizarRegistroPorDespachar = (prestamoActual, payload) =>
+  ejecutarAccionPrestamo('por_despachar', prestamoActual, payload);
+
+export const registrarControlGarita = (uuidPrestamo, payload) =>
+  ejecutarAccionPrestamo('garita', { uuid: uuidPrestamo }, payload);
+
+// =========================================================================
+// SINCRONIZACIÓN DE LA COLA OFFLINE DE PRÉSTAMOS (la llama useSync)
+// =========================================================================
+export const sincronizarPrestamosPendientes = async () => {
+  if (!navigator.onLine) return { synced: 0, failed: 0 };
+
+  let synced = 0;
+  let failed = 0;
+  const uuidsConError = new Set();
+
+  let pendientes;
+  try {
+    // Orden de llegada (++id): primero el registro, luego sus acciones
+    pendientes = await localDb.sync_queue.where('tabla').equals(TABLA_COLA).sortBy('id');
+  } catch (err) {
+    console.error('No se pudo leer la cola de préstamos:', err);
+    return { synced, failed };
+  }
+
+  for (const item of pendientes) {
+    const { payload } = item;
+    try {
+      if (item.operacion === 'INSERT') {
+        const creado = await crearPrestamoPalletOnline(payload.datos, { fechaEntregaISO: payload.fechaEntregaISO });
+        await localDb.prestamos.delete(payload.idLocal);
+        await localDb.prestamos.put({ ...creado, _sincronizado: true });
+      } else if (item.operacion === 'ACCION') {
+        // Si una acción anterior del mismo préstamo falló, esperamos para respetar el orden
+        if (uuidsConError.has(payload.uuid)) { failed++; continue; }
+
+        const accion = ACCIONES_PRESTAMO[payload.tipo];
+        if (!accion) throw new Error(`Acción desconocida: ${payload.tipo}`);
+
+        const fresco = await obtenerPrestamoRemoto(payload.uuid);
+        const resultado = await accion.online(fresco, payload.datos);
+
+        const quedanOtras = pendientes.some(
+          (p) => p.id > item.id && p.payload?.uuid === payload.uuid
+        );
+        await localDb.prestamos.put({ ...resultado, _sincronizado: !quedanOtras });
+      }
+
+      await localDb.sync_queue.delete(item.id);
+      synced++;
+    } catch (err) {
+      console.error('Error sincronizando préstamo pendiente:', err);
+      failed++;
+      if (payload?.uuid) uuidsConError.add(payload.uuid);
+      if (payload?.idLocal) uuidsConError.add(payload.idLocal);
+      // Se cayó la red a mitad: no tiene sentido seguir intentando el resto
+      if (esErrorDeRed(err)) break;
+    }
+  }
+
+  return { synced, failed };
 };

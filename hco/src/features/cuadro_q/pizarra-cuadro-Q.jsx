@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Loading from '../../layouts/Loading';
 import './pizarra-cuadro-Q.css';
+import { useCuadroQEnVivo } from './useCuadroQEnVivo';
+import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 
 import {
   obtenerRegistrosCuadroQ,
@@ -43,15 +45,21 @@ function PizarraCuadroQContenido() {
     cargarDatos();
   }, [currentUser, navigate]);
 
-  const cargarDatos = async () => {
-    setLoading(true);
+  // Tiempo real: los gráficos se recalculan solos cuando alguien registra o cierra un Q
+  const estadoRealtime = useCuadroQEnVivo(setRegistros, {
+    enabled: !!currentUser,
+    onReconectar: () => cargarDatos({ silencioso: true })
+  });
+
+  const cargarDatos = async ({ silencioso = false } = {}) => {
+    if (!silencioso) setLoading(true);
     try {
       const dataReg = await obtenerRegistrosCuadroQ();
       setRegistros(dataReg || []);
     } catch (error) {
       console.error("Error al cargar registros para la pizarra:", error);
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
   };
 
@@ -211,6 +219,7 @@ function PizarraCuadroQContenido() {
         <div>
           <span className="page-chip">CUADRO Q</span>
           <h1>Gráficos de Q</h1>
+            <IndicadorEnVivo estado={estadoRealtime} />
           <p id="pizarraStatus">
             Actualizado: {fechaActualStr} | Total errores: {registrosAreaFiltrados.length}
           </p>

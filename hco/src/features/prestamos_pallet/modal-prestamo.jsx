@@ -530,6 +530,19 @@ function ModalPrestamoContenido() {
       };
 
       const creado = await crearPrestamoPallet(payloadEnvio);
+
+      // Sin internet: quedó guardado en el dispositivo y se sube solo al volver la conexión
+      if (creado?._sincronizado === false) {
+        mostrarAviso(
+          'warning',
+          'Guardado sin conexión',
+          'No hay internet. El registro quedó guardado en este dispositivo y se enviará automáticamente cuando vuelva la conexión.',
+          'Aparecerá en el tracking como "Sin sincronizar" hasta que se suba.',
+          () => navigate('/prestamos/tracking')
+        );
+        return;
+      }
+
       mostrarAviso(
         'success',
         esOutboundRetail ? 'Préstamo Registrado' : 'Pre-Registro Creado',

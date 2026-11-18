@@ -350,3 +350,21 @@ export const actualizarRegistroCuadroQ = async (id, datosAnalisis) => {
 
   return normalizarRegistroCuadroQ(data);
 };
+
+// =========================================================================
+// TIEMPO REAL: procesa un evento de la tabla 'cuadro_q' (actualiza caché Dexie)
+// =========================================================================
+export const normalizarCuadroQ = normalizarRegistroCuadroQ;
+
+export const registrarCambioRemotoCuadroQ = async (cambio) => {
+  try {
+    if (!localDb.cuadro_q) return;
+    if (cambio.tipo === 'DELETE') {
+      if (cambio.anterior?.id) await localDb.cuadro_q.delete(cambio.anterior.id);
+    } else if (cambio.nuevo?.id) {
+      await localDb.cuadro_q.put(normalizarRegistroCuadroQ(cambio.nuevo));
+    }
+  } catch (err) {
+    console.warn('No se pudo aplicar el cambio remoto de Cuadro Q en Dexie:', err);
+  }
+};

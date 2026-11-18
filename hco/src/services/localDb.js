@@ -23,3 +23,9 @@ localDb.version(4).stores({
   // Tabla local para Tarjetas de Sugerencias
   tarjetas_sugerencias: 'id, id_sugerencia, estado, area_registro_id, area_responsable_id, usuario_registro_id, responsable_id, fecha_registro, _sincronizado'
 });
+
+// v5: Préstamos de pallets offline (lectura en caché + cola de escrituras en sync_queue)
+// Clave = uuid del préstamo. Los creados sin internet usan uuid 'local_...' hasta sincronizar.
+localDb.version(5).stores({
+  prestamos: 'uuid, id_prestamo, estado, fecha_entrega, _sincronizado'
+});

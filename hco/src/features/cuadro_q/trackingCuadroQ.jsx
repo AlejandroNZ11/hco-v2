@@ -12,6 +12,8 @@ import {
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './trackingCuadroQ.css';
+import { useCuadroQEnVivo } from './useCuadroQEnVivo';
+import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 import * as XLSX from 'xlsx';
 
 import {
@@ -74,8 +76,13 @@ function TrackingCuadroQContenido() {
     cargarDatos();
   }, []);
 
-  const cargarDatos = async () => {
-    setLoading(true);
+  // Tiempo real: registros nuevos / análisis de otros usuarios aparecen sin recargar
+  const estadoRealtime = useCuadroQEnVivo(setRegistros, {
+    onReconectar: () => cargarDatos({ silencioso: true })
+  });
+
+  const cargarDatos = async ({ silencioso = false } = {}) => {
+    if (!silencioso) setLoading(true);
     try {
       const [dataReg, catalogos] = await Promise.all([
         obtenerRegistrosCuadroQ(),
@@ -86,7 +93,7 @@ function TrackingCuadroQContenido() {
     } catch (error) {
       console.error("Error al cargar Cuadro Q:", error);
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
   };
 
@@ -337,6 +344,7 @@ function TrackingCuadroQContenido() {
         <section className="hero-card">
           <span className="module-pill">EXCELENCIA OPERATIVA</span>
           <h1>Tracking Cuadro Q</h1>
+          <IndicadorEnVivo estado={estadoRealtime} style={{ marginBottom: 6 }} />
           <p>Registre, analice causas raíz y dé seguimiento a las incidencias operativas por área.</p>
         </section>
 

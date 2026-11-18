@@ -14,8 +14,13 @@ import {
   obtenerDatosMaestrosPrestamos,
   completarDespachoAuxiliar,
   actualizarRegistroPorDespachar,
-  registrarControlGarita
+  registrarControlGarita,
+  crearFormateadorPrestamos,
+  registrarCambioRemotoPrestamo
 } from '../../services/prestamosService';
+import { useSupabaseRealtime, aplicarCambioEnLista } from '../../hooks/useSupabaseRealtime';
+import { escuchar, EVENTOS } from '../../services/eventBus';
+import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 
 function getStoredAuthUser() {
   const raw = localStorage.getItem("authUser") || sessionStorage.getItem("authUser");
@@ -170,14 +175,14 @@ function TrackingPrestamosContenido() {
     setLoading(true);
 
     try {
-      await registrarControlGarita(prestamoSeleccionado.uuid, {
+      const resultado = await registrarControlGarita(prestamoSeleccionado.uuid, {
         estado_garita: garitaData.estado_garita,
         comentario_garita: garitaData.comentario_garita,
         comentario_anterior: prestamoSeleccionado.comentario_garita, // <-- Conserva la evidencia anterior
         usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Seguridad'
       });
       await cargarDatos();
-      mostrarAviso('success', 'Control de Garita Guardado', `Salida registrada como: ${garitaData.estado_garita}`);
+      avisarResultado(resultado, 'Control de Garita Guardado', `Salida registrada como: ${garitaData.estado_garita}`);
     } catch (err) {
       setModalGaritaVisible(true);
       mostrarAviso('danger', 'Error en garita', err.message);
@@ -191,11 +196,39 @@ function TrackingPrestamosContenido() {
     cargarDatos();
   }, [currentUser, navigate]);
 
+  // Aviso uniforme: si la acción quedó en la cola offline, se le informa al usuario
+  const avisarResultado = (resultado, titulo, mensaje) => {
+    if (resultado?._sincronizado === false) {
+      mostrarAviso('warning', 'Guardado sin conexión', 'El cambio se aplicó en este dispositivo y se enviará automáticamente cuando vuelva internet.');
+    } else {
+      mostrarAviso('success', titulo, mensaje);
+    }
+  };
 
-  const cargarDatos = async () => {
-    setLoading(true);
+  // Catálogos usados para formatear las filas que llegan en tiempo real
+  const maestrosRef = useRef(null);
+
+  // ===== TIEMPO REAL: cambios de otros usuarios aparecen sin recargar =====
+  const estadoRealtime = useSupabaseRealtime(
+    'prestamos',
+    async (cambio) => {
+      const aplicar = await registrarCambioRemotoPrestamo(cambio);
+      if (!aplicar) return;
+      const formatear = crearFormateadorPrestamos(maestrosRef.current || {});
+      setPrestamos(prev => aplicarCambioEnLista(prev, cambio, { clave: 'uuid', transformar: formatear }));
+    },
+    // Al reconectar se recarga en silencio para recuperar eventos perdidos durante la caída
+    { enabled: !!currentUser, onReconectar: () => cargarDatos({ silencioso: true }) }
+  );
+
+  // Cuando la cola offline termina de subir, refrescamos (los 'PENDIENTE' pasan a tener ID real)
+  useEffect(() => escuchar(EVENTOS.SYNC_COMPLETADO, () => cargarDatos({ silencioso: true })), []);
+
+  const cargarDatos = async ({ silencioso = false } = {}) => {
+    if (!silencioso) setLoading(true);
     try {
       const maestros = await obtenerDatosMaestrosPrestamos();
+      maestrosRef.current = maestros;
       const listaPrestamos = await obtenerTrackingPrestamos(maestros);
       setPrestamos(listaPrestamos);
       setConductores(maestros.conductores || []);
@@ -222,9 +255,9 @@ function TrackingPrestamosContenido() {
         }
       }
     } catch (err) {
-      mostrarAviso('danger', 'Error al sincronizar datos', err.message);
+      if (!silencioso) mostrarAviso('danger', 'Error al sincronizar datos', err.message);
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
   };
 
@@ -422,12 +455,12 @@ function TrackingPrestamosContenido() {
     setLoading(true);
 
     try {
-      await actualizarRegistroPorDespachar(prestamoSeleccionado, {
+      const resultado = await actualizarRegistroPorDespachar(prestamoSeleccionado, {
         ...editDespachoData,
         usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Admin'
       });
       await cargarDatos();
-      mostrarAviso('success', 'Registro Actualizado', 'Los datos del despacho han sido modificados.');
+      avisarResultado(resultado, 'Registro Actualizado', 'Los datos del despacho han sido modificados.');
     } catch (err) {
       setModalEditarDespachoVisible(true);
       mostrarAviso('danger', 'Error al editar', err.message);
@@ -575,7 +608,7 @@ function TrackingPrestamosContenido() {
     setLoading(true);
 
     try {
-      await registrarDevolucionPrestamo(prestamoSeleccionado, {
+      const resultado = await registrarDevolucionPrestamo(prestamoSeleccionado, {
         cantidad_devuelta: cantDev,
         cantidad_noretorno: cantNoRet,
         tipo_accion: devData.tipo_accion,
@@ -586,7 +619,7 @@ function TrackingPrestamosContenido() {
         usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Usuario'
       });
       await cargarDatos();
-      mostrarAviso('success', 'Devolución Procesada', 'El estado del préstamo ha sido actualizado.');
+      avisarResultado(resultado, 'Devolución Procesada', 'El estado del préstamo ha sido actualizado.');
     } catch (err) {
       setModalDevVisible(true);
       mostrarAviso('danger', 'Error al procesar devolución', err.message);
@@ -643,13 +676,13 @@ function TrackingPrestamosContenido() {
       setLoading(true);
       try {
         const sinPaletas = Number(auxData.nr_paletas) === 0;
-        await completarDespachoAuxiliar(prestamoSeleccionado, {
+        const resultado = await completarDespachoAuxiliar(prestamoSeleccionado, {
           ...auxData,
           firma_conductor_base64: dataUrl,
           retorno: (prestamoSeleccionado.area_proceso === 'CLIENTE RECOGE' || sinPaletas) ? 'NO' : auxData.retorno,
           usuario_actualiza: currentUser?.nombre || currentUser?.usuario || 'Auxiliar'
         });
-        mostrarAviso('success', 'Despacho Completado', 'El registro se actualizó y ahora está activo en tracking.');
+        avisarResultado(resultado, 'Despacho Completado', 'El registro se actualizó y ahora está activo en tracking.');
         await cargarDatos();
       } catch (err) {
         mostrarAviso('danger', 'Error al despachar', err.message);
@@ -689,6 +722,7 @@ function TrackingPrestamosContenido() {
         <section className="hero-card">
           <span className="module-pill">MÓDULO LOGÍSTICA</span>
           <h1>Tracking Préstamos de Pallet</h1>
+          <IndicadorEnVivo estado={estadoRealtime} style={{ marginBottom: 6 }} />
           <p>Consulte, filtre y gestione el control y devolución de paletas a transportistas.</p>
         </section>
 
@@ -916,7 +950,14 @@ function TrackingPrestamosContenido() {
                   return (
                     <tr key={r.uuid} className={r.atrasado ? 'table-danger' : ''}>
                       <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#475569' }}>{numFila}</td>
-                      <td style={{ fontWeight: '800', color: '#0f4c81' }}>{r.id_prestamo}</td>
+                      <td style={{ fontWeight: '800', color: '#0f4c81' }}>
+                        {r.id_prestamo}
+                        {r._sincronizado === false && (
+                          <span title="Guardado sin internet: se subirá automáticamente al volver la conexión" style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: '#b45309' }}>
+                            ⏳ Sin sincronizar
+                          </span>
+                        )}
+                      </td>
                       <td style={{ textAlign: 'left' }}>
                         <span style={{
                           fontSize: '10px',

@@ -307,6 +307,16 @@ function MenuContenido() {
             estado: "Activo",
           },
           {
+            title: "Oficina Logística",
+            description: "Mapa en vivo: quién está en su puesto, en campo o en reunión.",
+            Icon: FaUsers,
+            accent: "accent-cyan",
+            buttonText: "Entrar",
+            image: "/img/oficina.jpg",
+            url: "/oficina/logistica",
+            estado: "Activo",
+          },
+          {
             title: "Auditoría 5S",
             description: "Realizar y registrar auditorías 5S.",
             Icon: FaClipboardCheck,

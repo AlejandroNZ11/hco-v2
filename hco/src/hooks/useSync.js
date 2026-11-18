@@ -5,6 +5,7 @@ import { supabase } from '../config/supabaseClient';
 import { sincronizarInspeccionesPendientes } from '../services/mheService';
 import { sincronizarSugerenciasPendientes } from '../services/sugerenciasService';
 import { sincronizarPrestamosPendientes } from '../services/prestamosService';
+import { sincronizarPuestosPendientes } from '../services/oficinaLogisticaService';
 import { emitir, EVENTOS } from '../services/eventBus';
 
 // Módulos con su propia lógica de sincronización. Cada uno corre aislado:
@@ -13,6 +14,7 @@ const SINCRONIZADORES = [
   { tabla: 'inspecciones', nombre: 'MHE', fn: sincronizarInspeccionesPendientes },
   { tabla: 'tarjetas_sugerencias', nombre: 'Sugerencias', fn: sincronizarSugerenciasPendientes },
   { tabla: 'prestamos', nombre: 'Préstamos', fn: sincronizarPrestamosPendientes },
+  { tabla: 'oficina_puestos', nombre: 'Oficina', fn: sincronizarPuestosPendientes },
 ];
 const TABLAS_CON_SINCRONIZADOR = new Set(SINCRONIZADORES.map(s => s.tabla));
 

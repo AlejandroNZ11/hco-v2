@@ -29,3 +29,9 @@ localDb.version(4).stores({
 localDb.version(5).stores({
   prestamos: 'uuid, id_prestamo, estado, fecha_entrega, _sincronizado'
 });
+
+// v6: Oficina Logística (puestos del plano isométrico con estado en vivo)
+// Clave = código del puesto ('A1', 'B3'...). Cambios offline van a sync_queue como UPSERT.
+localDb.version(6).stores({
+  oficina_puestos: 'id, empleado_id, estado, _sincronizado'
+});

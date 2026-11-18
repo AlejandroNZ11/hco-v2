@@ -720,9 +720,11 @@ function TrackingPrestamosContenido() {
       {/* TOP HEADER & RESUMEN: AL COSTADO EN LAPTOP, ABAJO EN MÓVIL */}
       <div className="top-summary-grid">
         <section className="hero-card">
-          <span className="module-pill">MÓDULO LOGÍSTICA</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+            <span className="module-pill" style={{ marginBottom: 0 }}>MÓDULO LOGÍSTICA</span>
+            <IndicadorEnVivo estado={estadoRealtime} />
+          </div>
           <h1>Tracking Préstamos de Pallet</h1>
-          <IndicadorEnVivo estado={estadoRealtime} style={{ marginBottom: 6 }} />
           <p>Consulte, filtre y gestione el control y devolución de paletas a transportistas.</p>
         </section>
 

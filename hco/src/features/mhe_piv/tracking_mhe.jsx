@@ -18,8 +18,12 @@ import * as XLSX from 'xlsx';
 import { 
   obtenerUltimasInspecciones, 
   aprobarInspeccionMhe,
-  habilitarEquipoMhe 
+  habilitarEquipoMhe,
+  leerInspeccionesLocales,
+  registrarCambioRemotoMhe
 } from '../../services/mheService';
+import { useSupabaseRealtime } from '../../hooks/useSupabaseRealtime';
+import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDb } from '../../services/localDb';
 import { obtenerTodosLosEmpleados } from '../../services/empleadosService';
@@ -205,15 +209,26 @@ function TrackingMHEContenido() {
     };
   }, []);
 
-  const cargarInspecciones = async () => {
-    setLoading(true);
+  // ===== TIEMPO REAL: inspecciones nuevas/aprobadas y equipos habilitados =====
+  // Cada evento se guarda en Dexie y la lista se rearma localmente (sin pedir nada a la red)
+  const estadoRealtime = useSupabaseRealtime(
+    ['inspecciones', 'equipos'],
+    async (cambio) => {
+      const aplicar = await registrarCambioRemotoMhe(cambio);
+      if (aplicar) setInspecciones(await leerInspeccionesLocales());
+    },
+    { onReconectar: () => cargarInspecciones({ silencioso: true }) }
+  );
+
+  const cargarInspecciones = async ({ silencioso = false } = {}) => {
+    if (!silencioso) setLoading(true);
     try {
       const data = await obtenerUltimasInspecciones();
       setInspecciones(data || []);
     } catch (error) {
       console.error("Error al cargar PIV:", error);
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
   };
 
@@ -466,7 +481,10 @@ function TrackingMHEContenido() {
       {/* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS KPI */}
       <div className="top-summary-grid">
         <section className="hero-card">
-          <span className="module-pill">MÓDULO OPERATIVO</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+            <span className="module-pill" style={{ marginBottom: 0 }}>MÓDULO OPERATIVO</span>
+            <IndicadorEnVivo estado={estadoRealtime} />
+          </div>
           <h1>Tracking MHE</h1>
           <p>Consulte, filtre, exporte y gestione las inspecciones diarias de equipos de manipulación.</p>
         </section>

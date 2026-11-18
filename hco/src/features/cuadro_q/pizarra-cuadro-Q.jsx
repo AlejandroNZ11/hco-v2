@@ -217,9 +217,11 @@ function PizarraCuadroQContenido() {
       {/* CABECERA */}
       <section className="q-header">
         <div>
-          <span className="page-chip">CUADRO Q</span>
-          <h1>Gráficos de Q</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+            <span className="page-chip" style={{ marginBottom: 0 }}>CUADRO Q</span>
             <IndicadorEnVivo estado={estadoRealtime} />
+          </div>
+          <h1>Gráficos de Q</h1>
           <p id="pizarraStatus">
             Actualizado: {fechaActualStr} | Total errores: {registrosAreaFiltrados.length}
           </p>

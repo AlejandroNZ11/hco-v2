@@ -41,6 +41,5 @@ where pubname = 'supabase_realtime'
 order by tablename;
 
 -- ---------------------------------------------------------------------
--- Siguiente fase (cuando toque MHE y Sugerencias), cambiar el array a:
---   array['prestamos', 'cuadro_q', 'inspecciones', 'tarjetas_sugerencias']
+-- Fase 2 (MHE y Sugerencias): ver realtime_fase2_mhe_sugerencias.sql
 -- ---------------------------------------------------------------------

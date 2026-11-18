@@ -5,7 +5,9 @@ import { emitir, EVENTOS } from '../services/eventBus';
 let contadorCanales = 0;
 
 /**
- * Se suscribe a los cambios (INSERT / UPDATE / DELETE) de una tabla de Supabase en tiempo real.
+ * Se suscribe a los cambios (INSERT / UPDATE / DELETE) de una o varias tablas de Supabase en tiempo real.
+ * `tabla` puede ser un string ('prestamos') o un arreglo (['inspecciones', 'equipos']);
+ * cada evento trae `cambio.tabla` para saber de cuál vino.
  *
  * - `onCambio({ tipo, nuevo, anterior })` se llama por cada evento. Se guarda en un ref,
  *   así que puedes pasar una función inline sin provocar re-suscripciones.
@@ -25,47 +27,49 @@ export function useSupabaseRealtime(tabla, onCambio, { enabled = true, onReconec
     onReconectarRef.current = onReconectar;
   });
 
+  const claveTablas = Array.isArray(tabla) ? tabla.join(',') : (tabla || '');
+
   useEffect(() => {
-    if (!enabled || !tabla) return undefined;
+    if (!enabled || !claveTablas) return undefined;
 
     let huboCaida = false;
+    const tablas = claveTablas.split(',');
     // Nombre único: dos pantallas abiertas sobre la misma tabla no comparten (ni rompen) el canal
-    const nombreCanal = `rt-${tabla}-${++contadorCanales}`;
+    const canal = supabase.channel(`rt-${tablas.join('-')}-${++contadorCanales}`);
 
-    const canal = supabase
-      .channel(nombreCanal)
-      .on('postgres_changes', { event: '*', schema: 'public', table: tabla }, (payload) => {
+    tablas.forEach((nombreTabla) => {
+      canal.on('postgres_changes', { event: '*', schema: 'public', table: nombreTabla }, (payload) => {
         const cambio = {
-          tabla,
+          tabla: nombreTabla,
           tipo: payload.eventType, // 'INSERT' | 'UPDATE' | 'DELETE'
           nuevo: payload.new && Object.keys(payload.new).length ? payload.new : null,
           anterior: payload.old && Object.keys(payload.old).length ? payload.old : null,
         };
-        try {
-          onCambioRef.current?.(cambio);
-        } catch (err) {
-          // Un error procesando un evento nunca debe tumbar la pantalla
-          console.error(`[realtime:${tabla}] Error procesando evento`, err);
-        }
+        // Un error procesando un evento nunca debe tumbar la pantalla (incluye errores async)
+        Promise.resolve()
+          .then(() => onCambioRef.current?.(cambio))
+          .catch((err) => console.error(`[realtime:${nombreTabla}] Error procesando evento`, err));
         emitir(EVENTOS.CAMBIO_REMOTO, cambio);
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setEstado('en_vivo');
-          if (huboCaida) {
-            huboCaida = false;
-            onReconectarRef.current?.();
-          }
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          huboCaida = true;
-          setEstado('desconectado');
-        }
       });
+    });
+
+    canal.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        setEstado('en_vivo');
+        if (huboCaida) {
+          huboCaida = false;
+          onReconectarRef.current?.();
+        }
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        huboCaida = true;
+        setEstado('desconectado');
+      }
+    });
 
     return () => {
       supabase.removeChannel(canal);
     };
-  }, [tabla, enabled]);
+  }, [claveTablas, enabled]);
 
   return estado;
 }

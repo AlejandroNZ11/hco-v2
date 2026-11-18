@@ -9,6 +9,8 @@ import {
   obtenerFechaHoraLima
 } from '../../services/sugerenciasService';
 import './PizarraSugerencias.css';
+import { useSugerenciasEnVivo } from './useSugerenciasEnVivo';
+import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 
 const PIZARRA_ESTADOS = [
   { key: 'porValidar', label: 'POR VALIDAR' },
@@ -155,6 +157,9 @@ export default function PizarraSugerencias() {
       setLoading(false);
     }
   }, [sugerencias.length]);
+
+  // Tiempo real: la pizarra se actualiza sola cuando otros registran o mueven tarjetas
+  const estadoRealtime = useSugerenciasEnVivo({ onReconectar: () => cargarDatos(false) });
 
   useEffect(() => {
     cargarDatos(true);
@@ -321,7 +326,10 @@ export default function PizarraSugerencias() {
         {/* BARRA ÚNICA: INFO + KPIS + FILTROS EN UNA SOLA FILA */}
         <section className="pizarra-control-row">
           <div className="toolbar-info">
-            <span className="page-chip">Dashboard operativo</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+              <span className="page-chip">Dashboard operativo</span>
+              <IndicadorEnVivo estado={estadoRealtime} />
+            </div>
             <p id="pizarraStatus">
               {errorMsg ? errorMsg : `Pizarra operativa: ${totalGeneral} sugerencias.`}
             </p>

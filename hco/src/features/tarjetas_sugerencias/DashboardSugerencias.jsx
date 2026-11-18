@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { obtenerSugerencias, obtenerCatalogosSugerencias } from '../../services/sugerenciasService';
 import './DashboardSugerencias.css';
 import Loading from '../../layouts/Loading';
+import { useSugerenciasEnVivo } from './useSugerenciasEnVivo';
+import { aplicarCambioEnLista } from '../../hooks/useSupabaseRealtime';
+import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 
 const MESES = [
   { id: 1, nombre: 'Enero', corto: 'Ene' },
@@ -568,6 +571,11 @@ function DashboardSugerenciasContenido() {
   const [empleados, setEmpleados] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  // Tiempo real: los indicadores se recalculan con cada tarjeta nueva o actualizada
+  const estadoRealtime = useSugerenciasEnVivo({
+    onCambio: (cambio) => setSugerencias(prev => aplicarCambioEnLista(prev, cambio, { clave: 'id' }))
+  });
+
   const hoy = useMemo(() => new Date(), []);
   const [anioFiltro, setAnioFiltro] = useState(hoy.getFullYear());
   const [mesFiltro, setMesFiltro] = useState(hoy.getMonth() + 1);
@@ -766,7 +774,10 @@ function DashboardSugerenciasContenido() {
       {/* FILTROS */}
       <header className="dash-header-filter">
         <div className="dash-header-titles">
-          <span className="dash-pill">Indicadores operativos</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+            <span className="dash-pill" style={{ marginBottom: 0 }}>Indicadores operativos</span>
+            <IndicadorEnVivo estado={estadoRealtime} />
+          </div>
           <h2>Tablero de sugerencias</h2>
         </div>
 

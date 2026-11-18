@@ -163,6 +163,15 @@ export const obtenerUltimasInspecciones = async () => {
   }
 
   // Leemos siempre desde Dexie (tiene tanto las pendientes de envío como las sincronizadas)
+  return leerInspeccionesLocales();
+};
+
+/**
+ * Arma la lista de las últimas 50 inspecciones SOLO con Dexie (sin red):
+ * une equipos, categorías y áreas y calcula el estado visual.
+ * La usan la carga normal y cada evento de tiempo real.
+ */
+export const leerInspeccionesLocales = async () => {
   const [todasInspecciones, allEquipos, allCategorias, allAreas] = await Promise.all([
     localDb.inspecciones.toArray(),
     localDb.equipos.toArray(),
@@ -595,4 +604,35 @@ export const actualizarInspeccionCompleta = async (inspeccionId, datosInspeccion
 
   await localDb.inspecciones.put({ ...inspActualizada, _sincronizado: true });
   return inspActualizada;
+};
+
+// =========================================================================
+// TIEMPO REAL: procesa eventos de 'inspecciones' y 'equipos' (actualiza Dexie)
+// =========================================================================
+/**
+ * Devuelve true si la pantalla debe refrescarse con leerInspeccionesLocales().
+ * No pisa inspecciones que este dispositivo tiene pendientes de envío.
+ */
+export const registrarCambioRemotoMhe = async (cambio) => {
+  const tabla = cambio.tabla === 'equipos' ? localDb.equipos : localDb.inspecciones;
+
+  if (cambio.tipo === 'DELETE') {
+    if (cambio.anterior?.id === undefined) return false;
+    await tabla.delete(cambio.anterior.id);
+    return true;
+  }
+
+  const fila = cambio.nuevo;
+  if (!fila || fila.id === undefined) return false;
+
+  if (cambio.tabla === 'equipos') {
+    await localDb.equipos.put(fila);
+    return true;
+  }
+
+  const local = await localDb.inspecciones.get(fila.id);
+  if (local && local._sincronizado === false) return false;
+
+  await localDb.inspecciones.put({ ...fila, _sincronizado: true });
+  return true;
 };

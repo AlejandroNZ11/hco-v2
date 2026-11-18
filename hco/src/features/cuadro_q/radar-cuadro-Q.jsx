@@ -361,8 +361,8 @@ function RadarCuadroQContenido() {
         <div className="radar-head-left">
           <div className="radar-title-row">
             <span className="field-badge auto">CUADRO Q</span>
-            <h1>Radar de Q</h1>
             <IndicadorEnVivo estado={estadoRealtime} />
+            <h1>Radar de Q</h1>
           </div>
           <p id="radarStatus">
             Radar anual <strong>{selectedYear}</strong>{areaTextoLabel} — <strong>{registrosFiltrados.length}</strong> registros

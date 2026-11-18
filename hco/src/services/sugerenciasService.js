@@ -344,3 +344,31 @@ export const obtenerCatalogosSugerencias = async () => {
     cargos: localesCargos
   };
 };
+
+// =========================================================================
+// TIEMPO REAL: procesa un evento de 'tarjetas_sugerencias' (actualiza Dexie)
+// =========================================================================
+// Tracking y Pizarra leen la lista con useLiveQuery sobre Dexie, así que basta con
+// escribir aquí para que se actualicen solas. Devuelve false si no se aplicó
+// (la tarjeta tiene cambios offline sin subir en este dispositivo).
+export const registrarCambioRemotoSugerencia = async (cambio) => {
+  try {
+    if (cambio.tipo === 'DELETE') {
+      if (cambio.anterior?.id === undefined) return false;
+      await localDb.tarjetas_sugerencias.delete(cambio.anterior.id);
+      return true;
+    }
+
+    const fila = cambio.nuevo;
+    if (!fila || fila.id === undefined) return false;
+
+    const local = await localDb.tarjetas_sugerencias.get(fila.id);
+    if (local && local._sincronizado === false) return false;
+
+    await localDb.tarjetas_sugerencias.put({ ...fila, _sincronizado: true });
+    return true;
+  } catch (err) {
+    console.warn('No se pudo aplicar el cambio remoto de sugerencias en Dexie:', err);
+    return false;
+  }
+};

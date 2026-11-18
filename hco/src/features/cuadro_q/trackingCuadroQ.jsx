@@ -342,9 +342,11 @@ function TrackingCuadroQContenido() {
       {/* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS KPI */}
       <div className="top-summary-grid">
         <section className="hero-card">
-          <span className="module-pill">EXCELENCIA OPERATIVA</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+            <span className="module-pill" style={{ marginBottom: 0 }}>EXCELENCIA OPERATIVA</span>
+            <IndicadorEnVivo estado={estadoRealtime} />
+          </div>
           <h1>Tracking Cuadro Q</h1>
-          <IndicadorEnVivo estado={estadoRealtime} style={{ marginBottom: 6 }} />
           <p>Registre, analice causas raíz y dé seguimiento a las incidencias operativas por área.</p>
         </section>
 

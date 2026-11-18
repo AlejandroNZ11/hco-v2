@@ -23,6 +23,8 @@ import {
   obtenerFechaCortaLima
 } from '../../services/sugerenciasService';
 import './trackingSugerencias.css';
+import { useSugerenciasEnVivo } from './useSugerenciasEnVivo';
+import IndicadorEnVivo from '../../components/IndicadorEnVivo';
 
 
 const ITEMS_POR_PAGINA = 40;
@@ -104,6 +106,12 @@ function TrackingSugerenciasContenido() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Tiempo real: las tarjetas de otros usuarios llegan a Dexie y la tabla se actualiza sola
+  const estadoRealtime = useSugerenciasEnVivo({
+    enabled: !!currentUser,
+    onReconectar: () => cargarTodo(false)
+  });
 
   const cargarTodo = async (mostrarLoader = true) => {
     if (mostrarLoader && sugerenciasLocal.length === 0) setLoading(true);
@@ -370,7 +378,10 @@ function TrackingSugerenciasContenido() {
       {/* 1. SECCIÓN SUPERIOR: TÍTULO + TARJETAS KPI */}
       <div className="top-summary-grid">
         <section className="hero-card">
-          <span className="module-pill">MÓDULO OPERATIVO</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+            <span className="module-pill" style={{ marginBottom: 0 }}>MÓDULO OPERATIVO</span>
+            <IndicadorEnVivo estado={estadoRealtime} />
+          </div>
           <h1>Tracking de Sugerencias</h1>
           <p>Consulte, filtre, exporte y gestione las tarjetas de sugerencias y mejora continua.</p>
         </section>

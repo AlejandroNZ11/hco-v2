@@ -462,3 +462,7 @@
   background: #22c55e;
   transition: width 0.1s linear;
 }
+
+/* Zoom digital (iPhone): el video se agranda dentro del modal sin desbordar */
+.tl-modal { overflow: hidden; }
+.tl-video { transform-origin: center center; transition: transform 0.2s ease; }

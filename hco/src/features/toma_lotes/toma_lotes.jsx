@@ -18,6 +18,10 @@ import './toma_lotes.css';
 const OCR_WHITELIST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/.: ';
 const SCAN_INTERVAL_MS = 110;
 const LOCK_MS = 600; // tiempo que hay que mantener el código en el láser
+// iPhone/iPad (iPadOS se presenta como Mac con pantalla táctil)
+const IS_IOS =
+  typeof navigator !== 'undefined' &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default function TomaLotes() {
@@ -35,6 +39,7 @@ export default function TomaLotes() {
   const [caps, setCaps] = useState({ torch: false, zoom: null, exposure: null, focus: false });
   const [torchOn, setTorchOn] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [digitalZoom, setDigitalZoom] = useState(false); // zoom por software (iPhone no expone el zoom de la cámara)
   const [exposure, setExposure] = useState(0);
   const [focusPoint, setFocusPoint] = useState(null);
 
@@ -281,8 +286,10 @@ export default function TomaLotes() {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            // En iPhone pedimos 4K: Safari no deja enfocar de cerca ni ajustar exposición,
+            // así que compensamos con más píxeles (se aleja el celular y se usa zoom digital).
+            width: { ideal: IS_IOS ? 3840 : 1920 },
+            height: { ideal: IS_IOS ? 2160 : 1080 },
           },
           audio: false,
         });
@@ -343,6 +350,7 @@ export default function TomaLotes() {
       trackRef.current = null;
       setTorchOn(false);
       setZoomLevel(1);
+      setDigitalZoom(false);
       setExposure(0);
       setLockInfo(null);
       setCaps({ torch: false, zoom: null, exposure: null, focus: false });
@@ -371,12 +379,23 @@ export default function TomaLotes() {
     if (await applyAdvanced({ torch: next })) setTorchOn(next);
   };
 
+  // Zoom real de la cámara si existe (Android); si no, zoom digital (iPhone).
+  // El zoom digital agranda el video en pantalla: el usuario aleja el celular (queda enfocado)
+  // y el recorte del recuadro sigue saliendo de la imagen en alta resolución.
   const cycleZoom = async () => {
-    if (!caps.zoom) return;
-    const steps = [1, 2, 3].filter((z) => z <= caps.zoom.max && z >= caps.zoom.min);
-    const idx = steps.indexOf(zoomLevel);
-    const next = steps[(idx + 1) % steps.length] ?? 1;
-    if (await applyAdvanced({ zoom: next })) setZoomLevel(next);
+    if (caps.zoom && !digitalZoom) {
+      const steps = [1, 2, 3].filter((z) => z <= caps.zoom.max && z >= caps.zoom.min);
+      const idx = steps.indexOf(zoomLevel);
+      const next = steps[(idx + 1) % steps.length] ?? 1;
+      if (await applyAdvanced({ zoom: next })) {
+        setZoomLevel(next);
+        return;
+      }
+    }
+    const steps = [1, 1.5, 2, 2.5];
+    const next = steps[(steps.indexOf(zoomLevel) + 1) % steps.length] ?? 1;
+    setDigitalZoom(next > 1);
+    setZoomLevel(next);
   };
 
   const changeExposure = async (value) => {
@@ -474,7 +493,8 @@ export default function TomaLotes() {
       // a) Tomar 5 frames y quedarse con el más nítido (evita el borroso por pulso)
       setProcessingLabel('Mantén firme…');
       let bestFrame = null;
-      for (let i = 0; i < 5; i++) {
+      const frames = IS_IOS ? 8 : 5; // iPhone: más intentos para cazar un frame nítido
+      for (let i = 0; i < frames; i++) {
         const rect = boxToVideoRect(video, box, 1.08, 1.15);
         const canvas = makeCanvas();
         const img = drawRegion(video, rect, canvas, 2000, 1);
@@ -512,7 +532,7 @@ export default function TomaLotes() {
         acceptValue({
           metodo: 'OCR TEXTO',
           motor: `Tesseract (${best.label})`,
-          modo: `nitidez ${Math.round(bestFrame.s)}`,
+          modo: `nitidez ${Math.round(bestFrame.s)} · cámara ${video.videoWidth}x${video.videoHeight}`,
           valor: best.cands[0],
           raw: best.text,
           confianza: best.conf,
@@ -524,7 +544,9 @@ export default function TomaLotes() {
       } else {
         setErrorMsg(
           bestFrame.s < 40
-            ? 'Imagen borrosa. Toca la pantalla para enfocar y vuelve a intentar.'
+            ? IS_IOS
+              ? 'Imagen borrosa. Aleja el celular (~25 cm), usa zoom 2x o el botón 📷.'
+              : 'Imagen borrosa. Toca la pantalla para enfocar y vuelve a intentar.'
             : 'No se detectó texto legible. Acerca un poco más o usa la linterna.',
         );
       }
@@ -772,6 +794,7 @@ export default function TomaLotes() {
             muted
             autoPlay
             onClick={handleTapFocus}
+            style={digitalZoom ? { transform: `scale(${zoomLevel})` } : undefined}
           />
           {focusPoint && (
             <span key={focusPoint.id} className="tl-focus-ring" style={{ left: focusPoint.x, top: focusPoint.y }} />
@@ -802,7 +825,11 @@ export default function TomaLotes() {
             <p className="tl-hint">
               Códigos de barras / QR se leen solos.
               <br />
-              Para texto: encuadra el lote y toca el botón rojo. Toca la imagen para enfocar.
+              Para texto: encuadra el lote y toca el botón rojo.
+              <br />
+              {IS_IOS
+                ? 'iPhone: no acerques demasiado (desenfoca). Aleja ~25 cm y usa 2x.'
+                : 'Toca la imagen para enfocar.'}
             </p>
           </div>
 
@@ -856,7 +883,6 @@ export default function TomaLotes() {
                 type="button"
                 className={`tl-tool-btn ${zoomLevel > 1 ? 'active' : ''}`}
                 onClick={cycleZoom}
-                disabled={!caps.zoom}
                 title="Zoom"
               >
                 {zoomLevel}x

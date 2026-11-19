@@ -16,7 +16,16 @@ const BASE_OPTIONS = {
   tryRotate: true,
   tryInvert: true,
   tryDownscale: true,
-  maxNumberOfSymbols: 1,
+  maxNumberOfSymbols: 4, // si hay varios en el recorte, devolvemos todos y elegimos el más centrado
+};
+
+const center = (p) => {
+  if (!p?.topLeft) return null;
+  const pts = [p.topLeft, p.topRight, p.bottomRight, p.bottomLeft].filter(Boolean);
+  return {
+    x: pts.reduce((s, q) => s + q.x, 0) / pts.length,
+    y: pts.reduce((s, q) => s + q.y, 0) / pts.length,
+  };
 };
 
 self.onmessage = async (e) => {
@@ -31,7 +40,9 @@ self.onmessage = async (e) => {
     self.postMessage({
       id,
       type: 'result',
-      results: valid.map((r) => ({ text: r.text, format: r.format })),
+      width: imageData.width,
+      height: imageData.height,
+      results: valid.map((r) => ({ text: r.text, format: r.format, center: center(r.position) })),
     });
   } catch (err) {
     self.postMessage({ id, type: 'result', results: [], error: String(err) });

@@ -341,12 +341,13 @@
   height: 2px;
   background: rgba(239, 68, 68, 0.85);
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
-  animation: tl-sweep 1.6s ease-in-out infinite alternate;
+  top: 50%;
+  animation: tl-pulse 1.2s ease-in-out infinite;
 }
 
-@keyframes tl-sweep {
-  from { top: 12%; }
-  to { top: 88%; }
+@keyframes tl-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 .tl-focus-ring {
@@ -436,3 +437,28 @@
 }
 
 .tl-status-pill { max-width: calc(100% - 56px); }
+
+/* Fijación de código de barras: el recuadro se pone verde y se llena la barra */
+.tl-scan-box.locking .tl-corner { border-color: #22c55e; }
+.tl-scan-box.locking .tl-scan-line {
+  animation: none;
+  top: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.9);
+}
+.tl-lock-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.tl-lock-bar span {
+  display: block;
+  height: 100%;
+  background: #22c55e;
+  transition: width 0.1s linear;
+}

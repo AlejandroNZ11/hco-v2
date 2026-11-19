@@ -7,6 +7,8 @@ import {
   isWeakFormat,
   makeCanvas,
   normalizeFormat,
+  cropLine,
+  looksLikeBarcodeNoise,
   parseLoteCandidates,
   preprocessForOcr,
   sharpness,
@@ -15,6 +17,7 @@ import './toma_lotes.css';
 
 const OCR_WHITELIST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/.: ';
 const SCAN_INTERVAL_MS = 110;
+const LOCK_MS = 600; // tiempo que hay que mantener el código en el láser
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default function TomaLotes() {
@@ -26,6 +29,7 @@ export default function TomaLotes() {
   const [ocrError, setOcrError] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [liveHint, setLiveHint] = useState('');
+  const [lockInfo, setLockInfo] = useState(null); // { text, progress } código en fijación
 
   // Capacidades de la cámara (dependen del celular)
   const [caps, setCaps] = useState({ torch: false, zoom: null, exposure: null, focus: false });
@@ -135,7 +139,13 @@ export default function TomaLotes() {
     if (!nativeDetectorRef.current) return [];
     try {
       const res = await nativeDetectorRef.current.detect(source);
-      return res.map((r) => ({ text: r.rawValue, format: r.format }));
+      return res.map((r) => ({
+        text: r.rawValue,
+        format: r.format,
+        center: r.boundingBox
+          ? { x: r.boundingBox.x + r.boundingBox.width / 2, y: r.boundingBox.y + r.boundingBox.height / 2 }
+          : null,
+      }));
     } catch {
       return [];
     }
@@ -146,6 +156,7 @@ export default function TomaLotes() {
     setIsProcessing(false);
     isProcessingRef.current = false;
     setLiveHint('');
+    setLockInfo(null);
   }, []);
 
   const acceptValue = useCallback((capture) => {
@@ -164,26 +175,41 @@ export default function TomaLotes() {
     let stream = null;
     let tick = 0;
     let attempts = 0;
-    let candidate = null; // { text, format, at } para formatos que requieren confirmación
+    // "Fijación": el mismo código debe verse dentro del láser durante LOCK_MS antes de aceptarse.
+    // Así, al pasar la cámara por una etiqueta con varios códigos, no se dispara con el primero que aparece.
+    let lock = null; // { text, format, engine, first, last, count }
     const cropCanvas = makeCanvas();
-    const fullCanvas = makeCanvas();
     openedAtRef.current = performance.now();
 
-    const tryAccept = (hit, engine, modo) => {
+    // Entre varios códigos en el recorte, elegimos el más cercano al láser (centro del recuadro)
+    const pickCentered = (hits, w, h) => {
+      if (hits.length <= 1) return hits[0];
+      const dist = (c) => (c ? Math.abs(c.y - h / 2) * 2 + Math.abs(c.x - w / 2) : Infinity);
+      return [...hits].sort((a, b) => dist(a.center) - dist(b.center))[0];
+    };
+
+    const onHit = (hit, engine, modo) => {
       const now = performance.now();
-      const text = String(hit.text || '').trim();
+      const text = String(hit?.text || '').trim();
       if (!text) return false;
-      if (isWeakFormat(hit.format)) {
-        if (!candidate || candidate.text !== text || now - candidate.at > 1500) {
-          candidate = { text, format: hit.format, at: now };
-          setLiveHint('Código detectado, confirmando…');
-          return false;
-        }
+
+      if (!lock || lock.text !== text || now - lock.last > 450) {
+        lock = { text, format: hit.format, engine, first: now, last: now, count: 1 };
+      } else {
+        lock.last = now;
+        lock.count++;
       }
+
+      const needCount = isWeakFormat(hit.format) ? 3 : 2;
+      const progress = Math.min(1, (now - lock.first) / LOCK_MS);
+      setLockInfo({ text, progress });
+
+      if (now - lock.first < LOCK_MS || lock.count < needCount) return false;
+
       acceptValue({
         metodo: `BARRAS · ${normalizeFormat(hit.format).toUpperCase()}`,
         motor: engine,
-        modo,
+        modo: `${modo} · fijado ${Math.round(now - lock.first)} ms`,
         valor: text,
         raw: text,
         tiempoMs: Math.round(now - openedAtRef.current),
@@ -203,38 +229,38 @@ export default function TomaLotes() {
 
         if (video && box && video.readyState >= 2 && video.videoWidth && !isProcessingRef.current) {
           attempts++;
-          const mode = tick++ % 3;
+          const mode = tick++ % 2;
           try {
-            // a) Nativo sobre el frame completo (Android)
+            // SOLO lo que está dentro del recuadro (un poco de margen vertical para códigos altos)
+            const rect = boxToVideoRect(video, box, 1.04, 1.6);
+            const imageData = drawRegion(video, rect, cropCanvas, 1400, 2);
+            const { width: w, height: h } = imageData;
+
+            if (tick % 18 === 0 && brightness(imageData) < 55) {
+              setLiveHint(caps.torch ? 'Poca luz: activa la linterna 🔦' : 'Poca luz: acerca a una fuente de luz');
+            }
+
+            let hit = null;
+            let engine = '';
+            // a) Nativo (Android) sobre el recorte
             if (nativeDetectorRef.current) {
-              const hits = await nativeDecode(video);
-              if (!active) return;
-              if (hits.length && tryAccept(hits[0], 'Nativo', 'completo')) return;
+              hit = pickCentered(await nativeDecode(cropCanvas), w, h);
+              engine = 'Nativo';
             }
-
-            // b) ZXing alternando: recorte ampliado / frame completo / recorte con limpieza de ruido
-            let imageData;
-            let opts = {};
-            let modo;
-            if (mode === 1) {
-              const rect = { sx: 0, sy: 0, sw: video.videoWidth, sh: video.videoHeight };
-              imageData = drawRegion(video, rect, fullCanvas, 1280);
-              modo = 'completo';
-            } else {
-              const rect = boxToVideoRect(video, box, 1.25, 3.2);
-              imageData = drawRegion(video, rect, cropCanvas, 1400, 2);
-              modo = mode === 0 ? 'recorte' : 'recorte+denoise';
-              if (mode === 2) opts = { denoise: true, binarizer: 'GlobalHistogram' };
-
-              // Aviso de poca luz (cada ~2 s)
-              if (tick % 18 === 0) {
-                const b = brightness(imageData);
-                if (b < 55) setLiveHint(caps.torch ? 'Poca luz: activa la linterna 🔦' : 'Poca luz: acerca a una fuente de luz');
-              }
+            // b) ZXing sobre el recorte, alternando normal / con limpieza de ruido
+            if (!hit) {
+              const opts = mode === 1 ? { denoise: true, binarizer: 'GlobalHistogram' } : {};
+              hit = pickCentered(await zxingDecode(imageData, opts), w, h);
+              engine = 'ZXing';
             }
-            const hits = await zxingDecode(imageData, opts);
             if (!active) return;
-            if (hits.length && tryAccept(hits[0], 'ZXing', modo)) return;
+
+            if (hit) {
+              if (onHit(hit, engine, mode === 1 ? 'recorte+denoise' : 'recorte')) return;
+            } else if (lock && performance.now() - lock.last > 450) {
+              lock = null;
+              setLockInfo(null);
+            }
           } catch {
             // frame fallido: seguimos
           }
@@ -318,6 +344,7 @@ export default function TomaLotes() {
       setTorchOn(false);
       setZoomLevel(1);
       setExposure(0);
+      setLockInfo(null);
       setCaps({ torch: false, zoom: null, exposure: null, focus: false });
     };
     // caps.torch solo se usa para el texto del aviso; no reiniciar la cámara por eso
@@ -380,19 +407,54 @@ export default function TomaLotes() {
   // ---------------------------------------------------------------------------
   // 4. OCR (tipo Photomath)
   // ---------------------------------------------------------------------------
-  const runOcr = async (canvases) => {
+  // Estrategia:
+  //  1) Lectura de todo el recorte para ubicar las líneas de texto (y sus cajas).
+  //  2) Cada línea útil se recorta, se agranda y se vuelve a leer sola (modo "una línea").
+  //     Esto recupera letras que se pierden en la lectura general (ej. la "B" de B26234).
+  //  3) Se juntan todas las lecturas y se puntúan los candidatos (LOTE: xxx primero).
+  const readLote = async (pre, firstPsm) => {
     const worker = ocrWorkerRef.current;
-    let best = null;
-    for (const { canvas, psm, label } of canvases) {
-      await worker.setParameters({ tessedit_pageseg_mode: psm });
-      const { data } = await worker.recognize(canvas);
-      const text = (data.text || '').trim();
-      const cands = parseLoteCandidates(text);
-      const score = (data.confidence || 0) + (cands.length ? 10 : 0);
-      if (!best || score > best.score) best = { text, conf: Math.round(data.confidence || 0), cands, label, canvas, score };
-      if (best.conf >= 85 && best.cands.length) break; // suficientemente bueno, no gastar más tiempo
+    const readings = [];
+
+    await worker.setParameters({ tessedit_pageseg_mode: firstPsm });
+    const { data } = await worker.recognize(pre.gray, {}, { text: true, blocks: true });
+    readings.push({ text: data.text || '', conf: data.confidence || 0 });
+
+    const lines = (data.blocks || [])
+      .flatMap((b) => b.paragraphs || [])
+      .flatMap((p) => p.lines || [])
+      .filter((l) => l.bbox.y1 - l.bbox.y0 >= 8 && !looksLikeBarcodeNoise(l.text))
+      .map((l) => ({ ...l, kw: /[O0]T[E3]|L[O0]T|BATCH/i.test(l.text) }))
+      .sort((x, y) => Number(y.kw) - Number(x.kw) || y.confidence - x.confidence)
+      .slice(0, 4);
+
+    await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
+    for (const line of lines) {
+      const g = await worker.recognize(cropLine(pre.gray, line.bbox));
+      readings.push({ text: g.data.text || '', conf: g.data.confidence || 0 });
+      // Si la línea salió dudosa, segunda opinión con la versión binarizada
+      if ((g.data.confidence || 0) < 80) {
+        const b = await worker.recognize(cropLine(pre.binary, line.bbox));
+        readings.push({ text: b.data.text || '', conf: b.data.confidence || 0 });
+      }
     }
-    return best;
+
+    // Sin líneas detectadas: plan B con la imagen binarizada completa
+    if (!lines.length) {
+      await worker.setParameters({ tessedit_pageseg_mode: firstPsm });
+      const b = await worker.recognize(pre.binary);
+      readings.push({ text: b.data.text || '', conf: b.data.confidence || 0 });
+    }
+
+    const cands = parseLoteCandidates(readings);
+    const bestReading = [...readings].sort((x, y) => y.conf - x.conf)[0];
+    return {
+      cands,
+      text: readings.map((r) => r.text.trim()).filter(Boolean).join(' | '),
+      conf: Math.round(bestReading?.conf || 0),
+      label: `${lines.length} líneas releídas`,
+      canvas: pre.gray,
+    };
   };
 
   const handleCaptureOcr = async () => {
@@ -443,11 +505,7 @@ export default function TomaLotes() {
       // c) Preprocesar y leer texto con varias estrategias
       setProcessingLabel('Leyendo texto…');
       const pre = preprocessForOcr(bestFrame.canvas);
-      const best = await runOcr([
-        { canvas: pre.gray, psm: PSM.SINGLE_BLOCK, label: 'gris+contraste' },
-        { canvas: pre.binary, psm: PSM.SINGLE_BLOCK, label: 'adaptativo' },
-        { canvas: pre.gray, psm: PSM.SINGLE_LINE, label: 'gris línea' },
-      ]);
+      const best = await readLote(pre, PSM.SINGLE_BLOCK);
 
       const ms = Math.round(performance.now() - t0);
       if (best?.cands.length) {
@@ -528,10 +586,7 @@ export default function TomaLotes() {
       const base = makeCanvas();
       drawRegion(bmp, rect, base, 2000);
       const pre = preprocessForOcr(base, { targetWidth: 2000, maxScale: 1.5 });
-      const best = await runOcr([
-        { canvas: pre.gray, psm: PSM.SPARSE_TEXT, label: 'foto gris' },
-        { canvas: pre.binary, psm: PSM.SPARSE_TEXT, label: 'foto adaptativo' },
-      ]);
+      const best = await readLote(pre, PSM.SPARSE_TEXT);
       if (best?.cands.length) {
         acceptValue({
           metodo: 'OCR FOTO',
@@ -578,6 +633,8 @@ export default function TomaLotes() {
 
   const statusText = isProcessing
     ? processingLabel
+    : lockInfo
+    ? `Mantén… ${lockInfo.text}`
     : liveHint ||
       (ocrError
         ? 'Barras: auto · OCR no disponible (sin internet)'
@@ -730,12 +787,17 @@ export default function TomaLotes() {
           <div className="tl-overlay-center">
             {errorMsg && <div className="tl-error-toast">{errorMsg}</div>}
 
-            <div ref={scanBoxRef} className={`tl-scan-box ${isProcessing ? 'busy' : ''}`}>
+            <div ref={scanBoxRef} className={`tl-scan-box ${isProcessing ? 'busy' : ''} ${lockInfo ? 'locking' : ''}`}>
               <span className="tl-corner tl-tl" />
               <span className="tl-corner tl-tr" />
               <span className="tl-corner tl-bl" />
               <span className="tl-corner tl-br" />
               {!isProcessing && <span className="tl-scan-line" />}
+              {lockInfo && (
+                <span className="tl-lock-bar">
+                  <span style={{ width: `${Math.round(lockInfo.progress * 100)}%` }} />
+                </span>
+              )}
             </div>
             <p className="tl-hint">
               Códigos de barras / QR se leen solos.

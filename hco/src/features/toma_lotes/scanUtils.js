@@ -208,53 +208,105 @@ export function preprocessForOcr(srcCanvas, { targetWidth = 1600, maxScale = 3 }
   return { gray: grayCanvas, binary: binCanvas, inverted: invert };
 }
 
-const KEYWORD_RE = /(?:\b(?:LOTE|LOT|BATCH)\b\s*[:.#Nº°-]*|\b(?:LT|L)\s*[:.#])\s*([A-Z0-9][A-Z0-9\-/.]{2,})/i;
+// "LOTE" tolerante a errores típicos del OCR: OTE, L0TE, 1OTE, LOT, LT, BATCH...
+const KEYWORD_RE = /(?:^|[^A-Z0-9])(?:[LI1|]?[O0]T[E3]|L[O0]T|BATCH|LT)\s*[:.;,]?\s*([A-Z0-9][A-Z0-9\-/.]{2,})/gi;
+const STOPWORDS = new Set([
+  'LOTE', 'LOT', 'BATCH', 'FECHA', 'VENCIMIENTO', 'VENC', 'VCTO', 'FAB', 'SKU', 'UM', 'CANT', 'PEDIDO',
+  'CLIENTE', 'TIPO', 'PRINCIPAL', 'PASILLO', 'FACTOR', 'AUXILIAR', 'AUDITOR', 'PALET', 'UBI', 'DE',
+]);
 
 function cleanToken(s) {
-  return s
+  return String(s || '')
     .toUpperCase()
     .replace(/[^A-Z0-9\-/.]/g, '')
     .replace(/^[-/.]+|[-/.]+$/g, '');
 }
 
+/** Puntaje "parece lote": letras+números > solo números > fechas / EAN largos > palabras. */
+function shapeScore(t) {
+  if (t.length < 3 || STOPWORDS.has(t)) return -100;
+  const hasD = /\d/.test(t);
+  const hasA = /[A-Z]/.test(t);
+  let s = hasD && hasA ? 30 : hasD ? 20 : -40;
+  if (/^\d{1,2}[/.-]\d{2,4}$/.test(t) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(t)) s -= 35; // fecha
+  if (/^\d{12,}$/.test(t)) s -= 15; // número de EAN/GTIN impreso bajo un código
+  if (t.length > 16) s -= 20; // probablemente basura pegada
+  if (t.length >= 4 && t.length <= 14) s += 5;
+  return s;
+}
+
+/** ¿Línea de barras leída como texto? (IIII||l11) */
+export function looksLikeBarcodeNoise(text) {
+  const t = String(text || '').replace(/\s/g, '');
+  if (t.length < 3) return true;
+  const noise = (t.match(/[IL1|!]/gi) || []).length;
+  return noise / t.length > 0.6;
+}
+
 /**
- * A partir del texto OCR devuelve candidatos de lote ordenados por probabilidad:
- *  1. Lo que venga después de "LOTE", "LOT", "BATCH"...
- *  2. Líneas completas limpias
- *  3. Tokens con letras+números (típico de lote)
+ * Recibe varias lecturas OCR ({ text, conf }) del mismo recorte (página completa + cada línea
+ * releída) y devuelve candidatos ordenados por probabilidad de ser el lote.
  */
-export function parseLoteCandidates(text) {
-  const out = [];
-  const push = (v) => {
-    const c = cleanToken(v || '');
-    if (c.length >= 3 && !out.includes(c)) out.push(c);
+export function parseLoteCandidates(readings) {
+  const list = Array.isArray(readings) ? readings : [{ text: readings, conf: 50 }];
+  const scores = new Map();
+  const add = (tok, pts) => {
+    const t = cleanToken(tok);
+    if (t.length < 3) return;
+    scores.set(t, (scores.get(t) || 0) + pts);
   };
-  const lines = String(text || '')
-    .split(/\n+/)
-    .map((l) => l.trim())
-    .filter(Boolean);
 
-  for (const line of lines) {
-    const m = line.match(KEYWORD_RE);
-    if (m) push(m[1]);
+  for (const { text, conf = 50 } of list) {
+    const c = Math.max(0, conf) / 10; // 0-10
+    const lines = String(text || '').split(/\n+/).map((l) => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      if (looksLikeBarcodeNoise(line)) continue;
+
+      // 1) Lo que viene después de LOTE / LOT / OTE…
+      for (const m of line.matchAll(KEYWORD_RE)) {
+        const v = cleanToken(m[1]);
+        if (!STOPWORDS.has(v)) add(v, 100 + c + Math.max(0, shapeScore(v)));
+      }
+
+      // 2) Cada palabra según su forma
+      const noKw = line.replace(/(?:^|[^A-Z0-9])(?:[LI1|]?[O0]T[E3]|L[O0]T|BATCH)\s*[:.;,]?/gi, ' ');
+      for (const w of noKw.split(/\s+/)) {
+        const t = cleanToken(w);
+        const sc = shapeScore(t);
+        if (sc > -50) add(t, sc + c);
+      }
+    }
   }
 
-  const tokens = [];
-  for (const line of lines) {
-    const noKw = line.replace(/\b(?:LOTE|LOT|BATCH)\b\s*[:.#Nº°-]*/gi, ' ');
-    push(noKw.replace(/\s+/g, ''));
-    noKw.split(/\s+/).forEach((t) => tokens.push(cleanToken(t)));
-  }
+  return [...scores.entries()]
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k]) => k)
+    .slice(0, 6);
+}
 
-  tokens
-    .filter((t) => t.length >= 3)
-    .sort((a, b) => {
-      const score = (t) => (/[A-Z]/.test(t) && /\d/.test(t) ? 2 : /\d/.test(t) ? 1 : 0) * 100 + t.length;
-      return score(b) - score(a);
-    })
-    .forEach(push);
-
-  return out.slice(0, 6);
+/**
+ * Recorta una línea (bbox de Tesseract) de un canvas, la escala a una altura cómoda y le agrega
+ * margen blanco (Tesseract lee mucho mejor con texto grande y aire alrededor).
+ */
+export function cropLine(canvas, bbox, targetH = 72) {
+  const lh = bbox.y1 - bbox.y0;
+  const padY = Math.round(lh * 0.35);
+  const padX = Math.round(lh * 0.5);
+  const sx = Math.max(0, bbox.x0 - padX);
+  const sy = Math.max(0, bbox.y0 - padY);
+  const sw = Math.min(canvas.width - sx, bbox.x1 - bbox.x0 + padX * 2);
+  const sh = Math.min(canvas.height - sy, lh + padY * 2);
+  const scale = clamp(targetH / Math.max(1, lh), 0.5, 4);
+  const border = 16;
+  const out = makeCanvas(sw * scale + border * 2, sh * scale + border * 2);
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(canvas, sx, sy, sw, sh, border, border, sw * scale, sh * scale);
+  return out;
 }
 
 // Formatos sin dígito verificador fuerte: pedimos 2 lecturas iguales antes de aceptar.

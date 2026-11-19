@@ -317,6 +317,16 @@ function MenuContenido() {
             estado: "Activo",
           },
           {
+            title: "Auditoría IT",
+            description: "Auditar los Instructivos de Trabajo.",
+            Icon: FaClipboardCheck,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/auditoria_it.png",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
             title: "Auditoría 5S",
             description: "Realizar y registrar auditorías 5S.",
             Icon: FaClipboardCheck,

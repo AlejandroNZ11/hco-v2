@@ -15,7 +15,7 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg', 'img/logo.png'],
       // En vite.config.js dentro de VitePWA -> workbox:
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt,woff,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt,woff,woff2,wasm}'],
         globIgnores: ['**/version.json'], // <-- Evita que la PWA congele la versión vieja
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         clientsClaim: true,

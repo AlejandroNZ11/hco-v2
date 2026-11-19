@@ -12,6 +12,7 @@ import { prestamosRoutes } from './prestamosRoutes';
 import { sugerenciasRoutes } from "./sugerenciasRoutes";
 import { lupRoutes } from "./lupRoutes";
 import { oficinaRoutes } from "./oficinaRoutes";
+import { lotesRoutes } from "./lotesRoutes";
 
 export const router = createBrowserRouter([
   {
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
       ...sugerenciasRoutes,
       ...lupRoutes,
       ...oficinaRoutes,
+      ...lotesRoutes,
     ],
   },
   {

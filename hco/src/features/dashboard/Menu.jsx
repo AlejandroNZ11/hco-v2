@@ -380,6 +380,16 @@ function MenuContenido() {
             url: "/prestamos/tracking",
             estado: "Activo",
           },
+          {
+            title: "Toma de lotes",
+            description: "Escanear lotes por código de barras o texto (OCR).",
+            Icon: FaPallet,
+            accent: "accent-slate",
+            buttonText: "Entrar",
+            image: "/img/palet.jpg",
+            url: "/toma/lotes",
+            estado: "Activo",
+          },
         ],
       },
       {

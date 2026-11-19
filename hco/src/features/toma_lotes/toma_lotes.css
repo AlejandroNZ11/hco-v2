@@ -1,0 +1,438 @@
+.tl-container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.tl-title {
+  font-size: 1.25rem;
+  margin-bottom: 16px;
+  color: #1e293b;
+}
+
+.tl-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.tl-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.tl-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.tl-input {
+  width: 100%;
+  padding: 12px 48px 12px 12px;
+  font-size: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.tl-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.tl-scan-btn {
+  position: absolute;
+  right: 6px;
+  background: #f1f5f9;
+  border: none;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tl-scan-btn:hover {
+  background: #e2e8f0;
+}
+
+.tl-save-btn {
+  width: 100%;
+  padding: 12px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+/* Diagnóstico */
+.tl-debug-card {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+}
+
+.tl-debug-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tl-badge {
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+}
+
+.tl-time {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.tl-debug-text {
+  margin: 4px 0;
+  font-size: 0.95rem;
+}
+
+.tl-debug-raw {
+  margin: 4px 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.tl-preview-box {
+  margin-top: 8px;
+}
+
+.tl-preview-box span {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.tl-preview-box img {
+  width: 100%;
+  max-height: 90px;
+  object-fit: contain;
+  background: #000;
+  border-radius: 6px;
+  border: 1px solid #94a3b8;
+}
+
+/* Lista */
+.tl-list {
+  margin-top: 18px;
+}
+
+.tl-list h3 {
+  font-size: 0.95rem;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.tl-list-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  font-size: 0.875rem;
+}
+
+/* Modal de Cámara Fullscreen */
+.tl-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tl-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tl-modal-top {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+}
+
+.tl-status-pill {
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  border-radius: 99px;
+}
+
+.tl-close-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+/* Visor tipo Photomath */
+.tl-overlay-center {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  pointer-events: none;
+}
+
+.tl-scan-box {
+  width: 82%;
+  max-width: 360px;
+  height: 82px;
+  position: relative;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.58);
+}
+
+.tl-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-color: #ef4444;
+  border-style: solid;
+}
+
+.tl-tl { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 6px; }
+.tl-tr { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 6px; }
+.tl-bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 6px; }
+.tl-br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 6px; }
+
+.tl-hint {
+  margin-top: 16px;
+  color: #f8fafc;
+  font-size: 0.82rem;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.tl-error-toast {
+  margin-bottom: 14px;
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+  font-size: 0.82rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Botonera inferior */
+.tl-modal-bottom {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 20px 16px 32px;
+}
+
+.tl-tool-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tl-tool-btn.active {
+  background: #facc15;
+  color: #000;
+  border-color: #facc15;
+}
+
+.tl-tool-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.tl-shutter-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 4px solid #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+}
+
+.tl-shutter-btn:active {
+  transform: scale(0.92);
+}
+
+.tl-shutter-btn:disabled {
+  opacity: 0.6;
+}
+
+.tl-spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid #fff;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: tl-spin 0.7s linear infinite;
+}
+
+@keyframes tl-spin {
+  to { transform: rotate(360deg); }
+}
+/* --- Añadidos escáner híbrido --- */
+.tl-video { cursor: crosshair; }
+
+.tl-scan-box { overflow: visible; }
+.tl-scan-box.busy .tl-corner { border-color: #facc15; }
+
+.tl-scan-line {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  height: 2px;
+  background: rgba(239, 68, 68, 0.85);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+  animation: tl-sweep 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes tl-sweep {
+  from { top: 12%; }
+  to { top: 88%; }
+}
+
+.tl-focus-ring {
+  position: absolute;
+  z-index: 11;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border: 2px solid #facc15;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: tl-focus 0.9s ease-out forwards;
+}
+
+@keyframes tl-focus {
+  0% { transform: scale(1.4); opacity: 1; }
+  70% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+.tl-modal-bottom-wrap {
+  position: relative;
+  z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.tl-modal-bottom { gap: 20px; }
+
+.tl-exposure {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto;
+  width: min(80%, 320px);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 14px;
+  border-radius: 99px;
+}
+
+.tl-exposure input { flex: 1; accent-color: #facc15; }
+
+.tl-photo-btn {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #f1f5f9;
+  color: #1e293b;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tl-photo-btn:disabled { opacity: 0.6; cursor: wait; }
+
+.tl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 12px;
+  align-items: center;
+}
+
+.tl-chips-label { font-size: 0.75rem; color: #64748b; width: 100%; }
+
+.tl-chip {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  cursor: pointer;
+}
+
+.tl-chip.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+
+.tl-error-inline {
+  margin-top: 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.tl-status-pill { max-width: calc(100% - 56px); }

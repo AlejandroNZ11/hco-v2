@@ -386,7 +386,7 @@ function MenuContenido() {
             Icon: FaPallet,
             accent: "accent-slate",
             buttonText: "Entrar",
-            image: "/img/palet.jpg",
+            image: "/img/toma_lotes.png",
             url: "/toma/lotes",
             estado: "Activo",
           },

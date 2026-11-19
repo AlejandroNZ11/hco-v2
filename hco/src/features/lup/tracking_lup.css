@@ -191,6 +191,12 @@
   }
 
   .tracking-lup-page .btn-action-primary:hover { background: #145d9b; }
+  .tracking-lup-page .btn-action-primary:disabled,
+  .tracking-lup-page .btn-action-primary:disabled:hover {
+    background: #cbd5e1;
+    color: #64748b;
+    cursor: not-allowed;
+  }
 
   .tracking-lup-page .btn-action-secondary {
     background: #eef2f7;
@@ -508,6 +514,21 @@
     background: #16a34a;
     color: #ffffff;
     border-color: #16a34a;
+  }
+
+  .tracking-lup-page .btn-tabla-toggle:disabled,
+  .tracking-lup-page .btn-tabla-toggle:disabled:hover {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border: 1px solid #e2e8f0;
+    cursor: not-allowed;
+  }
+
+  .tracking-lup-page .lup-fieldset-lectura {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
   }
 
   /* 7. MODAL DE CREAR / EDITAR LUP (4 COLUMNAS) */

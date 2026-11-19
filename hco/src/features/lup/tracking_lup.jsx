@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaEdit,
+  FaEye,
   FaPlus,
   FaSearch,
   FaUndo,
@@ -55,6 +56,25 @@ const extraerIdDrive = (url) => {
                 str.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
                 str.match(/[?&]id=([a-zA-Z0-9_-]+)/);
   return match ? match[1] : (str.length > 20 && !str.includes('/') ? str : null);
+};
+
+// Si Google Drive rechaza una URL de imagen, prueba las alternativas en orden
+const manejarErrorFotoDrive = (e) => {
+  const img = e.currentTarget;
+  const driveId = extraerIdDrive(img.dataset.origen || img.src);
+  if (!driveId) return;
+  if (!img.dataset.origen) img.dataset.origen = img.src;
+
+  const alternativas = [
+    `https://lh3.googleusercontent.com/d/${driveId}=w1280`,
+    `https://drive.google.com/thumbnail?id=${driveId}&sz=w1280`,
+    `https://drive.google.com/uc?export=view&id=${driveId}`
+  ];
+  const paso = Number(img.dataset.fallbackStep || 0);
+  if (paso < alternativas.length) {
+    img.dataset.fallbackStep = String(paso + 1);
+    img.src = alternativas[paso];
+  }
 };
 
 function calcularSemanaDesdeFecha(fechaStr) {
@@ -130,9 +150,6 @@ function TrackingLupContenido() {
   ).toLowerCase().trim();
 
   const puedeExportar =
-    rolUsuario === 'superadmin' || rolUsuario === 'supervisor' || rolUsuario === 'admin' || !rolUsuario;
-
-  const puedeGestionar =
     rolUsuario === 'superadmin' || rolUsuario === 'supervisor' || rolUsuario === 'admin' || !rolUsuario;
 
   const tableContainerRef = useRef(null);
@@ -240,6 +257,30 @@ function TrackingLupContenido() {
     });
     return mapa;
   }, [areas]);
+
+  // Área del usuario logueado (authUser es el registro de `empleados`; se resuelve area_id -> areas.nombre)
+  const areaUsuario = useMemo(() => {
+    if (!currentUser) return '';
+    const directo =
+      currentUser?.area_nombre ||
+      currentUser?.area?.nombre ||
+      currentUser?.areas?.nombre ||
+      (typeof currentUser?.area === 'string' ? currentUser.area : '');
+    if (directo) return String(directo).toUpperCase().trim();
+
+    const areaId = currentUser?.area_id ?? mapaEmpleadosPorId[String(currentUser?.id)]?.area_id;
+    if (areaId !== undefined && areaId !== null) {
+      return String(mapaAreasPorId[String(areaId)] || '').toUpperCase().trim();
+    }
+    return '';
+  }, [currentUser, mapaEmpleadosPorId, mapaAreasPorId]);
+
+  // Solo el área BPE puede editar y activar/inactivar; el resto solo visualiza
+  const puedeGestionar = areaUsuario === 'BPE';
+
+  // Registrar nuevas LUP: área BPE o rol SUPERADMIN
+  const esSuperAdmin = rolUsuario.replace(/[\s_-]+/g, '') === 'superadmin';
+  const puedeRegistrar = puedeGestionar || esSuperAdmin;
 
   const generarSiguienteNumeroLup = () => {
     if (lups.length === 0) return 'LUP-0001';
@@ -442,6 +483,7 @@ function TrackingLupContenido() {
   };
 
   const handleAbrirModalCrear = () => {
+    if (!puedeRegistrar) return alert('Solo el área BPE o SUPERADMIN pueden registrar LUP.');
     const hoyLima = obtenerFechaHoyLima();
     setModoEdicion(false);
     setRegistroSeleccionado(null);
@@ -497,9 +539,13 @@ function TrackingLupContenido() {
     setErrorModal('');
   };
 
+  // En edición, quien no es BPE abre el modal solo para visualizar
+  const soloLectura = modoEdicion && !puedeGestionar;
+
   const handleGuardarLup = async (e) => {
     e.preventDefault();
     setErrorModal('');
+    if (soloLectura) return setErrorModal('Solo el área BPE puede editar registros LUP.');
 
     const numLupLimpio = String(formData.numero_lup || '').trim().toUpperCase();
     const tituloLimpio = String(formData.titulo || '').trim().toUpperCase();
@@ -579,7 +625,7 @@ function TrackingLupContenido() {
   };
 
   const handleToggleOperatividad = async (reg) => {
-    if (!puedeGestionar) return alert('No tienes permisos para cambiar la operatividad de la LUP.');
+    if (!puedeGestionar) return alert('Solo el área BPE puede activar o inactivar registros LUP.');
 
     const actualmenteActivo = esLupActiva(reg);
     const nuevaOperatividad = actualmenteActivo ? 'INACTIVO' : 'ACTIVO';
@@ -790,6 +836,8 @@ function TrackingLupContenido() {
             type="button"
             className="btn-action-primary"
             onClick={handleAbrirModalCrear}
+            disabled={!puedeRegistrar}
+            title={puedeRegistrar ? 'Registrar nueva LUP' : 'Solo el área BPE o SUPERADMIN pueden registrar'}
           >
             <FaPlus />
             <span>Registrar</span>
@@ -960,21 +1008,23 @@ function TrackingLupContenido() {
                         <div className="acciones-cell">
                           <button
                             type="button"
-                            className={`btn-tabla-editar ${!puedeGestionar ? 'disabled-by-role' : ''}`}
-                            onClick={() => {
-                              if (!puedeGestionar) return alert('No tienes permisos para editar.');
-                              handleAbrirModalEditar(reg);
-                            }}
-                            title="Editar LUP"
+                            className="btn-tabla-editar"
+                            onClick={() => handleAbrirModalEditar(reg)}
+                            title={puedeGestionar ? 'Editar LUP' : 'Visualizar LUP'}
                           >
-                            <FaEdit />
+                            {puedeGestionar ? <FaEdit /> : <FaEye />}
                           </button>
 
                           <button
                             type="button"
-                            className={`btn-tabla-toggle ${activa ? 'is-active' : 'is-inactive'} ${!puedeGestionar ? 'disabled-by-role' : ''}`}
+                            className={`btn-tabla-toggle ${activa ? 'is-active' : 'is-inactive'}`}
                             onClick={() => handleToggleOperatividad(reg)}
-                            title={activa ? 'Inactivar registro' : 'Activar registro'}
+                            disabled={!puedeGestionar}
+                            title={
+                              !puedeGestionar
+                                ? 'Solo el área BPE puede activar o inactivar'
+                                : activa ? 'Inactivar registro' : 'Activar registro'
+                            }
                           >
                             {activa ? <FaPowerOff /> : <FaCheck />}
                             <span>{activa ? 'Inactivar' : 'Activar'}</span>
@@ -1000,9 +1050,11 @@ function TrackingLupContenido() {
                   <FaClipboardList />
                 </span>
                 <div>
-                  <h2>{modoEdicion ? 'Editar Registro LUP' : 'Registrar Nueva LUP'}</h2>
+                  <h2>{soloLectura ? 'Visualizar Registro LUP' : modoEdicion ? 'Editar Registro LUP' : 'Registrar Nueva LUP'}</h2>
                   <p>
-                    {modoEdicion
+                    {soloLectura
+                      ? `Solo lectura: ${registroSeleccionado?.numero_lup || ''} (edición exclusiva del área BPE)`
+                      : modoEdicion
                       ? `Actualizando datos de la ${registroSeleccionado?.numero_lup || ''}`
                       : 'Complete los datos de la Lección de Un Punto en el formulario.'}
                   </p>
@@ -1026,6 +1078,7 @@ function TrackingLupContenido() {
                   </div>
                 )}
 
+                <fieldset disabled={soloLectura} className="lup-fieldset-lectura">
                 <div className="lup-form-grid-4cols">
                   {/* FILA 1: N° LUP - Fecha LUP - Semana - Rol */}
                   <div className="tc-form-group">
@@ -1211,7 +1264,7 @@ function TrackingLupContenido() {
                       <label style={{ margin: 0 }}>
                         <FaImage style={{ marginRight: '4px' }} /> Foto LUP (Opcional)
                       </label>
-                      {urlFotoRender && (
+                      {urlFotoRender && !soloLectura && (
                         <button
                           type="button"
                           className="btn-quitar-foto-top"
@@ -1229,7 +1282,9 @@ function TrackingLupContenido() {
                             src={urlFotoRender}
                             alt="Foto LUP"
                             className="foto-preview-img-max"
-                            onClick={() => setZoomFotoUrl(urlFotoRender)}
+                            referrerPolicy="no-referrer"
+                            onError={manejarErrorFotoDrive}
+                            onClick={(e) => setZoomFotoUrl(e.currentTarget.currentSrc || urlFotoRender)}
                             title="Clic para ver en tamaño grande"
                           />
                         </div>
@@ -1306,6 +1361,7 @@ function TrackingLupContenido() {
                     />
                   </div>
                 </div>
+                </fieldset>
 
                 {/* AUDITORÍA FORMATEADA EN CAJA COMPACTA */}
                 <div className="tc-audit-info">
@@ -1323,10 +1379,12 @@ function TrackingLupContenido() {
                         <span>Actualizado por:</span>
                         <strong>{registroSeleccionado?.usuario_actualiza || '-'}</strong>
                       </div>
-                      <div className="tc-audit-item">
-                        <span>Se modificará por:</span>
-                        <strong>{nombreUsuarioSesion}</strong>
-                      </div>
+                      {!soloLectura && (
+                        <div className="tc-audit-item">
+                          <span>Se modificará por:</span>
+                          <strong>{nombreUsuarioSesion}</strong>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="tc-audit-grid single">
@@ -1346,16 +1404,18 @@ function TrackingLupContenido() {
                   onClick={handleCerrarModal}
                   disabled={guardando}
                 >
-                  Cancelar
+                  {soloLectura ? 'Cerrar' : 'Cancelar'}
                 </button>
-                <button
-                  type="submit"
-                  className="btn-modal-save"
-                  disabled={guardando}
-                >
-                  <FaSave />
-                  <span>{guardando ? 'Guardando...' : modoEdicion ? 'Guardar Cambios' : 'Registrar LUP'}</span>
-                </button>
+                {!soloLectura && (
+                  <button
+                    type="submit"
+                    className="btn-modal-save"
+                    disabled={guardando}
+                  >
+                    <FaSave />
+                    <span>{guardando ? 'Guardando...' : modoEdicion ? 'Guardar Cambios' : 'Registrar LUP'}</span>
+                  </button>
+                )}
               </div>
             </form>
           </div>
@@ -1374,7 +1434,13 @@ function TrackingLupContenido() {
             >
               <FaTimes />
             </button>
-            <img src={zoomFotoUrl} alt="Foto LUP Grande" className="tc-zoom-image" />
+            <img
+              src={zoomFotoUrl}
+              alt="Foto LUP Grande"
+              className="tc-zoom-image"
+              referrerPolicy="no-referrer"
+              onError={manejarErrorFotoDrive}
+            />
           </div>
         </div>
       )}

@@ -371,7 +371,7 @@ function MenuContenido() {
             buttonText: "Entrar",
             image: "/img/generar_rdr.png",
             url: "/generar_rdr/track",
-            estado: "En proceso",
+            estado: "Activo",
           },
         ],
       },

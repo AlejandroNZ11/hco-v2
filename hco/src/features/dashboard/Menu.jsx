@@ -513,6 +513,43 @@ function MenuContenido() {
           },
         ],
       },
+      {
+        key: "inteligencia_artificial",
+        label: "Inteligencia Artificial",
+        shortLabel: "IA",
+        items: [
+          {
+            title: "Detección de EPPs",
+            description: "Identificación de equipos de protección personal.",
+            Icon: FaUsers,
+            accent: "accent-cyan",
+            buttonText: "Entrar",
+            image: "/img/detectar_epp.png",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Detección de objetos Industriales",
+            description: "Identificación de objetos en el entorno Labeling.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/detectar_objetos.png",
+            url: "#",
+            estado: "Inactivo",
+          },
+          {
+            title: "Conteo de personal",
+            description: "Contar la cantidad de personal presente en el entorno.",
+            Icon: FaBoxOpen,
+            accent: "accent-violet",
+            buttonText: "Entrar",
+            image: "/img/contar_personal.png",
+            url: "#",
+            estado: "Inactivo",
+          },
+        ],
+      },
     ];
 
     let filteredTabs = tabs;

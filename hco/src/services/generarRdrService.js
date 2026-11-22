@@ -200,10 +200,10 @@ const descargarPorServidor = async (url) => {
   return new Blob([bytes], { type: data.contentType || 'image/jpeg' });
 };
 
-// Re-codifica a JPEG (máx. 1280 px) para que el Excel no pese demasiado y acepte cualquier formato
+// Re-codifica a JPEG (máx. 800 px): en el Excel la foto mide ~170 px, así el archivo no pesa de más
 const normalizarImagen = async (blob) => {
   const bitmap = await createImageBitmap(blob);
-  const escala = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
+  const escala = Math.min(1, 800 / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * escala));
   const height = Math.max(1, Math.round(bitmap.height * escala));
 

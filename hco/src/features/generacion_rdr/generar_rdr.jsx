@@ -375,7 +375,7 @@ function GenerarRdrContenido() {
 
     setLoading(true);
     try {
-      const { porCosto, hojasLeidas, hojasFaltantes, filasSinCosto, totalFotos } =
+      const { porCosto, hojasLeidas, hojasFaltantes, filasSinCosto, totalFotos, fotosSinSku } =
         await leerExcelFotosRdr(file, new Set(rdrs.map((g) => g.costo)));
 
       if (hojasLeidas.length === 0) {
@@ -426,6 +426,14 @@ function GenerarRdrContenido() {
           (despues - antes < guardadas.length ? ` (${guardadas.length - (despues - antes)} ya existían).` : '.')
       );
       if (sinFotos > 0) mostrarAlerta('info', 'Costos sin fotos', `${sinFotos} costo(s) no tienen fotos en el Excel.`);
+      if (fotosSinSku > 0) {
+        mostrarAlerta(
+          'warning',
+          'Abollados sin SKU',
+          `${fotosSinSku} foto(s) de la hoja Abollados no tienen SKU (columna D vacía o sin formato "SKU = cantidad").`,
+          10000
+        );
+      }
       if (filasSinCosto > 0) {
         mostrarAlerta('info', 'Filas sin coincidencia', `${filasSinCosto} fila(s) del Excel de fotos no corresponden a ningún costo generado.`);
       }
@@ -498,7 +506,8 @@ function GenerarRdrContenido() {
     costo: g.costo,
     filas: g.filas,
     fotos: g.fotos.map((f) => {
-      const etiqueta = f.sku ? `${f.origen} - SKU ${f.sku}` : f.origen;
+      // En el Excel solo las fotos de Abollados llevan texto: su SKU
+      const etiqueta = f.sku ? `SKU ${f.sku}` : '';
       const img = imagenesRef.current.get(f.url);
       return img && !img.error
         ? { etiqueta, buffer: new Uint8Array(img.buffer), width: img.width, height: img.height }

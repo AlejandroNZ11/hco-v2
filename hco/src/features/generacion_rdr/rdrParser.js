@@ -178,7 +178,7 @@ const col = (letra) => XLSX.utils.decode_col(letra);
 export const HOJAS_FOTOS = [
   { nombre: 'Transferencia_Imagenes', etiqueta: 'Transferencia', costo: col('D'), desde: col('F'), hasta: col('S') },
   { nombre: 'aereos', etiqueta: 'Aéreos', costo: col('C'), desde: col('F'), hasta: col('P') },
-  { nombre: 'Abollados', etiqueta: 'Abollados', costo: col('C'), desde: col('E'), hasta: col('J'), sku: col('S') },
+  { nombre: 'Abollados', etiqueta: 'Abollados', costo: col('C'), desde: col('E'), hasta: col('J'), sku: col('D') },
 ];
 
 /**
@@ -204,6 +204,52 @@ const urlDeCelda = (celda) => {
   return m ? m[0] : '';
 };
 
+// ---------- SKU de Abollados ----------
+
+// Ej: "MN90010437 = 114" → MN90010437 | "7000614983=3" → 7000614983
+const RE_SKU_CON_CANTIDAD = /^\s*([A-Za-z0-9]{6,15})\s*[=:]\s*[\d.,]+/;
+
+const limpiarSku = (texto) => {
+  const t = textoCelda(texto);
+  if (!t || /^https?:\/\//i.test(t)) return '';
+  const conCantidad = t.match(RE_SKU_CON_CANTIDAD);
+  if (conCantidad) return conCantidad[1].slice(0, 10).toUpperCase();
+  return t.replace(/\s+/g, '').slice(0, 10).toUpperCase(); // los primeros 10 caracteres
+};
+
+// Columna con título "SKU" en las primeras filas (si la hoja tiene cabecera)
+const buscarColumnaSku = (ws, rango) => {
+  for (let r = rango.s.r; r <= Math.min(rango.s.r + 4, rango.e.r); r++) {
+    for (let c = rango.s.c; c <= rango.e.c; c++) {
+      const v = normalizarTexto(ws[XLSX.utils.encode_cell({ r, c })]?.v);
+      if (v === 'SKU' || v.startsWith('SKU ')) return c;
+    }
+  }
+  return -1;
+};
+
+/**
+ * SKU de una fila de Abollados. Orden:
+ * 1) columna con título SKU, 2) columna D, 3) cualquier celda de la fila con forma "SKU = cantidad".
+ */
+const obtenerSku = (ws, r, conf, colCabecera, rango) => {
+  const celda = (c) => ws[XLSX.utils.encode_cell({ r, c })]?.v;
+
+  if (colCabecera >= 0) {
+    const s = limpiarSku(celda(colCabecera));
+    if (s && normalizarTexto(s) !== 'SKU') return s;
+  }
+  const deS = limpiarSku(celda(conf.sku));
+  if (deS) return deS;
+
+  for (let c = rango.s.c; c <= rango.e.c; c++) {
+    if (c === conf.costo || (c >= conf.desde && c <= conf.hasta)) continue;
+    const m = textoCelda(celda(c)).match(RE_SKU_CON_CANTIDAD);
+    if (m) return m[1].slice(0, 10).toUpperCase();
+  }
+  return '';
+};
+
 /**
  * Lee el Excel de fotos y agrupa las URL por costo.
  * @param {File} file
@@ -217,6 +263,7 @@ export const leerExcelFotosRdr = async (file, costosValidos) => {
   const hojasFaltantes = [];
   let filasSinCosto = 0;
   let totalFotos = 0;
+  let fotosSinSku = 0;
 
   for (const conf of HOJAS_FOTOS) {
     const nombreReal = wb.SheetNames.find((n) => normalizarTexto(n) === normalizarTexto(conf.nombre));
@@ -229,6 +276,7 @@ export const leerExcelFotosRdr = async (file, costosValidos) => {
     const ws = wb.Sheets[nombreReal];
     if (!ws['!ref']) continue;
     const rango = XLSX.utils.decode_range(ws['!ref']);
+    const colSkuCabecera = conf.sku !== undefined ? buscarColumnaSku(ws, rango) : -1;
 
     for (let r = rango.s.r; r <= rango.e.r; r++) {
       const celdaCosto = ws[XLSX.utils.encode_cell({ r, c: conf.costo })];
@@ -245,11 +293,8 @@ export const leerExcelFotosRdr = async (file, costosValidos) => {
         continue;
       }
 
-      let sku = '';
-      if (conf.sku !== undefined) {
-        const celdaSku = ws[XLSX.utils.encode_cell({ r, c: conf.sku })];
-        sku = textoCelda(celdaSku?.v).replace(/\s+/g, '').slice(0, 10);
-      }
+      const sku = conf.sku !== undefined ? obtenerSku(ws, r, conf, colSkuCabecera, rango) : '';
+      if (conf.sku !== undefined && !sku) fotosSinSku += urls.length;
 
       costos.forEach((costo) => {
         if (!porCosto.has(costo)) porCosto.set(costo, []);
@@ -263,5 +308,5 @@ export const leerExcelFotosRdr = async (file, costosValidos) => {
     }
   }
 
-  return { porCosto, hojasLeidas, hojasFaltantes, filasSinCosto, totalFotos };
+  return { porCosto, hojasLeidas, hojasFaltantes, filasSinCosto, totalFotos, fotosSinSku };
 };

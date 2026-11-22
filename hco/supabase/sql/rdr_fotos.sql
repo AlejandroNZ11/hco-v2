@@ -10,7 +10,7 @@
 --   costo  → número de costo (para buscar rápido)
 --   url    → enlace de la foto (ej. https://drive.google.com/file/d/.../view)
 --   origen → hoja del Excel de fotos: Transferencia | Aéreos | Abollados
---   sku    → solo Abollados: primeros 10 caracteres de la columna S
+--   sku    → solo Abollados: primeros 10 caracteres de la columna D
 -- =====================================================================
 
 create table if not exists public.rdr_fotos (

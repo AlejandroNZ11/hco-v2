@@ -7,7 +7,7 @@
 // - H7 = FECHA, H15 = HORA (del primer registro del costo).
 // - Desde la fila 24, de 2 en 2: B = OBSERVACION, J = SN, P = CÓDIGO, Y = QTY.
 // - Si hay más de 26 líneas, inserta pares de filas iguales a la 74-75 y baja la leyenda.
-// - Fotos al costado del formato, desde la columna AN.
+// - Fotos al costado del formato, desde la columna AN, en 5-7 columnas (Abollados con su SKU).
 // Este archivo no depende de React: recibe JSZip y la plantilla como parámetros.
 // =====================================================================
 
@@ -20,17 +20,15 @@ const FILA_FIN_DETALLE = 75;
 // Fotos
 const COL_FOTOS = 40; // AN
 const FILA_TITULO_FOTOS = 2;
-const FOTOS_POR_FILA = 2;
-const FOTO_ANCHO_MAX = 190; // px
-const FOTO_ALTO_MAX = 210; // px
-const SEPARACION_PX = 10;
-const ALTO_MIN_ETIQUETA_PX = 15; // fila donde va el texto de cada foto
+const SEPARACION_PX = 6; // espacio entre fotos (horizontal y vertical)
+const ALTO_TEXTO_PX = 14; // alto del texto "SKU ..." encima de la foto
 const EMU_POR_PX = 9525;
 
 const NS_REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const TIPO_HOJA = `${NS_REL}/worksheet`;
 const TIPO_DRAWING = `${NS_REL}/drawing`;
 const TIPO_IMAGEN = `${NS_REL}/image`;
+const TIPO_HIPERVINCULO = `${NS_REL}/hyperlink`;
 const TIPO_PRINTER = `${NS_REL}/printerSettings`;
 
 // ---------- utilidades ----------
@@ -159,15 +157,6 @@ const escribirTexto = (hoja, r, col, valor, estilo) => {
   });
 };
 
-const escribirHipervinculo = (hoja, r, col, url, texto, estilo) => {
-  const fila = obtenerFila(hoja, r);
-  const f = `HYPERLINK("${String(url).replace(/"/g, '""')}","${String(texto).replace(/"/g, '""')}")`;
-  fila.celdas.set(col, {
-    attrs: `${estilo ? ` s="${estilo}"` : ''} t="str"`,
-    interior: `<f>${escaparXml(f)}</f><v>${escaparXml(texto)}</v>`,
-  });
-};
-
 // ---------- filas extra del detalle ----------
 
 const agregarFilasDetalle = (hoja, paresExtra) => {
@@ -222,7 +211,7 @@ const anchosColumnas = (xmlAntes) => {
 const altoFilaPx = (hoja, defPt) => (r) => {
   const fila = hoja.filas.get(r);
   const ht = fila ? Number((fila.attrs.match(/\bht="([\d.]+)"/) || [])[1] || defPt) : defPt;
-  return Math.round((ht * 96) / 72);
+  return fila && /\bhidden="1"/.test(fila.attrs) ? 0 : Math.round((ht * 96) / 72);
 };
 
 // Convierte un desplazamiento en px desde una columna inicial a { col (0-based), off (EMU) }
@@ -236,20 +225,66 @@ const posicionX = (anchoCol, colInicio, xPx) => {
   return { col: col - 1, off: Math.round(x * EMU_POR_PX) };
 };
 
-const xmlAnclaImagen = (idx, relId, { col, colOff, fila, ancho, alto, nombre }) =>
-  `<xdr:oneCellAnchor><xdr:from><xdr:col>${col}</xdr:col><xdr:colOff>${colOff}</xdr:colOff>` +
-  `<xdr:row>${fila}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>` +
-  `<xdr:ext cx="${ancho * EMU_POR_PX}" cy="${alto * EMU_POR_PX}"/>` +
-  `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${idx + 2}" name="${escaparXml(nombre)}"/>` +
+// Convierte una altura en px desde la fila 1 a { fila (0-based), off (EMU) }
+const posicionY = (altoFila, yPx) => {
+  let r = 1;
+  let y = yPx;
+  while (y >= altoFila(r) && r < 1048576) {
+    y -= altoFila(r);
+    r++;
+  }
+  return { fila: r - 1, off: Math.round(y * EMU_POR_PX) };
+};
+
+const xmlDesde = ({ col, colOff, fila, filaOff }) =>
+  `<xdr:from><xdr:col>${col}</xdr:col><xdr:colOff>${colOff}</xdr:colOff>` +
+  `<xdr:row>${fila}</xdr:row><xdr:rowOff>${filaOff}</xdr:rowOff></xdr:from>`;
+
+const xmlAnclaImagen = (id, relId, a) =>
+  `<xdr:oneCellAnchor>${xmlDesde(a)}` +
+  `<xdr:ext cx="${a.ancho * EMU_POR_PX}" cy="${a.alto * EMU_POR_PX}"/>` +
+  `<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${id}" name="Foto ${id}"/>` +
   `<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>` +
   `<xdr:blipFill><a:blip xmlns:r="${NS_REL}" r:embed="${relId}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>` +
-  `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${ancho * EMU_POR_PX}" cy="${alto * EMU_POR_PX}"/></a:xfrm>` +
+  `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${a.ancho * EMU_POR_PX}" cy="${a.alto * EMU_POR_PX}"/></a:xfrm>` +
   `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:ln w="9525"><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></xdr:spPr>` +
   `</xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
 
+// Texto flotante (SKU o enlace de foto no descargada) sin bordes ni relleno
+const xmlAnclaTexto = (id, a, relEnlace) =>
+  `<xdr:oneCellAnchor>${xmlDesde(a)}` +
+  `<xdr:ext cx="${a.ancho * EMU_POR_PX}" cy="${a.alto * EMU_POR_PX}"/>` +
+  `<xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="Texto ${id}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr>` +
+  `<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${a.ancho * EMU_POR_PX}" cy="${a.alto * EMU_POR_PX}"/></a:xfrm>` +
+  `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></xdr:spPr>` +
+  `<xdr:txBody><a:bodyPr vertOverflow="overflow" horzOverflow="overflow" wrap="none" lIns="0" tIns="0" rIns="0" bIns="0" anchor="b"/><a:lstStyle/>` +
+  `<a:p><a:r><a:rPr lang="es-PE" sz="${a.tamano || 800}" b="1"${relEnlace ? ' u="sng"' : ''}>` +
+  `<a:solidFill><a:srgbClr val="${relEnlace ? '0563C1' : '0B2239'}"/></a:solidFill><a:latin typeface="Arial"/>` +
+  (relEnlace ? `<a:hlinkClick xmlns:r="${NS_REL}" r:id="${relEnlace}"/>` : '') +
+  `</a:rPr><a:t>${escaparXml(a.texto)}</a:t></a:r></a:p></xdr:txBody></xdr:sp><xdr:clientData/></xdr:oneCellAnchor>`;
+
 /**
- * Ubica las fotos al costado del formato (desde AN), 2 por fila y juntas.
- * Devuelve las anclas para el drawing; las etiquetas se escriben como celdas.
+ * Columnas de fotos según la cantidad: pocas fotos → 5 columnas grandes; muchas → hasta 12 más pequeñas.
+ */
+export const columnasFotos = (cantidad) => {
+  if (cantidad <= 10) return 5;
+  if (cantidad <= 18) return 6;
+  if (cantidad <= 35) return 7;
+  if (cantidad <= 60) return 8;
+  if (cantidad <= 100) return 10;
+  return 12;
+};
+
+// Tamaño máximo de cada foto según las columnas (más columnas → fotos más pequeñas)
+const tamanoFoto = (columnas) => {
+  const ancho = columnas <= 7 ? 170 : columnas <= 8 ? 150 : columnas <= 10 ? 135 : 120;
+  return { ancho, alto: Math.round(ancho * 1.1) };
+};
+
+/**
+ * Ubica las fotos al costado del formato (desde AN). Todo se posiciona en píxeles,
+ * así la altura de las filas de la plantilla no deja espacios. Solo las fotos de
+ * Abollados llevan texto encima (su SKU). Devuelve los elementos para el drawing.
  */
 const ubicarFotos = (hoja, grupo, { anchoCol, altoFila, estiloTitulo }) => {
   const fotos = grupo.fotos || [];
@@ -257,52 +292,55 @@ const ubicarFotos = (hoja, grupo, { anchoCol, altoFila, estiloTitulo }) => {
 
   escribirTexto(hoja, FILA_TITULO_FOTOS, COL_FOTOS, `REGISTRO FOTOGRÁFICO - COSTO ${grupo.costo}`, estiloTitulo);
 
-  // Ancho de casillero: lo que ocupan las columnas enteras más cercanas a FOTO_ANCHO_MAX
-  const xCasillero = [0];
-  let x = 0;
-  let col = COL_FOTOS;
-  for (let j = 1; j < FOTOS_POR_FILA; j++) {
-    let usado = 0;
-    while (usado < FOTO_ANCHO_MAX + SEPARACION_PX) usado += anchoCol(col++);
-    x += usado;
-    xCasillero.push(x);
-  }
+  const porFila = columnasFotos(fotos.length);
+  const { ancho: anchoMax, alto: altoMax } = tamanoFoto(porFila);
+  const paso = anchoMax + SEPARACION_PX;
 
-  const anclas = [];
-  let filaEtiqueta = FILA_TITULO_FOTOS + 2;
+  const ubicar = (xPx, yPx) => {
+    const px = posicionX(anchoCol, COL_FOTOS, xPx);
+    const py = posicionY(altoFila, yPx);
+    return { col: px.col, colOff: px.off, fila: py.fila, filaOff: py.off };
+  };
 
-  for (let i = 0; i < fotos.length; i += FOTOS_POR_FILA) {
-    const lote = fotos.slice(i, i + FOTOS_POR_FILA);
+  // Las fotos empiezan justo debajo del título
+  let y = 0;
+  for (let r = 1; r <= FILA_TITULO_FOTOS; r++) y += altoFila(r);
+  y += SEPARACION_PX;
+
+  const elementos = [];
+  for (let i = 0; i < fotos.length; i += porFila) {
+    const lote = fotos.slice(i, i + porFila);
+    const conTexto = lote.some((f) => f.etiqueta);
+    const yImagen = y + (conTexto ? ALTO_TEXTO_PX : 0);
     let altoLote = 0;
 
     lote.forEach((foto, j) => {
-      const pos = posicionX(anchoCol, COL_FOTOS, xCasillero[j]);
-      const colEtiqueta = pos.col + 1;
+      const x = j * paso;
+
+      if (foto.etiqueta) {
+        elementos.push({ tipo: 'texto', texto: foto.etiqueta, ancho: anchoMax, alto: ALTO_TEXTO_PX, ...ubicar(x, y) });
+      }
+
       if (foto.buffer) {
-        escribirTexto(hoja, filaEtiqueta, colEtiqueta, foto.etiqueta || '', estiloTitulo);
-        const escala = Math.min(FOTO_ANCHO_MAX / foto.width, FOTO_ALTO_MAX / foto.height, 1);
+        const escala = Math.min(anchoMax / foto.width, altoMax / foto.height, 1);
         const ancho = Math.max(1, Math.round(foto.width * escala));
         const alto = Math.max(1, Math.round(foto.height * escala));
         altoLote = Math.max(altoLote, alto);
-        anclas.push({ foto, col: pos.col, colOff: pos.off, fila: filaEtiqueta, ancho, alto });
+        // Centrada en su casillero (las verticales son más angostas)
+        elementos.push({ tipo: 'imagen', foto, ancho, alto, ...ubicar(x + Math.floor((anchoMax - ancho) / 2), yImagen) });
       } else {
-        escribirTexto(hoja, filaEtiqueta, colEtiqueta, foto.etiqueta || '', estiloTitulo);
-        escribirHipervinculo(hoja, filaEtiqueta + 1, colEtiqueta, foto.url, 'Abrir foto (no se pudo descargar)');
-        altoLote = Math.max(altoLote, 34);
+        elementos.push({
+          tipo: 'texto', texto: 'Abrir foto (no descargada)', url: foto.url, tamano: 700,
+          ancho: anchoMax, alto: ALTO_TEXTO_PX, ...ubicar(x, yImagen),
+        });
+        altoLote = Math.max(altoLote, ALTO_TEXTO_PX);
       }
     });
 
-    // Siguiente fila de fotos: debajo de la foto más alta del lote, en una fila con
-    // altura suficiente para que la etiqueta se lea (la plantilla tiene filas muy bajas)
-    let r = filaEtiqueta + 1;
-    let acumulado = 0;
-    while (acumulado < altoLote) acumulado += altoFila(r++);
-    r++;
-    while (altoFila(r) < ALTO_MIN_ETIQUETA_PX) r++;
-    filaEtiqueta = r;
+    y = yImagen + altoLote + SEPARACION_PX;
   }
 
-  return anclas;
+  return elementos;
 };
 
 // ---------- libro ----------
@@ -414,10 +452,19 @@ export const construirLibroRdr = async ({ JSZip, plantillaBuffer, grupos }) => {
     if (anclas.length > 0) {
       const relsDrawing = [];
       const anclasXml = anclas.map((a, k) => {
-        numImagen++;
-        zip.file(`xl/media/rdr_imagen${numImagen}.jpeg`, a.foto.buffer);
-        relsDrawing.push(`<Relationship Id="rId${k + 1}" Type="${TIPO_IMAGEN}" Target="../media/rdr_imagen${numImagen}.jpeg"/>`);
-        return xmlAnclaImagen(k, `rId${k + 1}`, { ...a, nombre: `Foto ${k + 1}` });
+        const id = k + 2;
+        const relId = `rId${k + 1}`;
+        if (a.tipo === 'imagen') {
+          numImagen++;
+          zip.file(`xl/media/rdr_imagen${numImagen}.jpeg`, a.foto.buffer);
+          relsDrawing.push(`<Relationship Id="${relId}" Type="${TIPO_IMAGEN}" Target="../media/rdr_imagen${numImagen}.jpeg"/>`);
+          return xmlAnclaImagen(id, relId, a);
+        }
+        if (a.url) {
+          relsDrawing.push(`<Relationship Id="${relId}" Type="${TIPO_HIPERVINCULO}" Target="${escaparXml(a.url)}" TargetMode="External"/>`);
+          return xmlAnclaTexto(id, a, relId);
+        }
+        return xmlAnclaTexto(id, a, null);
       }).join('');
 
       zip.file(

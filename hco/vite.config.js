@@ -16,7 +16,9 @@ export default defineConfig({
       // En vite.config.js dentro de VitePWA -> workbox:
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,json,txt,woff,woff2,wasm}'],
-        globIgnores: ['**/version.json'], // <-- Evita que la PWA congele la versión vieja
+        // version.json: evita que la PWA congele la versión vieja.
+        // ort-wasm (14 MB) y los .onnx: solo los descarga quien abre Visión IA (ver runtimeCaching)
+        globIgnores: ['**/version.json', '**/ort-wasm-*.wasm'],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         clientsClaim: true,
         skipWaiting: true,
@@ -27,7 +29,17 @@ export default defineConfig({
           {
             urlPattern: /\/version\.json/,
             handler: 'NetworkOnly', // <-- Obliga a consultar siempre al servidor
-          }
+          },
+          {
+            // Visión IA: motor ONNX y modelos se guardan al primer uso y luego funcionan offline
+            urlPattern: ({ url }) => /\/assets\/ort-wasm-.*\.wasm$/.test(url.pathname) || /\/models\/.+\.onnx$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'vision-ia-modelos',
+              expiration: { maxEntries: 10 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
         ]
       },
             manifest: {

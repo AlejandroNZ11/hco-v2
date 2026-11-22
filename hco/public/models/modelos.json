@@ -1,0 +1,22 @@
+{
+  "_ayuda": "Modelos ONNX (formato YOLOX) que usa Visión IA en el celular. 'url' puede ser local (/models/...) o externa con CORS (p. ej. https://huggingface.co/<usuario>/<repo>/resolve/main/archivo.onnx). Si 'url' está vacía o el archivo no existe, ese modelo queda desactivado. 'etiquetas': \"coco\" o la lista de clases en el orden del entrenamiento.",
+  "general": {
+    "url": "/models/yolox_nano.onnx",
+    "tipo": "yolox",
+    "tamano": 416,
+    "etiquetas": "coco",
+    "licencia": "Apache-2.0 (Megvii YOLOX)"
+  },
+  "epp": {
+    "url": "",
+    "tipo": "yolox",
+    "tamano": 416,
+    "etiquetas": ["person", "helmet", "vest", "goggles", "gloves"]
+  },
+  "conteo": {
+    "url": "",
+    "tipo": "yolox",
+    "tamano": 416,
+    "etiquetas": ["caja", "pallet", "botella", "producto"]
+  }
+}

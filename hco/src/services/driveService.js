@@ -7,7 +7,7 @@ import { supabase } from '../config/supabaseClient';
  * @param {string} dataUrlBase64 - Imagen en formato "data:image/...;base64,..."
  * @param {string} nombreArchivo - Nombre del archivo en Drive
  * @param {Object} opciones
- * @param {'lup'|'prestamos'|'personal'} opciones.destino - Carpeta destino (la traduce el servidor)
+ * @param {'lup'|'prestamos'|'personal'|'vision'} opciones.destino - Carpeta destino (la traduce el servidor)
  * @param {'renombrar'|'borrar'} [opciones.anterior] - Qué hacer si ya existe un archivo con ese nombre
  * @param {boolean} [opciones.publico=true] - Dar permiso de lectura pública al archivo
  * @returns {Promise<string>} URL de visualización en Drive, o '' si no hay imagen

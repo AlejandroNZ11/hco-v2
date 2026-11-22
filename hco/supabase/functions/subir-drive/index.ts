@@ -4,7 +4,8 @@
 //
 // Secretos requeridos (npx supabase secrets set ...):
 //   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN,
-//   DRIVE_FOLDER_LUP, DRIVE_FOLDER_PRESTAMOS, DRIVE_FOLDER_PERSONAL
+//   DRIVE_FOLDER_LUP, DRIVE_FOLDER_PRESTAMOS, DRIVE_FOLDER_PERSONAL,
+//   DRIVE_FOLDER_VISION (fotos de "No Conforme" del módulo Visión IA / EPP)
 // SUPABASE_URL y SUPABASE_ANON_KEY los inyecta Supabase automáticamente.
 
 import { createClient } from "@supabase/supabase-js";
@@ -14,6 +15,7 @@ const CARPETAS: Record<string, string | undefined> = {
   lup: Deno.env.get("DRIVE_FOLDER_LUP"),
   prestamos: Deno.env.get("DRIVE_FOLDER_PRESTAMOS"),
   personal: Deno.env.get("DRIVE_FOLDER_PERSONAL"),
+  vision: Deno.env.get("DRIVE_FOLDER_VISION"),
 };
 
 const MAX_BASE64 = 15 * 1024 * 1024; // ~11 MB de imagen

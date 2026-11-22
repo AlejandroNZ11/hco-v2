@@ -10,6 +10,7 @@ import {
   cropLine,
   looksLikeBarcodeNoise,
   parseLoteCandidates,
+  pickWordAtCross,
   preprocessForOcr,
   sharpness,
 } from './scanUtils';
@@ -18,6 +19,16 @@ import './toma_lotes.css';
 const OCR_WHITELIST = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/.: ';
 const SCAN_INTERVAL_MS = 110;
 const LOCK_MS = 600; // tiempo que hay que mantener el código en el láser
+const OCR_VOTOS = 2; // lecturas iguales seguidas bajo la mira para aceptar el texto
+const OCR_CONF_MIN = 50; // confianza mínima de la palabra para contarla
+const MODO_KEY = 'tl-modo-escaner';
+const leerModoGuardado = () => {
+  try {
+    return localStorage.getItem(MODO_KEY) === 'texto' ? 'texto' : 'barras';
+  } catch {
+    return 'barras';
+  }
+};
 // iPhone/iPad (iPadOS se presenta como Mac con pantalla táctil)
 const IS_IOS =
   typeof navigator !== 'undefined' &&
@@ -34,6 +45,9 @@ export default function TomaLotes() {
   const [errorMsg, setErrorMsg] = useState('');
   const [liveHint, setLiveHint] = useState('');
   const [lockInfo, setLockInfo] = useState(null); // { text, progress } código en fijación
+  // Modo del escáner: 'barras' (automático) o 'texto' (mira central tipo DataWedge)
+  const [scanMode, setScanMode] = useState(leerModoGuardado);
+  const [ocrLive, setOcrLive] = useState(null); // palabra bajo la mira { text, conf, votos, box }
 
   // Capacidades de la cámara (dependen del celular)
   const [caps, setCaps] = useState({ torch: false, zoom: null, exposure: null, focus: false });
@@ -57,6 +71,8 @@ export default function TomaLotes() {
   const isProcessingRef = useRef(false);
   const photoInputRef = useRef(null);
   const openedAtRef = useRef(0);
+  const scanModeRef = useRef(scanMode);
+  const ocrLiveRef = useRef(null);
 
   // ---------------------------------------------------------------------------
   // 1. Motores: OCR (Tesseract) + Barras (ZXing en worker + nativo si existe)
@@ -232,7 +248,10 @@ export default function TomaLotes() {
         const video = videoRef.current;
         const box = scanBoxRef.current;
 
-        if (video && box && video.readyState >= 2 && video.videoWidth && !isProcessingRef.current) {
+        if (
+          video && box && video.readyState >= 2 && video.videoWidth &&
+          !isProcessingRef.current && scanModeRef.current === 'barras'
+        ) {
           attempts++;
           const mode = tick++ % 2;
           try {
@@ -358,6 +377,142 @@ export default function TomaLotes() {
     // caps.torch solo se usa para el texto del aviso; no reiniciar la cámara por eso
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isScannerOpen, acceptValue, closeScanner, nativeDecode, zxingDecode]);
+
+  // ---------------------------------------------------------------------------
+  // 2b. Modo TEXTO (tipo DataWedge): lectura continua de la franja con mira central.
+  //     Se lee solo la franja, se toma la palabra que está bajo la cruz y se acepta
+  //     cuando sale igual en OCR_VOTOS lecturas seguidas (evita letras mal leídas).
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isScannerOpen || scanMode !== 'texto' || !ocrReady) return;
+
+    let active = true;
+    let iter = 0;
+    let fallos = 0;
+    const historial = [];
+    const t0 = performance.now();
+
+    const loop = async () => {
+      while (active) {
+        const started = performance.now();
+        const video = videoRef.current;
+        const box = scanBoxRef.current;
+        const worker = ocrWorkerRef.current;
+
+        if (worker && video && box && video.readyState >= 2 && video.videoWidth && !isProcessingRef.current) {
+          try {
+            // 2 frames de la franja exacta (la mira es su centro) y nos quedamos con el más nítido
+            let mejor = null;
+            for (let i = 0; i < 2; i++) {
+              const canvas = makeCanvas();
+              const img = drawRegion(video, boxToVideoRect(video, box, 1, 1), canvas, 1400, 1);
+              const s = sharpness(img);
+              if (!mejor || s > mejor.s) mejor = { canvas, s };
+              if (i === 0) await sleep(35);
+            }
+
+            const pre = preprocessForOcr(mejor.canvas, { targetWidth: 1100, maxScale: 2.5 });
+            // Alterna gris / binarizada: una aguanta borroso, la otra sombras y reflejos
+            const src = iter++ % 3 === 2 ? pre.binary : pre.gray;
+            await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+            const { data } = await worker.recognize(src, {}, { blocks: true });
+            if (!active) return;
+
+            const pick = pickWordAtCross(data.blocks, src.width / 2, src.height / 2);
+            if (pick && pick.text.length >= 3 && pick.conf >= OCR_CONF_MIN) {
+              fallos = 0;
+              historial.push(pick.text);
+              if (historial.length > 4) historial.shift();
+              const votos = historial.filter((t) => t === pick.text).length;
+              const live = {
+                ...pick,
+                votos,
+                nitidez: Math.round(mejor.s),
+                box: {
+                  left: (pick.bbox.x0 / src.width) * 100,
+                  top: (pick.bbox.y0 / src.height) * 100,
+                  width: ((pick.bbox.x1 - pick.bbox.x0) / src.width) * 100,
+                  height: ((pick.bbox.y1 - pick.bbox.y0) / src.height) * 100,
+                },
+                previewUrl: () => src.toDataURL('image/jpeg', 0.8),
+                tiempoMs: Math.round(performance.now() - t0),
+                intentos: iter,
+              };
+              ocrLiveRef.current = live;
+              setOcrLive(live);
+
+              if (votos >= OCR_VOTOS) {
+                aceptarLecturaMira(live, `${votos} lecturas iguales`);
+                return;
+              }
+            } else {
+              historial.push(null);
+              if (historial.length > 4) historial.shift();
+              // Dos lecturas sin nada bajo la mira: se borra el resaltado
+              if (++fallos >= 2 && ocrLiveRef.current) {
+                ocrLiveRef.current = null;
+                setOcrLive(null);
+              }
+              if (fallos % 8 === 0 && mejor.s < 40) {
+                setLiveHint(IS_IOS ? 'Borroso: aleja un poco y usa 2x' : 'Borroso: toca la pantalla para enfocar');
+              }
+            }
+          } catch {
+            // lectura fallida: seguimos
+          }
+        }
+
+        await sleep(Math.max(0, 60 - (performance.now() - started)));
+      }
+    };
+
+    loop();
+    return () => {
+      active = false;
+      ocrLiveRef.current = null;
+      setOcrLive(null);
+      setLiveHint('');
+    };
+    // aceptarLecturaMira solo usa refs y callbacks estables
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isScannerOpen, scanMode, ocrReady]);
+
+  function aceptarLecturaMira(live, motivo) {
+    acceptValue({
+      metodo: 'OCR · MIRA',
+      motor: 'Tesseract',
+      modo: `${motivo} · nitidez ${live.nitidez}`,
+      valor: live.text,
+      raw: live.lineText,
+      confianza: live.conf,
+      tiempoMs: live.tiempoMs,
+      intentos: live.intentos,
+      previewUrl: live.previewUrl(),
+      candidatos: [live.text, ...live.alternativas].filter((v, i, a) => a.indexOf(v) === i).slice(0, 6),
+    });
+    closeScanner();
+  }
+
+  const cambiarModo = (modo) => {
+    scanModeRef.current = modo;
+    setScanMode(modo);
+    setLockInfo(null);
+    setLiveHint('');
+    try {
+      localStorage.setItem(MODO_KEY, modo);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
+
+  // Gatillo (botón rojo): en modo texto toma al instante lo que está bajo la mira
+  const handleGatillo = () => {
+    if (scanMode === 'texto' && ocrLiveRef.current) {
+      aceptarLecturaMira(ocrLiveRef.current, 'gatillo');
+      return;
+    }
+    handleCaptureOcr();
+  };
 
   // ---------------------------------------------------------------------------
   // 3. Controles de cámara
@@ -655,6 +810,14 @@ export default function TomaLotes() {
 
   const statusText = isProcessing
     ? processingLabel
+    : scanMode === 'texto'
+    ? !ocrReady
+      ? ocrError
+        ? 'OCR no disponible (sin internet)'
+        : 'Cargando OCR…'
+      : ocrLive
+      ? `Leyendo: ${ocrLive.text} (${ocrLive.votos}/${OCR_VOTOS})`
+      : liveHint || 'Texto: apunta la cruz al lote'
     : lockInfo
     ? `Mantén… ${lockInfo.text}`
     : liveHint ||
@@ -810,12 +973,35 @@ export default function TomaLotes() {
           <div className="tl-overlay-center">
             {errorMsg && <div className="tl-error-toast">{errorMsg}</div>}
 
-            <div ref={scanBoxRef} className={`tl-scan-box ${isProcessing ? 'busy' : ''} ${lockInfo ? 'locking' : ''}`}>
+            <div
+              ref={scanBoxRef}
+              className={`tl-scan-box ${scanMode === 'texto' ? 'modo-texto' : ''} ${isProcessing ? 'busy' : ''} ${
+                lockInfo ? 'locking' : ''
+              } ${ocrLive ? 'leyendo' : ''}`}
+            >
               <span className="tl-corner tl-tl" />
               <span className="tl-corner tl-tr" />
               <span className="tl-corner tl-bl" />
               <span className="tl-corner tl-br" />
-              {!isProcessing && <span className="tl-scan-line" />}
+              {scanMode === 'texto' ? (
+                <>
+                  <span className="tl-mira" aria-hidden="true" />
+                  {ocrLive && (
+                    <span
+                      className={`tl-palabra ${ocrLive.votos >= OCR_VOTOS ? 'ok' : ''}`}
+                      style={{
+                        left: `${ocrLive.box.left}%`,
+                        top: `${ocrLive.box.top}%`,
+                        width: `${ocrLive.box.width}%`,
+                        height: `${ocrLive.box.height}%`,
+                      }}
+                    />
+                  )}
+                  {ocrLive && <span className="tl-palabra-texto">{ocrLive.text}</span>}
+                </>
+              ) : (
+                !isProcessing && <span className="tl-scan-line" />
+              )}
               {lockInfo && (
                 <span className="tl-lock-bar">
                   <span style={{ width: `${Math.round(lockInfo.progress * 100)}%` }} />
@@ -823,9 +1009,19 @@ export default function TomaLotes() {
               )}
             </div>
             <p className="tl-hint">
-              Códigos de barras / QR se leen solos.
-              <br />
-              Para texto: encuadra el lote y toca el botón rojo.
+              {scanMode === 'texto' ? (
+                <>
+                  Pon la cruz sobre el lote: se captura solo al leerlo 2 veces igual.
+                  <br />
+                  El botón rojo lo toma al instante.
+                </>
+              ) : (
+                <>
+                  Códigos de barras / QR se leen solos.
+                  <br />
+                  Para texto usa el modo «Texto».
+                </>
+              )}
               <br />
               {IS_IOS
                 ? 'iPhone: no acerques demasiado (desenfoca). Aleja ~25 cm y usa 2x.'
@@ -834,6 +1030,27 @@ export default function TomaLotes() {
           </div>
 
           <div className="tl-modal-bottom-wrap">
+            <div className="tl-modo" role="tablist" aria-label="Modo de lectura">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={scanMode === 'barras'}
+                className={scanMode === 'barras' ? 'active' : ''}
+                onClick={() => cambiarModo('barras')}
+              >
+                ▥ Barras
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={scanMode === 'texto'}
+                className={scanMode === 'texto' ? 'active' : ''}
+                onClick={() => cambiarModo('texto')}
+                disabled={ocrError}
+              >
+                Aa Texto
+              </button>
+            </div>
             {caps.exposure && (
               <label className="tl-exposure">
                 <span>☀</span>
@@ -871,9 +1088,9 @@ export default function TomaLotes() {
               <button
                 type="button"
                 className={`tl-shutter-btn ${isProcessing ? 'loading' : ''}`}
-                onClick={handleCaptureOcr}
+                onClick={handleGatillo}
                 disabled={isProcessing || !ocrReady}
-                title="Capturar texto (OCR)"
+                title={scanMode === 'texto' ? 'Tomar el texto bajo la mira' : 'Capturar texto (OCR)'}
                 aria-label="Capturar texto"
               >
                 {isProcessing && <span className="tl-spinner" />}

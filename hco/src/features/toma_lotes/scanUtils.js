@@ -319,3 +319,67 @@ export function normalizeFormat(f) {
 export function isWeakFormat(f) {
   return WEAK_FORMATS.has(normalizeFormat(f));
 }
+
+// ---------------------------------------------------------------------------
+// Modo "mira" (como DataWedge): se lee la palabra que está bajo la cruz central
+// ---------------------------------------------------------------------------
+const LABEL_RE = /^(?:[LI1|]?[O0]T[E3]|L[O0]T|BATCH|LT)$/;
+const isLabelToken = (t) => t.length < 2 || STOPWORDS.has(t) || LABEL_RE.test(t);
+
+/**
+ * Recibe los bloques de Tesseract (blocks → paragraphs → lines → words) y el punto de la cruz
+ * (en píxeles de la imagen leída). Devuelve la palabra bajo la cruz:
+ *  - la línea que pasa por la cruz (o la más cercana en vertical),
+ *  - dentro de ella, la palabra que contiene la cruz (o la más cercana),
+ *  - si la cruz cae sobre una etiqueta ("LOTE", "SKU", ":"), se toma la palabra siguiente.
+ */
+export function pickWordAtCross(blocks, cx, cy) {
+  const lines = (blocks || [])
+    .flatMap((b) => b.paragraphs || [])
+    .flatMap((p) => p.lines || [])
+    .map((l) => ({
+      bbox: l.bbox,
+      words: (l.words || [])
+        .map((w) => {
+          // "LOTE:0220503" pegado → "0220503"
+          let text = cleanToken(w.text);
+          const sinEtiqueta = text.replace(/^(?:[LI1]?[O0]T[E3]|L[O0]T|BATCH)(?=[0-9])/, '');
+          if (sinEtiqueta.length >= 3) text = sinEtiqueta;
+          return { text, conf: w.confidence || 0, bbox: w.bbox };
+        })
+        .filter((w) => w.text && !looksLikeBarcodeNoise(w.text))
+        .sort((a, b) => a.bbox.x0 - b.bbox.x0),
+    }))
+    .filter((l) => l.words.length && l.bbox.y1 - l.bbox.y0 >= 6);
+  if (!lines.length) return null;
+
+  const vdist = (b) => (cy < b.y0 ? b.y0 - cy : cy > b.y1 ? cy - b.y1 : 0);
+  const hdist = (b) => (cx < b.x0 ? b.x0 - cx : cx > b.x1 ? cx - b.x1 : 0);
+  const centroY = (b) => Math.abs((b.y0 + b.y1) / 2 - cy);
+
+  const line = [...lines].sort((a, b) => vdist(a.bbox) - vdist(b.bbox) || centroY(a.bbox) - centroY(b.bbox))[0];
+  const lh = line.bbox.y1 - line.bbox.y0;
+  if (vdist(line.bbox) > lh * 1.2) return null; // la cruz no está sobre ninguna línea
+
+  const { words } = line;
+  let idx = 0;
+  words.forEach((w, i) => {
+    if (hdist(w.bbox) < hdist(words[idx].bbox)) idx = i;
+  });
+  if (hdist(words[idx].bbox) > lh * 3) return null;
+  if (isLabelToken(words[idx].text)) {
+    const sig = words.findIndex((w, i) => i > idx && !isLabelToken(w.text));
+    if (sig === -1) return null;
+    idx = sig;
+  }
+
+  const w = words[idx];
+  return {
+    text: w.text,
+    conf: Math.round(w.conf),
+    bbox: w.bbox,
+    lineText: words.map((x) => x.text).join(' '),
+    // Otras palabras de la línea, por si el usuario quiere elegir otra
+    alternativas: words.map((x) => x.text).filter((t) => t !== w.text && !isLabelToken(t) && t.length >= 3),
+  };
+}

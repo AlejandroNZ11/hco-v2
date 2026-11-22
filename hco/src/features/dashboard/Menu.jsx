@@ -363,6 +363,16 @@ function MenuContenido() {
             url: "#",
             estado: "Inactivo",
           },
+          {
+            title: "Reportes de Discrepancia",
+            description: "Registrar reportes de discrepancia.",
+            Icon: FaSearch,
+            accent: "accent-blue",
+            buttonText: "Entrar",
+            image: "/img/generar_rdr.png",
+            url: "/generar_rdr/track",
+            estado: "En proceso",
+          },
         ],
       },
       {

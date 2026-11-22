@@ -13,6 +13,7 @@ import { sugerenciasRoutes } from "./sugerenciasRoutes";
 import { lupRoutes } from "./lupRoutes";
 import { oficinaRoutes } from "./oficinaRoutes";
 import { lotesRoutes } from "./lotesRoutes";
+import { generar_rdrRoutes } from "./generar_rdrRoutes";
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +33,8 @@ export const router = createBrowserRouter([
       ...lupRoutes,
       ...oficinaRoutes,
       ...lotesRoutes,
+      ...generar_rdrRoutes,
+    
     ],
   },
   {

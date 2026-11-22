@@ -901,6 +901,19 @@
 
   .rdr-page .rdr-preview-tabla th { position: sticky; top: 0; z-index: 1; }
 
+  /* Tabla principal: ~10 filas visibles, scroll interno y encabezado fijo */
+  .rdr-page .rdr-tabla-scroll {
+    max-height: 460px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .rdr-page .rdr-tabla-scroll th { position: sticky; top: 0; z-index: 2; }
+
+  @media (max-width: 768px) {
+    .rdr-page .rdr-tabla-scroll { max-height: 60vh; }
+  }
+
   .rdr-page .fila-duplicada td { background: #fffbeb; color: #92400e; }
 
   .rdr-page .rdr-nota { font-size: 11px; color: #64748b; }

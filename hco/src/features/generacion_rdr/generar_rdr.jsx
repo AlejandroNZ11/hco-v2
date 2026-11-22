@@ -761,7 +761,7 @@ function GenerarRdrContenido() {
           </button>
         </div>
 
-        <div className="table-container">
+        <div className="table-container rdr-tabla-scroll">
           <table>
             <thead>
               <tr>

@@ -11,6 +11,7 @@ import {
   looksLikeBarcodeNoise,
   parseLoteCandidates,
   pickWordAtCross,
+  elegirLectura,
   preprocessForOcr,
   sharpness,
 } from './scanUtils';
@@ -21,6 +22,8 @@ const SCAN_INTERVAL_MS = 110;
 const LOCK_MS = 600; // tiempo que hay que mantener el código en el láser
 const OCR_VOTOS = 2; // lecturas iguales seguidas bajo la mira para aceptar el texto
 const OCR_CONF_MIN = 50; // confianza mínima de la palabra para contarla
+const OCR_MARGEN_X = 1.5; // se lee 50% más ancho que el recuadro visible (palabras largas)
+const OCR_MARGEN_Y = 1.25;
 const MODO_KEY = 'tl-modo-escaner';
 const leerModoGuardado = () => {
   try {
@@ -401,53 +404,102 @@ export default function TomaLotes() {
 
         if (worker && video && box && video.readyState >= 2 && video.videoWidth && !isProcessingRef.current) {
           try {
-            // 2 frames de la franja exacta (la mira es su centro) y nos quedamos con el más nítido
+            // Se lee una franja MÁS ANCHA que la visible: así una palabra que se sale del
+            // recuadro igual se lee completa. La cruz sigue siendo el centro del recuadro.
+            const visible = boxToVideoRect(video, box, 1, 1);
+            const rect = boxToVideoRect(video, box, OCR_MARGEN_X, OCR_MARGEN_Y);
+
+            // 3 frames y nos quedamos con el más nítido (pulso / desenfoque momentáneo)
             let mejor = null;
-            for (let i = 0; i < 2; i++) {
+            for (let i = 0; i < 3; i++) {
               const canvas = makeCanvas();
-              const img = drawRegion(video, boxToVideoRect(video, box, 1, 1), canvas, 1400, 1);
+              const img = drawRegion(video, rect, canvas, 1600, 1);
               const s = sharpness(img);
               if (!mejor || s > mejor.s) mejor = { canvas, s };
-              if (i === 0) await sleep(35);
+              if (i < 2) await sleep(30);
             }
 
-            const pre = preprocessForOcr(mejor.canvas, { targetWidth: 1100, maxScale: 2.5 });
+            const pre = preprocessForOcr(mejor.canvas, { targetWidth: 1300, maxScale: 2.5 });
             // Alterna gris / binarizada: una aguanta borroso, la otra sombras y reflejos
             const src = iter++ % 3 === 2 ? pre.binary : pre.gray;
             await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
             const { data } = await worker.recognize(src, {}, { blocks: true });
             if (!active) return;
 
-            const pick = pickWordAtCross(data.blocks, src.width / 2, src.height / 2);
+            // Píxeles de la imagen leída ↔ video ↔ recuadro visible
+            const kx = rect.sw / src.width;
+            const ky = rect.sh / src.height;
+            const cx = (visible.sx + visible.sw / 2 - rect.sx) / kx;
+            const cy = (visible.sy + visible.sh / 2 - rect.sy) / ky;
+            const pick = pickWordAtCross(data.blocks, cx, cy);
+
             if (pick && pick.text.length >= 3 && pick.conf >= OCR_CONF_MIN) {
               fallos = 0;
-              historial.push(pick.text);
-              if (historial.length > 4) historial.shift();
-              const votos = historial.filter((t) => t === pick.text).length;
+              const lh = pick.bbox.y1 - pick.bbox.y0;
+              // ¿La palabra toca el borde de lo leído? Entonces sigue afuera: no se acepta cortada
+              const cortada = pick.bbox.x0 <= lh * 0.15 || pick.bbox.x1 >= src.width - lh * 0.15;
+
+              // Segunda opinión: se recorta SOLO esa palabra, se amplía y se relee sola
+              // (en gris y en blanco/negro). Recupera letras que la lectura general pierde.
+              const lecturas = [{ text: pick.text, conf: pick.conf }];
+              await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_WORD });
+              for (const lienzo of [pre.gray, pre.binary]) {
+                const r = await worker.recognize(cropLine(lienzo, pick.bbox, 64));
+                lecturas.push({ text: r.data.text || '', conf: r.data.confidence || 0 });
+              }
+              if (!active) return;
+              const lectura = elegirLectura(lecturas) || { text: pick.text, conf: pick.conf };
+
+              if (!cortada) {
+                // Si la cruz pasó a otra palabra, se empieza a contar de nuevo
+                const previa = historial[historial.length - 1]?.text;
+                const relacionadas = (a, b) => a.startsWith(b) || b.startsWith(a) || a.endsWith(b) || b.endsWith(a);
+                if (previa && !relacionadas(previa, lectura.text)) historial.length = 0;
+                historial.push({ text: lectura.text, conf: lectura.conf });
+                if (historial.length > 5) historial.shift();
+              }
+              // Consenso de las últimas lecturas (también une OPERACIONE con OPERACIONES)
+              const consenso = elegirLectura(historial);
+              const mismaPalabra =
+                consenso &&
+                (consenso.text === lectura.text ||
+                  consenso.text.startsWith(lectura.text) ||
+                  consenso.text.endsWith(lectura.text));
+              const texto = mismaPalabra && !cortada ? consenso.text : lectura.text;
+              const votos = cortada ? 0 : mismaPalabra ? consenso.votos : 1;
+              // Nítido y seguro → 2 lecturas; borroso o dudoso → 3
+              const necesarios = lectura.conf >= 80 && mejor.s >= 60 ? OCR_VOTOS : OCR_VOTOS + 1;
+
+              const aPct = (x, y) => ({
+                x: ((rect.sx + x * kx - visible.sx) / visible.sw) * 100,
+                y: ((rect.sy + y * ky - visible.sy) / visible.sh) * 100,
+              });
+              const p0 = aPct(pick.bbox.x0, pick.bbox.y0);
+              const p1 = aPct(pick.bbox.x1, pick.bbox.y1);
               const live = {
                 ...pick,
+                text: texto,
+                conf: lectura.conf,
                 votos,
+                necesarios,
+                cortada,
                 nitidez: Math.round(mejor.s),
-                box: {
-                  left: (pick.bbox.x0 / src.width) * 100,
-                  top: (pick.bbox.y0 / src.height) * 100,
-                  width: ((pick.bbox.x1 - pick.bbox.x0) / src.width) * 100,
-                  height: ((pick.bbox.y1 - pick.bbox.y0) / src.height) * 100,
-                },
+                box: { left: p0.x, top: p0.y, width: p1.x - p0.x, height: p1.y - p0.y },
                 previewUrl: () => src.toDataURL('image/jpeg', 0.8),
                 tiempoMs: Math.round(performance.now() - t0),
                 intentos: iter,
               };
               ocrLiveRef.current = live;
               setOcrLive(live);
+              setLiveHint(cortada ? 'La palabra se sale: aleja un poco el equipo' : '');
 
-              if (votos >= OCR_VOTOS) {
-                aceptarLecturaMira(live, `${votos} lecturas iguales`);
+              if (!cortada && votos >= necesarios) {
+                aceptarLecturaMira(live, `${votos} lecturas coinciden`);
                 return;
               }
             } else {
-              historial.push(null);
-              if (historial.length > 4) historial.shift();
+              // Sin nada bajo la mira: la lectura más antigua deja de contar
+              historial.shift();
               // Dos lecturas sin nada bajo la mira: se borra el resaltado
               if (++fallos >= 2 && ocrLiveRef.current) {
                 ocrLiveRef.current = null;
@@ -816,7 +868,9 @@ export default function TomaLotes() {
         ? 'OCR no disponible (sin internet)'
         : 'Cargando OCR…'
       : ocrLive
-      ? `Leyendo: ${ocrLive.text} (${ocrLive.votos}/${OCR_VOTOS})`
+      ? ocrLive.cortada
+        ? `Se sale del recuadro: ${ocrLive.text}…`
+        : `Leyendo: ${ocrLive.text} (${ocrLive.votos}/${ocrLive.necesarios})`
       : liveHint || 'Texto: apunta la cruz al lote'
     : lockInfo
     ? `Mantén… ${lockInfo.text}`
@@ -988,7 +1042,7 @@ export default function TomaLotes() {
                   <span className="tl-mira" aria-hidden="true" />
                   {ocrLive && (
                     <span
-                      className={`tl-palabra ${ocrLive.votos >= OCR_VOTOS ? 'ok' : ''}`}
+                      className={`tl-palabra ${ocrLive.cortada ? 'cortada' : ocrLive.votos >= ocrLive.necesarios ? 'ok' : ''}`}
                       style={{
                         left: `${ocrLive.box.left}%`,
                         top: `${ocrLive.box.top}%`,
@@ -1011,7 +1065,7 @@ export default function TomaLotes() {
             <p className="tl-hint">
               {scanMode === 'texto' ? (
                 <>
-                  Pon la cruz sobre el lote: se captura solo al leerlo 2 veces igual.
+                  Pon la cruz sobre el lote: se captura solo cuando varias lecturas coinciden.
                   <br />
                   El botón rojo lo toma al instante.
                 </>

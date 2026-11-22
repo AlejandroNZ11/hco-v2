@@ -326,6 +326,49 @@ export function isWeakFormat(f) {
 const LABEL_RE = /^(?:[LI1|]?[O0]T[E3]|L[O0]T|BATCH|LT)$/;
 const isLabelToken = (t) => t.length < 2 || STOPWORDS.has(t) || LABEL_RE.test(t);
 
+/** Limpia una palabra leída: mayúsculas, sin símbolos raros y sin "LOTE:" pegado delante. */
+export function normalizarPalabra(raw) {
+  const text = cleanToken(raw);
+  const sinEtiqueta = text.replace(/^(?:[LI1]?[O0]T[E3]|L[O0]T|BATCH)(?=[0-9])/, '');
+  return sinEtiqueta.length >= 3 ? sinEtiqueta : text;
+}
+
+/**
+ * Elige la mejor lectura de una misma palabra hecha de varias formas
+ * (lectura general + palabra ampliada en gris + en blanco/negro).
+ *  - Gana la que más se repite; empate → mayor confianza.
+ *  - Si una lectura es igual a otra pero con 1-2 letras más al inicio o al final
+ *    (ej. OPERACIONE vs OPERACIONES), se prefiere la completa: el OCR suele
+ *    perder la última letra, casi nunca inventarla.
+ */
+export function elegirLectura(lecturas) {
+  const validas = lecturas
+    .map((l) => ({ text: normalizarPalabra(l.text), conf: l.conf || 0 }))
+    .filter((l) => l.text.length >= 3 && !looksLikeBarcodeNoise(l.text));
+  if (!validas.length) return null;
+
+  const grupos = new Map();
+  for (const l of validas) {
+    const g = grupos.get(l.text) || { text: l.text, votos: 0, conf: 0 };
+    g.votos++;
+    g.conf = Math.max(g.conf, l.conf);
+    grupos.set(l.text, g);
+  }
+  const lista = [...grupos.values()];
+  // La versión corta suma su voto a la completa
+  for (const g of lista) {
+    for (const h of lista) {
+      const extra = h.text.length - g.text.length;
+      if (h !== g && extra >= 1 && extra <= 2 && h.conf >= 55 && (h.text.startsWith(g.text) || h.text.endsWith(g.text))) {
+        h.votos += g.votos;
+        g.votos = 0;
+      }
+    }
+  }
+  lista.sort((x, y) => y.votos - x.votos || y.conf - x.conf || y.text.length - x.text.length);
+  return { text: lista[0].text, conf: Math.round(lista[0].conf), votos: lista[0].votos, total: validas.length };
+}
+
 /**
  * Recibe los bloques de Tesseract (blocks → paragraphs → lines → words) y el punto de la cruz
  * (en píxeles de la imagen leída). Devuelve la palabra bajo la cruz:
@@ -340,13 +383,7 @@ export function pickWordAtCross(blocks, cx, cy) {
     .map((l) => ({
       bbox: l.bbox,
       words: (l.words || [])
-        .map((w) => {
-          // "LOTE:0220503" pegado → "0220503"
-          let text = cleanToken(w.text);
-          const sinEtiqueta = text.replace(/^(?:[LI1]?[O0]T[E3]|L[O0]T|BATCH)(?=[0-9])/, '');
-          if (sinEtiqueta.length >= 3) text = sinEtiqueta;
-          return { text, conf: w.confidence || 0, bbox: w.bbox };
-        })
+        .map((w) => ({ text: normalizarPalabra(w.text), conf: w.confidence || 0, bbox: w.bbox }))
         .filter((w) => w.text && !looksLikeBarcodeNoise(w.text))
         .sort((a, b) => a.bbox.x0 - b.bbox.x0),
     }))

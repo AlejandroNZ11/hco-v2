@@ -546,3 +546,4 @@
 }
 .tl-modo button.active { background: #ffffff; color: #0f172a; }
 .tl-modo button:disabled { opacity: 0.4; cursor: not-allowed; }
+.tl-palabra.cortada { border-color: #f97316; border-style: dashed; background: rgba(249, 115, 22, 0.15); }

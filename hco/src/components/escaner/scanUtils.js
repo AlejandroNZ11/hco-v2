@@ -424,21 +424,59 @@ export function pickWordAtCross(blocks, cx, cy) {
 // ---------------------------------------------------------------------------
 // Variante para el lector de barras: código inclinado
 // ---------------------------------------------------------------------------
-// Recorte girado (códigos 1D inclinados; ZXing por sí solo solo prueba giros de 90°)
-export function recorteGirado(origen, grados, canvas) {
+// Gira un canvas `grados` (fondo blanco, el lienzo crece para que no se corte nada)
+export function girarCanvas(origen, grados) {
   const rad = (grados * Math.PI) / 180;
   const w = origen.width;
   const h = origen.height;
   const W = Math.round(Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad)));
   const H = Math.round(Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad)));
-  canvas.width = W;
-  canvas.height = H;
+  const canvas = makeCanvas(W, H);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, W, H);
   ctx.translate(W / 2, H / 2);
   ctx.rotate(rad);
   ctx.drawImage(origen, -w / 2, -h / 2);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  return ctx.getImageData(0, 0, W, H);
+  return canvas;
+}
+
+// Recorte girado (códigos 1D inclinados; ZXing por sí solo solo prueba giros de 90°)
+export function recorteGirado(origen, grados) {
+  const c = girarCanvas(origen, grados);
+  return c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height);
+}
+
+/**
+ * Inclinación del texto (grados, -20..20) por perfil de proyección: se prueban ángulos y gana el
+ * que deja las filas de tinta más "apiladas" (líneas de texto bien horizontales). Usa la imagen
+ * binarizada (texto negro sobre blanco). ~8 ms. 0 si no hay tinta suficiente.
+ */
+export function estimarInclinacion(binario) {
+  const f = Math.min(1, 360 / binario.width);
+  const w = Math.max(1, Math.round(binario.width * f));
+  const h = Math.max(1, Math.round(binario.height * f));
+  const c = makeCanvas(w, h);
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(binario, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const pts = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) if (d[(y * w + x) * 4] < 128) pts.push(x - w / 2, y - h / 2);
+  }
+  // Muy poca tinta (nada que leer) o demasiada (fondo oscuro): no se endereza
+  if (pts.length < 40 || pts.length > w * h * 0.9) return 0;
+  const R = Math.ceil(Math.hypot(w, h));
+  let mejor = { a: 0, v: -1 };
+  for (let a = -20; a <= 20; a++) {
+    const rad = (a * Math.PI) / 180;
+    const sn = Math.sin(rad);
+    const cs = Math.cos(rad);
+    const filas = new Float32Array(2 * R + 2);
+    for (let k = 0; k < pts.length; k += 2) filas[Math.round(-pts[k] * sn + pts[k + 1] * cs + R)]++;
+    let v = 0;
+    for (let i = 0; i < filas.length; i++) v += filas[i] * filas[i];
+    if (v > mejor.v) mejor = { a, v };
+  }
+  return mejor.a;
 }

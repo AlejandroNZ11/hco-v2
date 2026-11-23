@@ -19,6 +19,9 @@ import {
   preprocessForOcr,
   sharpness,
   recorteGirado,
+  girarCanvas,
+  estimarInclinacion,
+  normalizarPalabra,
 } from './scanUtils';
 import { nativeDecode, obtenerOcrWorker, useMotoresEscaner, zxingDecode } from './motoresEscaner';
 import { sonarEscaneo } from './sonidoEscaneo';
@@ -158,7 +161,6 @@ export default function EscanerCamara({ onCapture, onClose }) {
     // Formatos sin dígito de control: hay que verlos 2 veces iguales seguidas
     let lock = null; // { text, count, last }
     const cropCanvas = makeCanvas();
-    const giroCanvas = makeCanvas();
     openedAtRef.current = performance.now();
 
     // Entre varios códigos en el recorte, elegimos el más cercano al láser (centro del recuadro)
@@ -224,7 +226,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
             let zxImg;
             let zxOpts = {};
             if (variante === 'giro+' || variante === 'giro-') {
-              zxImg = recorteGirado(cropCanvas, variante === 'giro+' ? 20 : -20, giroCanvas);
+              zxImg = recorteGirado(cropCanvas, variante === 'giro+' ? 20 : -20);
             } else {
               if (variante === 'denoise') zxOpts = { denoise: true, binarizer: 'GlobalHistogram' };
               if (variante === 'ruido') zxOpts = { denoise: true };
@@ -527,32 +529,72 @@ export default function EscanerCamara({ onCapture, onClose }) {
             }
 
             const pre = preprocessForOcr(mejor.canvas, { targetWidth: 1300, maxScale: 2.5 });
+            const preW = pre.gray.width;
+            const preH = pre.gray.height;
+
+            // Etiqueta inclinada: se mide el ángulo del texto y se endereza antes de leer
+            // (Tesseract pierde letras del final con solo 5-6° de giro).
+            const ang = estimarInclinacion(pre.binary);
+            const enderezar = Math.abs(ang) >= 2;
+            const gris = enderezar ? girarCanvas(pre.gray, -ang) : pre.gray;
+            const bn = enderezar ? girarCanvas(pre.binary, -ang) : pre.binary;
+            const rad = (ang * Math.PI) / 180;
+            // Punto en la imagen enderezada ↔ punto en la imagen original (giro alrededor del centro)
+            const aOriginal = (x, y) => {
+              if (!enderezar) return { x, y };
+              const dx = x - gris.width / 2;
+              const dy = y - gris.height / 2;
+              return { x: preW / 2 + dx * Math.cos(rad) - dy * Math.sin(rad), y: preH / 2 + dx * Math.sin(rad) + dy * Math.cos(rad) };
+            };
+            const aEnderezada = (x, y) => {
+              if (!enderezar) return { x, y };
+              const dx = x - preW / 2;
+              const dy = y - preH / 2;
+              return { x: gris.width / 2 + dx * Math.cos(rad) + dy * Math.sin(rad), y: gris.height / 2 - dx * Math.sin(rad) + dy * Math.cos(rad) };
+            };
+
             // Alterna gris / binarizada: una aguanta borroso, la otra sombras y reflejos
-            const src = iter++ % 3 === 2 ? pre.binary : pre.gray;
-            await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-            const { data } = await worker.recognize(src, {}, { blocks: true });
-            if (!active) return;
+            const src = iter++ % 3 === 2 ? bn : gris;
 
             // Píxeles de la imagen leída ↔ video ↔ recuadro visible
-            const kx = rect.sw / src.width;
-            const ky = rect.sh / src.height;
-            const cx = (visible.sx + visible.sw / 2 - rect.sx) / kx;
-            const cy = (visible.sy + visible.sh / 2 - rect.sy) / ky;
-            const pick = pickWordAtCross(data.blocks, cx, cy);
+            const kx = rect.sw / preW;
+            const ky = rect.sh / preH;
+            const cruz = aEnderezada((visible.sx + visible.sw / 2 - rect.sx) / kx, (visible.sy + visible.sh / 2 - rect.sy) / ky);
+
+            // Lectura por bloque (aguanta letras grandes y varias líneas); si no hay nada bajo la
+            // cruz, segunda pasada en modo "texto suelto" (letras chicas o dispersas).
+            let pick = null;
+            for (const psm of [PSM.SINGLE_BLOCK, PSM.SPARSE_TEXT]) {
+              await worker.setParameters({ tessedit_pageseg_mode: psm });
+              const { data } = await worker.recognize(src, {}, { blocks: true });
+              if (!active) return;
+              pick = pickWordAtCross(data.blocks, cruz.x, cruz.y);
+              if (pick && pick.text.length >= 3 && pick.conf >= OCR_CONF_MIN) break;
+            }
 
             if (pick && pick.text.length >= 3 && pick.conf >= OCR_CONF_MIN) {
               fallos = 0;
               const lh = pick.bbox.y1 - pick.bbox.y0;
+              const medioY = (pick.bbox.y0 + pick.bbox.y1) / 2;
               // ¿La palabra toca el borde de lo leído? Entonces sigue afuera: no se acepta cortada
-              const cortada = pick.bbox.x0 <= lh * 0.15 || pick.bbox.x1 >= src.width - lh * 0.15;
+              const izq = aOriginal(pick.bbox.x0, medioY);
+              const der = aOriginal(pick.bbox.x1, medioY);
+              const cortada = Math.min(izq.x, der.x) <= lh * 0.15 || Math.max(izq.x, der.x) >= preW - lh * 0.15;
 
               // Segunda opinión: se recorta SOLO esa palabra, se amplía y se relee sola
               // (en gris y en blanco/negro). Recupera letras que la lectura general pierde.
+              // Si la relectura en gris ya coincide y ambas son muy seguras, no hace falta la tercera.
               const lecturas = [{ text: pick.text, conf: pick.conf }];
+              let fuerte = false;
               await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_WORD });
-              for (const lienzo of [pre.gray, pre.binary]) {
+              for (const lienzo of [gris, bn]) {
                 const r = await worker.recognize(cropLine(lienzo, pick.bbox, 64));
-                lecturas.push({ text: r.data.text || '', conf: r.data.confidence || 0 });
+                const conf = r.data.confidence || 0;
+                lecturas.push({ text: r.data.text || '', conf });
+                if (lienzo === gris && normalizarPalabra(r.data.text) === pick.text && conf >= 85 && pick.conf >= 85) {
+                  fuerte = true;
+                  break;
+                }
               }
               if (!active) return;
               const lectura = elegirLectura(lecturas) || { text: pick.text, conf: pick.conf };
@@ -576,15 +618,18 @@ export default function EscanerCamara({ onCapture, onClose }) {
               const votos = cortada ? 0 : mismaPalabra ? consenso.votos : 1;
               // Las 3 lecturas de este frame (general + palabra ampliada en gris y en B/N) coinciden
               // → se acepta YA. 2 de 3 y segura → 2 frames. Dudosa o borrosa → 3 frames.
-              const unanime = lectura.votos >= 3 && lectura.conf >= 70 && mejor.s >= 25;
+              const unanime = (fuerte || (lectura.votos >= 3 && lectura.conf >= 70)) && mejor.s >= 25;
               const necesarios = unanime ? 1 : lectura.votos >= 2 && lectura.conf >= 75 ? OCR_VOTOS : OCR_VOTOS + 1;
 
               const aPct = (x, y) => ({
                 x: ((rect.sx + x * kx - visible.sx) / visible.sw) * 100,
                 y: ((rect.sy + y * ky - visible.sy) / visible.sh) * 100,
               });
-              const p0 = aPct(pick.bbox.x0, pick.bbox.y0);
-              const p1 = aPct(pick.bbox.x1, pick.bbox.y1);
+              // Resaltado: centro de la palabra llevado a la imagen original (el tamaño se conserva)
+              const centro = aOriginal((pick.bbox.x0 + pick.bbox.x1) / 2, medioY);
+              const anchoP = pick.bbox.x1 - pick.bbox.x0;
+              const p0 = aPct(centro.x - anchoP / 2, centro.y - lh / 2);
+              const p1 = aPct(centro.x + anchoP / 2, centro.y + lh / 2);
               const live = {
                 ...pick,
                 text: texto,

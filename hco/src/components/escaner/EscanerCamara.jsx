@@ -42,6 +42,25 @@ const OCR_CONF_MIN = 50; // confianza mínima de la palabra para contarla
 const OCR_MARGEN_X = 1.5; // se lee 50% más ancho que el recuadro visible (palabras largas)
 const OCR_MARGEN_Y = 1.25;
 const MODO_KEY = 'tl-modo-escaner';
+// Zoom: el botón alterna x1 → x2 → x3 → x4. Cada celular es distinto, así que la cámara abre
+// con el ÚLTIMO zoom que se usó en ese equipo. La primera vez abre en x2 (en x1 la etiqueta
+// suele quedar chica y muchos lentes no enfocan bien las letras de cerca).
+const ZOOMS = [1, 2, 3, 4];
+const ZOOM_INICIAL = 2;
+const ZOOM_KEY = 'tl-zoom-escaner';
+const leerZoomGuardado = () => {
+  try {
+    const z = Number(localStorage.getItem(ZOOM_KEY));
+    return ZOOMS.includes(z) ? z : ZOOM_INICIAL;
+  } catch {
+    return ZOOM_INICIAL;
+  }
+};
+// Reparte el zoom entre el lente (zoom real, sin perder calidad) y el zoom digital (lo que falte)
+const repartirZoom = (nivel, zoomReal) => {
+  const real = zoomReal ? Math.min(nivel, zoomReal.max) : 1;
+  return { real, digital: nivel / real };
+};
 const leerModoGuardado = () => {
   try {
     return localStorage.getItem(MODO_KEY) === 'texto' ? 'texto' : 'barras';
@@ -90,8 +109,10 @@ export default function EscanerCamara({ onCapture, onClose }) {
   // Capacidades de la cámara (dependen del celular)
   const [caps, setCaps] = useState({ torch: false, zoom: null, exposure: null, focus: false });
   const [torchOn, setTorchOn] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [digitalZoom, setDigitalZoom] = useState(false); // zoom por software (iPhone no expone el zoom de la cámara)
+  const [zoomLevel, setZoomLevel] = useState(leerZoomGuardado);
+  // Parte del zoom hecha por software (iPhone no expone el zoom real; otros llegan solo a x2-x3)
+  const [zoomDigital, setZoomDigital] = useState(1);
+  const zoomInicialRef = useRef(zoomLevel);
   const [exposure, setExposure] = useState(0);
   const [focusPoint, setFocusPoint] = useState(null);
   const [enfocandoAuto, setEnfocandoAuto] = useState(false);
@@ -303,9 +324,21 @@ export default function EscanerCamara({ onCapture, onClose }) {
           }
         }
 
+        const zoomReal = c.zoom && c.zoom.max > 1 ? { min: c.zoom.min || 1, max: c.zoom.max } : null;
+        // Abrir directamente con el zoom guardado (x2 por defecto)
+        const inicial = repartirZoom(zoomInicialRef.current, zoomReal);
+        if (inicial.real > 1) {
+          try {
+            await track.applyConstraints({ advanced: [{ zoom: inicial.real }] });
+          } catch {
+            inicial.digital = zoomInicialRef.current; // no aceptó el zoom real: todo digital
+          }
+        }
+        setZoomDigital(inicial.digital);
+
         setCaps({
           torch: Boolean(c.torch),
-          zoom: c.zoom && c.zoom.max > 1 ? { min: c.zoom.min || 1, max: c.zoom.max } : null,
+          zoom: zoomReal,
           exposure:
             c.exposureCompensation && c.exposureCompensation.max > c.exposureCompensation.min
               ? c.exposureCompensation
@@ -660,7 +693,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
                 setOcrLive(null);
               }
               if (fallos % 8 === 0 && mejor.s < 40) {
-                setLiveHint(IS_IOS ? 'Borroso: aleja un poco y usa 2x' : 'Borroso: mantén firme, enfocando el recuadro…');
+                setLiveHint(IS_IOS ? 'Borroso: aleja un poco el celular o sube el zoom' : 'Borroso: mantén firme, enfocando el recuadro…');
               }
             }
           } catch {
@@ -742,19 +775,16 @@ export default function EscanerCamara({ onCapture, onClose }) {
 
   // Zoom real de la cámara si existe (Android); si no, zoom digital (iPhone).
   const cycleZoom = async () => {
-    if (caps.zoom && !digitalZoom) {
-      const steps = [1, 2, 3].filter((z) => z <= caps.zoom.max && z >= caps.zoom.min);
-      const idx = steps.indexOf(zoomLevel);
-      const next = steps[(idx + 1) % steps.length] ?? 1;
-      if (await applyAdvanced({ zoom: next })) {
-        setZoomLevel(next);
-        return;
-      }
-    }
-    const steps = [1, 1.5, 2, 2.5];
-    const next = steps[(steps.indexOf(zoomLevel) + 1) % steps.length] ?? 1;
-    setDigitalZoom(next > 1);
+    const next = ZOOMS[(ZOOMS.indexOf(zoomLevel) + 1) % ZOOMS.length];
+    const { real, digital } = repartirZoom(next, caps.zoom);
+    const okReal = real > 1 || caps.zoom ? await applyAdvanced({ zoom: Math.max(real, caps.zoom?.min || 1) }) : true;
+    setZoomDigital(okReal ? digital : next);
     setZoomLevel(next);
+    try {
+      localStorage.setItem(ZOOM_KEY, String(next));
+    } catch {
+      /* sin almacenamiento */
+    }
   };
 
   const changeExposure = async (value) => {
@@ -900,7 +930,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
         setErrorMsg(
           bestFrame.s < 40
             ? IS_IOS
-              ? 'Imagen borrosa. Aleja el celular (~25 cm), usa zoom 2x o el botón 📷.'
+              ? 'Imagen borrosa. Aleja el celular (~25 cm), sube el zoom o usa el botón 📷.'
               : 'Imagen borrosa. Toca la pantalla para enfocar y vuelve a intentar.'
             : 'No se detectó texto legible. Acerca un poco más o usa la linterna.',
         );
@@ -1021,7 +1051,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
         muted
         autoPlay
         onClick={handleTapFocus}
-        style={digitalZoom ? { transform: `scale(${zoomLevel})` } : undefined}
+        style={zoomDigital > 1 ? { transform: `scale(${zoomDigital})` } : undefined}
       />
       {focusPoint && (
         <span key={focusPoint.id} className="tl-focus-ring" style={{ left: focusPoint.x, top: focusPoint.y }} />
@@ -1087,7 +1117,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
             </>
           )}
           <br />
-          {IS_IOS ? 'iPhone: no acerques demasiado (desenfoca). Aleja ~25 cm y usa 2x.' : 'Toca la imagen para enfocar.'}
+          {IS_IOS ? 'iPhone: no acerques demasiado (desenfoca). Aleja ~25 cm y ajusta el zoom.' : 'Toca la imagen para enfocar.'}
         </p>
       </div>
 
@@ -1160,11 +1190,11 @@ export default function EscanerCamara({ onCapture, onClose }) {
 
           <button
             type="button"
-            className={`tl-tool-btn ${zoomLevel > 1 ? 'active' : ''}`}
+            className="tl-tool-btn active"
             onClick={cycleZoom}
-            title="Zoom"
+            title="Zoom (x1 · x2 · x3 · x4)"
           >
-            {zoomLevel}x
+            x{zoomLevel}
           </button>
         </div>
       </div>

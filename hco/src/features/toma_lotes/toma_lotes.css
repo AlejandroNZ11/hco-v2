@@ -597,3 +597,9 @@
   }
   .hco-toma-lotes .btn-exportar-excel .excel-icon-box { background: #cbd5e1 !important; color: #fff !important; }
 }
+
+/* v5: filas con lotes en verde suave + negrita; Cliente alineado a la izquierda */
+.hco-toma-lotes .table-container th.tl-cliente,
+.hco-toma-lotes .table-container td.tl-cliente { text-align: left; }
+.hco-toma-lotes .table-container tr.tl-fila-ok td { background-color: #e8f7ee; font-weight: 700; }
+.hco-toma-lotes .table-container tr.tl-fila-ok:hover td { background-color: #d5f0df; }

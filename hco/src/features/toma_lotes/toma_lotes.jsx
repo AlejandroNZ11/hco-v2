@@ -412,7 +412,7 @@ function TomaLotesContenido() {
                 <th className="col-solo-movil">Lotes</th>
                 <th className="col-ocultar-movil">F. Registro</th>
                 <th>Ruta</th>
-                <th>Cliente</th>
+                <th className="tl-cliente">Cliente</th>
                 <th>Pedido</th>
                 <th>SKU</th>
                 <th className="col-ocultar-movil">Registrado por</th>
@@ -442,7 +442,7 @@ function TomaLotesContenido() {
                     </span>
                   );
                   return (
-                    <tr key={r.id} className="tl-fila" onClick={() => abrirDesdeFila(r)} title="Click para ingresar lotes">
+                    <tr key={r.id} className={`tl-fila${n ? ' tl-fila-ok' : ''}`} onClick={() => abrirDesdeFila(r)} title="Click para ingresar lotes">
                       <td className="tl-num">
                         {inicio + i + 1}
                         {pendiente && <span className="tl-dot-pendiente" title="Pendiente de envío" />}

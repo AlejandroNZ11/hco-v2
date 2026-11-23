@@ -126,7 +126,27 @@ export const sincronizarInspeccionesPendientes = async () => {
 };
 
 /**
- * Obtiene las últimas 50 inspecciones combinando las pendientes de envío (Offline) + las de Supabase
+ * Trae TODAS las inspecciones de Supabase en bloques de 1000
+ * (Supabase devuelve como máximo 1000 filas por petición).
+ */
+const obtenerTodasInspeccionesRemotas = async () => {
+  const TAM_BLOQUE = 1000;
+  const todas = [];
+  for (let desde = 0; ; desde += TAM_BLOQUE) {
+    const { data, error } = await supabase
+      .from('inspecciones')
+      .select('*')
+      .order('fecha_hora', { ascending: false })
+      .range(desde, desde + TAM_BLOQUE - 1);
+    if (error) return { data: null, error };
+    todas.push(...(data || []));
+    if (!data || data.length < TAM_BLOQUE) break;
+  }
+  return { data: todas, error: null };
+};
+
+/**
+ * Obtiene todas las inspecciones combinando las pendientes de envío (Offline) + las de Supabase
  */
 export const obtenerUltimasInspecciones = async () => {
   if (navigator.onLine) {
@@ -135,7 +155,7 @@ export const obtenerUltimasInspecciones = async () => {
 
     try {
       const [resInsp, resAreas, resEq, resCat] = await Promise.all([
-        supabase.from('inspecciones').select('*').order('fecha_hora', { ascending: false }).limit(50),
+        obtenerTodasInspeccionesRemotas(),
         supabase.from('areas').select('id, nombre'),
         // Traemos '*' de equipos para incluir estado_operativo, fecha_habilitacion, habilitado_por_id y foto_url
         supabase.from('equipos').select('*'),
@@ -167,7 +187,7 @@ export const obtenerUltimasInspecciones = async () => {
 };
 
 /**
- * Arma la lista de las últimas 50 inspecciones SOLO con Dexie (sin red):
+ * Arma la lista de todas las inspecciones SOLO con Dexie (sin red):
  * une equipos, categorías y áreas y calcula el estado visual.
  * La usan la carga normal y cada evento de tiempo real.
  */
@@ -186,7 +206,7 @@ export const leerInspeccionesLocales = async () => {
     return fechaB - fechaA;
   });
 
-  const inspLimitadas = todasInspecciones.slice(0, 50);
+  const inspLimitadas = todasInspecciones;
 
   const areasMap = Object.fromEntries(allAreas.map(a => [String(a.id), a]));
   const categoriasMap = Object.fromEntries(allCategorias.map(c => [String(c.id), c]));

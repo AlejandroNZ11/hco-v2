@@ -43,6 +43,15 @@ const IS_IOS =
   (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Enfoque automático al recuadro: cada AF_TICK_MS se mide la nitidez SOLO dentro del recuadro.
+// Si cae bastante respecto a lo mejor visto hace poco, se reenfoca apuntando al centro del recuadro.
+const AF_TICK_MS = 300;
+const AF_CAIDA = 0.55; // nitidez actual < 55% de la mejor reciente = desenfocado
+const AF_TICKS_BORROSO = 2; // lecturas borrosas seguidas para reenfocar
+const AF_ESPERA_MS = 1800; // mínimo entre reenfoques (deja que el lente termine de moverse)
+// Distancias (m) que se prueban en celulares sin autoenfoque continuo: etiquetas de cerca primero
+const AF_BARRIDO_M = [0.1, 0.14, 0.2, 0.28, 0.4, 0.6, 1];
+
 export default function EscanerCamara({ onCapture, onClose }) {
   const { ocrReady, ocrError } = useMotoresEscaner();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -61,6 +70,8 @@ export default function EscanerCamara({ onCapture, onClose }) {
   const [digitalZoom, setDigitalZoom] = useState(false); // zoom por software (iPhone no expone el zoom de la cámara)
   const [exposure, setExposure] = useState(0);
   const [focusPoint, setFocusPoint] = useState(null);
+  const [enfocandoAuto, setEnfocandoAuto] = useState(false);
+  const ultimoEnfoqueRef = useRef(0);
 
   const videoRef = useRef(null);
   const scanBoxRef = useRef(null);
@@ -294,6 +305,124 @@ export default function EscanerCamara({ onCapture, onClose }) {
   }, [acceptValue]);
 
   // ---------------------------------------------------------------------------
+  // 1b. Enfoque automático dentro del recuadro (barras y texto)
+  //     - Al abrir: se le indica a la cámara que enfoque el centro del recuadro (pointsOfInterest)
+  //       y se deja en enfoque continuo.
+  //     - Se vigila la nitidez del recuadro; si se pone borroso (se acercó/alejó la etiqueta, o el
+  //       lente enfocó el fondo), se fuerza un enfoque en el recuadro y se vuelve a continuo.
+  //     - Celulares sin enfoque continuo pero con enfoque manual: se prueban varias distancias y se
+  //       deja la que da la imagen más nítida dentro del recuadro.
+  //     (iPhone/Safari no permite controlar el enfoque: ahí lo maneja el propio iOS.)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    let active = true;
+    let preparado = false;
+    let pico = 0;
+    let borrosos = 0;
+    let enfocando = false;
+    const canvas = makeCanvas();
+
+    const centroRecuadro = () => {
+      const video = videoRef.current;
+      const box = scanBoxRef.current;
+      if (!video || !box || !video.videoWidth) return null;
+      const r = boxToVideoRect(video, box, 1, 1);
+      return {
+        x: Math.min(1, Math.max(0, (r.sx + r.sw / 2) / video.videoWidth)),
+        y: Math.min(1, Math.max(0, (r.sy + r.sh / 2) / video.videoHeight)),
+      };
+    };
+
+    const nitidezRecuadro = () => {
+      const video = videoRef.current;
+      const box = scanBoxRef.current;
+      if (!video || !box || video.readyState < 2 || !video.videoWidth) return null;
+      return sharpness(drawRegion(video, boxToVideoRect(video, box, 1, 1), canvas, 420, 1));
+    };
+
+    const aplicar = async (track, cons) => {
+      try {
+        await track.applyConstraints({ advanced: [cons] });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const barrerDistancias = async (track, c) => {
+      const { min = 0, max = 10 } = c.focusDistance || {};
+      const pasos = AF_BARRIDO_M.filter((d) => d >= min && d <= max);
+      if (!pasos.length) return;
+      let mejor = null;
+      for (const d of pasos) {
+        if (!active || isProcessingRef.current) return;
+        if (!(await aplicar(track, { focusMode: 'manual', focusDistance: d }))) return;
+        await sleep(160);
+        const n = nitidezRecuadro() ?? 0;
+        if (!mejor || n > mejor.n) mejor = { d, n };
+      }
+      if (mejor && active) await aplicar(track, { focusMode: 'manual', focusDistance: mejor.d });
+    };
+
+    const enfocarRecuadro = async (track) => {
+      if (enfocando) return;
+      enfocando = true;
+      setEnfocandoAuto(true);
+      try {
+        const c = track.getCapabilities?.() || {};
+        const centro = centroRecuadro();
+        const modos = c.focusMode || [];
+        if (modos.includes('continuous') || modos.includes('single-shot') || c.pointsOfInterest) {
+          const cons = {};
+          if (c.pointsOfInterest && centro) cons.pointsOfInterest = [centro];
+          if (modos.includes('single-shot')) cons.focusMode = 'single-shot';
+          else if (modos.includes('continuous')) cons.focusMode = 'continuous';
+          await aplicar(track, cons);
+          await sleep(900);
+          // De vuelta a continuo, siempre apuntando al recuadro
+          if (active && modos.includes('continuous')) {
+            await aplicar(track, { focusMode: 'continuous', ...(c.pointsOfInterest && centro ? { pointsOfInterest: [centro] } : {}) });
+          }
+        } else if (modos.includes('manual') && c.focusDistance) {
+          await barrerDistancias(track, c);
+        }
+      } finally {
+        ultimoEnfoqueRef.current = performance.now();
+        pico = 0; // la referencia de nitidez se rehace con el nuevo enfoque
+        borrosos = 0;
+        enfocando = false;
+        if (active) setEnfocandoAuto(false);
+      }
+    };
+
+    const id = setInterval(() => {
+      const track = trackRef.current;
+      if (!active || !track || enfocando || isProcessingRef.current || document.hidden) return;
+      const n = nitidezRecuadro();
+      if (n == null) return;
+
+      // Primera vez con imagen: enfocar el recuadro de entrada
+      if (!preparado) {
+        preparado = true;
+        enfocarRecuadro(track);
+        return;
+      }
+
+      // La mejor nitidez reciente se va "olvidando" de a poco (la escena cambia)
+      pico = Math.max(n, pico * 0.97);
+      borrosos = n < pico * AF_CAIDA ? borrosos + 1 : 0;
+      if (borrosos >= AF_TICKS_BORROSO && performance.now() - ultimoEnfoqueRef.current > AF_ESPERA_MS) {
+        enfocarRecuadro(track);
+      }
+    }, AF_TICK_MS);
+
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // 2. Modo TEXTO (tipo DataWedge): lectura continua de la franja con mira central.
   //    Se lee solo la franja, se toma la palabra que está bajo la cruz y se acepta
   //    cuando sale igual en OCR_VOTOS lecturas seguidas (evita letras mal leídas).
@@ -418,7 +547,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
                 setOcrLive(null);
               }
               if (fallos % 8 === 0 && mejor.s < 40) {
-                setLiveHint(IS_IOS ? 'Borroso: aleja un poco y usa 2x' : 'Borroso: toca la pantalla para enfocar');
+                setLiveHint(IS_IOS ? 'Borroso: aleja un poco y usa 2x' : 'Borroso: mantén firme, enfocando el recuadro…');
               }
             }
           } catch {
@@ -528,6 +657,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
     const x = (e.clientX - r.left) / r.width;
     const y = (e.clientY - r.top) / r.height;
     setFocusPoint({ x: e.clientX - r.left, y: e.clientY - r.top, id: Date.now() });
+    ultimoEnfoqueRef.current = performance.now() + 1500; // el automático espera al toque manual
     const c = trackRef.current.getCapabilities?.() || {};
     const cons = {};
     if (c.pointsOfInterest) cons.pointsOfInterest = [{ x, y }];
@@ -795,7 +925,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
           ref={scanBoxRef}
           className={`tl-scan-box ${scanMode === 'texto' ? 'modo-texto' : ''} ${isProcessing ? 'busy' : ''} ${
             lockInfo ? 'locking' : ''
-          } ${ocrLive ? 'leyendo' : ''}`}
+          } ${ocrLive ? 'leyendo' : ''} ${enfocandoAuto ? 'enfocando' : ''}`}
         >
           <span className="tl-corner tl-tl" />
           <span className="tl-corner tl-tr" />

@@ -15,14 +15,16 @@ export function prepararSonido() {
   }
 }
 
-function tono(frecuencia, inicio, duracion, volumen = 0.25) {
+// Volumen casi al máximo y frecuencias de 2–3 kHz, que es donde más suena el parlante de un celular
+function tono(frecuencia, inicio, duracion, volumen = 0.9) {
   const osc = ctx.createOscillator();
   const gan = ctx.createGain();
   osc.type = 'square';
   osc.frequency.value = frecuencia;
   const t0 = ctx.currentTime + inicio;
   gan.gain.setValueAtTime(0.0001, t0);
-  gan.gain.exponentialRampToValueAtTime(volumen, t0 + 0.005);
+  gan.gain.exponentialRampToValueAtTime(volumen, t0 + 0.004);
+  gan.gain.setValueAtTime(volumen, t0 + duracion - 0.02);
   gan.gain.exponentialRampToValueAtTime(0.0001, t0 + duracion);
   osc.connect(gan).connect(ctx.destination);
   osc.start(t0);
@@ -35,10 +37,10 @@ export function sonarEscaneo(tipo = 'ok') {
     prepararSonido();
     if (!ctx) return;
     if (tipo === 'texto') {
-      tono(1800, 0, 0.07);
-      tono(1800, 0.11, 0.07);
+      tono(2400, 0, 0.09);
+      tono(2400, 0.13, 0.09);
     } else {
-      tono(2200, 0, 0.12);
+      tono(2700, 0, 0.16);
     }
   } catch {
     /* sin audio: no pasa nada */

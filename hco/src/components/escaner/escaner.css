@@ -566,3 +566,7 @@
 .tl-campo .tl-scan-btn { right: 5px; height: 32px; width: 38px; padding: 0; background: #e8eef6; color: #0f4c81; }
 .tl-campo .tl-scan-btn:hover { background: #dbe5f1; }
 .tl-campo .tl-chips { margin: 6px 0 0; }
+
+/* Enfoque automático en curso: las esquinas parpadean en celeste */
+.tl-scan-box.enfocando .tl-corner { border-color: #38bdf8; animation: tl-enfocando 0.45s ease-in-out infinite alternate; }
+@keyframes tl-enfocando { from { opacity: 1; } to { opacity: 0.35; } }

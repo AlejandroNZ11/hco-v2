@@ -3,6 +3,9 @@ import { supabase } from '../config/supabaseClient';
 const TABLA = 'generar_rdr';
 const TAM_LOTE_INSERT = 500;
 const TAM_PAGINA_LECTURA = 1000;
+// Solo lo que usa la pantalla / el Excel (antes select('*')): sin registrado_por
+const COLUMNAS_RDR = 'id, fecha, costo, sn, observacion, hora, qty, codigo, obd, orden, lote_carga, nombre_registrador, fecha_registro';
+const COLUMNAS_FOTO = 'id, rdr_id, costo, url, origen, hoja, sku, fila, fecha_registro';
 
 /**
  * Lee los registros de generar_rdr (paginando de 1000 en 1000, límite de Supabase).
@@ -11,14 +14,13 @@ const TAM_PAGINA_LECTURA = 1000;
  * @param {string} [filtros.hasta] - fecha_registro hasta (YYYY-MM-DD)
  */
 export const obtenerRegistrosRdr = async ({ desde, hasta } = {}) => {
-  await supabase.auth.getSession();
   const todos = [];
   let inicio = 0;
 
   for (;;) {
     let query = supabase
       .from(TABLA)
-      .select('*')
+      .select(COLUMNAS_RDR)
       .order('fecha_registro', { ascending: false })
       .order('costo', { ascending: true })
       .range(inicio, inicio + TAM_PAGINA_LECTURA - 1);
@@ -128,7 +130,7 @@ export const guardarFotosRdr = async (fotos, usuario) => {
     const { data, error } = await supabase
       .from('rdr_fotos')
       .upsert(payload.slice(i, i + TAM_LOTE_INSERT), { onConflict: 'rdr_id,url' })
-      .select();
+      .select(COLUMNAS_FOTO);
     if (error) throw new Error(`No se pudieron guardar las fotos: ${error.message}`);
     guardadas.push(...(data || []));
   }
@@ -142,7 +144,7 @@ export const obtenerFotosRdr = async (rdrIds) => {
   for (let i = 0; i < ids.length; i += 200) {
     const { data, error } = await supabase
       .from('rdr_fotos')
-      .select('*')
+      .select(COLUMNAS_FOTO)
       .in('rdr_id', ids.slice(i, i + 200))
       .order('fecha_registro', { ascending: true })
       .order('fila', { ascending: true });

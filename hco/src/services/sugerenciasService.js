@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
+import { consultaCacheada, estaFresco, marcarFresco, MIN } from './cacheConsultas';
 
 /**
  * Convierte cualquier valor (array antiguo o string) en texto plano o null para columnas TEXT
@@ -124,7 +125,9 @@ export const sincronizarSugerenciasPendientes = async () => {
  * Obtiene todas las sugerencias combinando las locales (Offline) y las de Supabase
  */
 export const obtenerSugerencias = async () => {
-  if (navigator.onLine) {
+  // Tracking, Pizarra y Dashboard la piden al montar: si el canal en vivo no se cayó desde la
+  // última descarga, Dexie ya está al día y no se vuelven a bajar hasta 3000 filas.
+  if (navigator.onLine && !estaFresco('tarjetas_sugerencias')) {
     await sincronizarSugerenciasPendientes();
 
     try {
@@ -143,6 +146,7 @@ export const obtenerSugerencias = async () => {
         await localDb.tarjetas_sugerencias.clear();
         const remotasMarcadas = data.map(s => ({ ...s, _sincronizado: true }));
         await localDb.tarjetas_sugerencias.bulkPut([...noSincronizadas, ...remotasMarcadas]);
+        marcarFresco('tarjetas_sugerencias');
       }
     } catch (err) {
       console.warn('Sin conexión estable, leyendo sugerencias desde Dexie local...', err);
@@ -309,40 +313,56 @@ export const actualizarSugerencia = async (id, cambios) => {
 /**
  * Carga rápida de Áreas y Empleados usando caché en Dexie para velocidad instantánea
  */
-export const obtenerCatalogosSugerencias = async () => {
-  const [localesUsuarios, localesAreas, localesCargos] = await Promise.all([
-    localDb.usuarios.toArray(),
-    localDb.areas.toArray(),
-    localDb.cargos.toArray()
-  ]);
+// Solo las columnas que usan las pantallas de sugerencias (antes select('*'), que traía TODO el
+// perfil de cada empleado, incluida la contraseña `cl`).
+const COLUMNAS_EMPLEADO_SUG = 'id, dni, usuario, nombre, tipo, rol, estado, area_id, cargo_id, foto_url';
 
+/** Mezcla filas parciales en Dexie sin borrar campos que otras pantallas guardaron (area, cargo…). */
+const fusionarUsuariosLocales = async (filas) => {
+  const existentes = await localDb.usuarios.bulkGet(filas.map((f) => f.id));
+  const fusionadas = filas.map((f, i) => ({ ...(existentes[i] || {}), ...f }));
+  await localDb.usuarios.bulkPut(fusionadas);
+  return fusionadas;
+};
+
+const descargarCatalogosSugerencias = async () => {
+  const [resEmp, resAreas, resCargos] = await Promise.all([
+    supabase.from('empleados').select(COLUMNAS_EMPLEADO_SUG).order('nombre'),
+    supabase.from('areas').select('id, nombre').order('nombre'),
+    supabase.from('cargos').select('id, nombre').order('nombre')
+  ]);
+  if (resEmp.error && resAreas.error && resCargos.error) throw resEmp.error;
+
+  const empleados = !resEmp.error && resEmp.data ? await fusionarUsuariosLocales(resEmp.data) : await localDb.usuarios.toArray();
+  if (!resAreas.error && resAreas.data) await localDb.areas.bulkPut(resAreas.data);
+  if (!resCargos.error && resCargos.data) await localDb.cargos.bulkPut(resCargos.data);
+
+  return {
+    empleados,
+    areas: !resAreas.error && resAreas.data ? resAreas.data : await localDb.areas.toArray(),
+    cargos: !resCargos.error && resCargos.data ? resCargos.data : await localDb.cargos.toArray(),
+  };
+};
+
+/**
+ * Catálogos de Empleados, Áreas y Cargos. Online se comparten 10 min entre las pantallas
+ * de sugerencias; offline (o si falla la red) salen de Dexie.
+ */
+export const obtenerCatalogosSugerencias = async () => {
   if (navigator.onLine) {
     try {
-      const [resEmp, resAreas, resCargos] = await Promise.all([
-        supabase.from('empleados').select('*').order('nombre'),
-        supabase.from('areas').select('id, nombre').order('nombre'),
-        supabase.from('cargos').select('id, nombre').order('nombre')
-      ]);
-
-      const empleados = !resEmp.error && resEmp.data ? resEmp.data : localesUsuarios;
-      const areas = !resAreas.error && resAreas.data ? resAreas.data : localesAreas;
-      const cargos = !resCargos.error && resCargos.data ? resCargos.data : localesCargos;
-
-      if (!resEmp.error && resEmp.data) await localDb.usuarios.bulkPut(resEmp.data);
-      if (!resAreas.error && resAreas.data) await localDb.areas.bulkPut(resAreas.data);
-      if (!resCargos.error && resCargos.data) await localDb.cargos.bulkPut(resCargos.data);
-
-      return { empleados, areas, cargos };
+      return await consultaCacheada('catalogos:sugerencias', descargarCatalogosSugerencias, 10 * MIN);
     } catch (e) {
       console.warn('Usando catálogos en caché local Dexie:', e);
     }
   }
 
-  return {
-    empleados: localesUsuarios,
-    areas: localesAreas,
-    cargos: localesCargos
-  };
+  const [empleados, areas, cargos] = await Promise.all([
+    localDb.usuarios.toArray(),
+    localDb.areas.toArray(),
+    localDb.cargos.toArray()
+  ]);
+  return { empleados, areas, cargos };
 };
 
 // =========================================================================

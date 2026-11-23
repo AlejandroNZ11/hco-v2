@@ -495,7 +495,11 @@ export default function VisionIA() {
             <div className="via-info">Cargando el modelo de IA (la primera vez descarga ~5 MB; luego queda guardado).</div>
           )}
           {!usarServidor && motorLocal.pendientes > 0 && (
-            <div className="via-aviso">{motorLocal.pendientes} evento(s) esperando señal para guardarse.</div>
+            <div className="via-aviso">
+              {motorLocal.pausado
+                ? `${motorLocal.pendientes} evento(s) en espera: Supabase rechazó el guardado por permisos. Vuelve a iniciar sesión; se enviarán solos.`
+                : `${motorLocal.pendientes} evento(s) esperando señal para guardarse.`}
+            </div>
           )}
           {usarServidor && wsEstado === 'despertando' && (
             <div className="via-info">El servidor de IA estaba dormido; puede tardar 1–3 minutos en despertar.</div>

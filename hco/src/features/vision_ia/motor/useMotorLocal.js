@@ -60,6 +60,7 @@ export function useMotorLocal({ activo, config, videoRef, fpsMax, onResultado, o
   const [fase, setFase] = useState(null); // null (cargando) | 'listo' | 'error'
   const [error, setError] = useState('');
   const [pendientes, setPendientes] = useState(0);
+  const [pausado, setPausado] = useState(false); // cola detenida por 401/403 (sesión o RLS)
   const [hilos, setHilos] = useState(1);
   const configRef = useRef(config);
   const fpsRef = useRef(fpsMax);
@@ -80,7 +81,13 @@ export function useMotorLocal({ activo, config, videoRef, fpsMax, onResultado, o
     let idMsg = 0;
     const pendientesMsg = new Map();
     const worker = new Worker(new URL('./detector.worker.js', import.meta.url), { type: 'module' });
-    const persistencia = new Persistencia({ onEstado: (e) => vivo && setPendientes(e.pendientes) });
+    const persistencia = new Persistencia({
+      onEstado: (e) => {
+        if (!vivo) return;
+        setPendientes(e.pendientes);
+        setPausado(Boolean(e.pausado));
+      },
+    });
     const cuadro = document.createElement('canvas');
     const lienzos = new Map(); // tamaño → canvas del letterbox
     let catalogo = null; // contenido de /models/modelos.json
@@ -268,6 +275,7 @@ export function useMotorLocal({ activo, config, videoRef, fpsMax, onResultado, o
     estado: !activo ? 'inactivo' : fase === 'listo' ? 'listo' : fase === 'error' ? 'error' : 'cargando',
     error,
     pendientes,
+    pausado,
     hilos,
   };
 }

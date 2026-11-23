@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabaseClient';
+import { consultaCacheada, estaFresco, invalidarConsultas, marcarFresco, MIN } from './cacheConsultas';
 import { subirImagenDrive } from './driveService';
 import { localDb } from './localDb';
 
@@ -87,7 +88,7 @@ const esRegistroActivo = (item) => {
 // =========================================================================
 // 1. OBTENER DATOS MAESTROS (INCLUYE EMPLEADOS Y ÁREAS)
 // =========================================================================
-export const obtenerDatosMaestrosPrestamos = async () => {
+const descargarMaestrosPrestamos = async () => {
   // Sin internet: ir directo a la caché, sin esperar a que fallen 7 peticiones
   if (!navigator.onLine) {
     try {
@@ -172,6 +173,13 @@ export const obtenerDatosMaestrosPrestamos = async () => {
     throw error;
   }
 };
+
+/**
+ * Catálogos de préstamos (7 tablas). Se comparten 3 min entre pantallas y recargas silenciosas
+ * (antes se pedían las 7 tablas en cada montaje, reconexión y sincronización).
+ * Se invalidan al crear/editar conductores, placas, clientes o empresas.
+ */
+export const obtenerDatosMaestrosPrestamos = () => consultaCacheada('catalogos:prestamos', descargarMaestrosPrestamos, 3 * MIN);
 
 // =========================================
 // 2. CREAR PRÉSTAMO PALLET
@@ -343,7 +351,8 @@ const ordenarPorFechaEntrega = (filas) =>
  * Offline o red caída: lo último guardado en Dexie (incluye los pendientes de subir).
  */
 export const obtenerFilasPrestamos = async () => {
-  if (navigator.onLine) {
+  // Si el canal en vivo de 'prestamos' no se ha caído desde la última descarga, Dexie ya está al día
+  if (navigator.onLine && !estaFresco('prestamos')) {
     try {
       const { data, error } = await supabase
         .from('prestamos')
@@ -373,6 +382,7 @@ export const obtenerFilasPrestamos = async () => {
         console.warn('No se pudo refrescar la caché local de préstamos:', err);
       }
 
+      marcarFresco('prestamos');
       return ordenarPorFechaEntrega([...pendientes, ...remotas]);
     } catch (err) {
       if (!esErrorDeRed(err)) throw err;
@@ -637,6 +647,7 @@ export const buscarConductorPorDni = async (dni) => {
 };
 
 export const guardarConductorMaestro = async ({ dni, nombre, empresa_id, usuario }) => {
+  invalidarConsultas('catalogos:prestamos');
   const ahoraISO = obtenerFechaHoraPeruISO();
   const dniLimpio = String(dni || '').trim();
   const nombreMayus = String(nombre || '').trim().toUpperCase();
@@ -694,6 +705,7 @@ export const buscarPlacaPorNro = async (nroPlaca) => {
 };
 
 export const guardarPlacaMaestra = async ({ nro_placa, empresa_id, volumen_m3, usuario }) => {
+  invalidarConsultas('catalogos:prestamos');
   const ahoraISO = obtenerFechaHoraPeruISO();
   const placaLimpia = String(nro_placa || '').replace(/[^A-Z0-9]/gi, '').toUpperCase();
   const empIdNum = Number(empresa_id);
@@ -742,6 +754,7 @@ export const guardarPlacaMaestra = async ({ nro_placa, empresa_id, volumen_m3, u
 };
 
 export const obtenerOcrearEmpresaOther = async (usuario) => {
+  invalidarConsultas('catalogos:prestamos');
   const ahoraISO = obtenerFechaHoraPeruISO();
   const { data: existente } = await supabase
     .from('empresas_transporte')

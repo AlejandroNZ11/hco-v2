@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { subirImagenDrive } from './driveService';
+import { consultaCacheada, MIN } from './cacheConsultas';
 
 // =========================================================================
 // SUBIDA A GOOGLE DRIVE (vía Edge Function `subir-drive`)
@@ -30,7 +31,10 @@ export const obtenerLups = async () => {
 /**
  * Obtiene el catálogo de empleados (incluyendo su tipo/rol, área y jefe_directo_id)
  */
-export const obtenerEmpleadosCatalogo = async () => {
+export const obtenerEmpleadosCatalogo = () =>
+  consultaCacheada('catalogos:lup-empleados', descargarEmpleadosCatalogo, 10 * MIN).catch(() => []);
+
+const descargarEmpleadosCatalogo = async () => {
   const { data, error } = await supabase
     .from('empleados')
     .select('id, dni, nombre, tipo, rol, area_id, jefe_directo_id, estado')
@@ -38,7 +42,7 @@ export const obtenerEmpleadosCatalogo = async () => {
 
   if (error) {
     console.error('Error obteniendo catálogo de empleados:', error);
-    return [];
+    throw error; // no se guarda en caché: se reintenta la próxima vez
   }
   return data || [];
 };
@@ -46,7 +50,10 @@ export const obtenerEmpleadosCatalogo = async () => {
 /**
  * Obtiene el catálogo de áreas (id, nombre)
  */
-export const obtenerAreasCatalogo = async () => {
+export const obtenerAreasCatalogo = () =>
+  consultaCacheada('catalogos:areas-cuadroq', descargarAreasCatalogo, 10 * MIN).catch(() => []);
+
+const descargarAreasCatalogo = async () => {
   const { data, error } = await supabase
     .from('areas')
     .select('id, nombre, cuadro_q')
@@ -54,7 +61,7 @@ export const obtenerAreasCatalogo = async () => {
 
   if (error) {
     console.error('Error obteniendo catálogo de áreas:', error);
-    return [];
+    throw error;
   }
   return data || [];
 };

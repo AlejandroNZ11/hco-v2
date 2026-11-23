@@ -8,6 +8,7 @@ import { sincronizarPrestamosPendientes } from '../services/prestamosService';
 import { sincronizarPuestosPendientes } from '../services/oficinaLogisticaService';
 import { sincronizarTomaLotesPendientes } from '../services/tomaLotesService';
 import { emitir, EVENTOS } from '../services/eventBus';
+import { marcarTodoViejo } from '../services/cacheConsultas';
 
 // Módulos con su propia lógica de sincronización. Cada uno corre aislado:
 // si uno falla, los demás igual suben sus pendientes.
@@ -96,8 +97,12 @@ export function useSync(authUser) {
         }
       }
 
-      // Avisamos a las pantallas abiertas que ya se sincronizó
-      emitir(EVENTOS.SYNC_COMPLETADO, { synced: totalSynced, failed: totalFailed });
+      // Avisamos a las pantallas abiertas SOLO si se subió algo. Antes se emitía siempre (al abrir
+      // la app y en cada 'online'), y cada pantalla volvía a descargar todo su historial sin motivo.
+      if (totalSynced > 0) {
+        marcarTodoViejo(); // los registros 'PENDIENTE' ya tienen id real: hay que releer del servidor
+        emitir(EVENTOS.SYNC_COMPLETADO, { synced: totalSynced, failed: totalFailed });
+      }
 
       if (!esAutomatico) {
         if (totalSynced > 0 && totalFailed === 0) {

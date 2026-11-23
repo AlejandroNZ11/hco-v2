@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
+import { consultaCacheada, estaFresco, marcarFresco, MIN } from './cacheConsultas';
 
 export const ERRORES_POR_AREA = {
   "INBOUND": [
@@ -218,12 +219,14 @@ export const obtenerErroresPorNombreArea = (nombreArea) => {
  */
 export const obtenerCatalogosCuadroQ = async () => {
   try {
-    await supabase.auth.getSession();
-
-    const [resAreas, resWhite] = await Promise.all([
-      supabase.from('areas').select('id, nombre, cuadro_q').order('nombre'),
-      supabase.from('empleados').select('id, dni, nombre, tipo, estado, area_id').ilike('tipo', 'WHITE').ilike('estado', 'Activo').order('nombre')
-    ]);
+    const [resAreas, resWhite] = await consultaCacheada('catalogos:cuadroq', async () => {
+      const r = await Promise.all([
+        supabase.from('areas').select('id, nombre, cuadro_q').order('nombre'),
+        supabase.from('empleados').select('id, dni, nombre, tipo, estado, area_id').ilike('tipo', 'WHITE').ilike('estado', 'Activo').order('nombre')
+      ]);
+      if (r[0].error) throw new Error(r[0].error.message); // no se cachea un error
+      return r;
+    }, 10 * MIN);
 
     const todasAreas = resAreas.data || [];
     if (todasAreas.length > 0 && localDb?.areas) {
@@ -254,10 +257,19 @@ export const obtenerCatalogosCuadroQ = async () => {
 /**
  * Obtiene todos los registros de la tabla cuadro_q
  */
-export const obtenerRegistrosCuadroQ = async () => {
-  try {
-    await supabase.auth.getSession();
+const leerCuadroQLocal = async () => {
+  if (!localDb.cuadro_q) return [];
+  const registrosLocales = await localDb.cuadro_q.toArray();
+  return registrosLocales
+    .map(normalizarRegistroCuadroQ)
+    .sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro));
+};
 
+export const obtenerRegistrosCuadroQ = async () => {
+  // Tracking, Pizarra y Radar la piden al montar: si el canal en vivo de cuadro_q no se cayó
+  // desde la última descarga, Dexie ya está al día (Realtime aplica cada cambio ahí).
+  if (estaFresco('cuadro_q')) return leerCuadroQLocal();
+  try {
     const { data, error } = await supabase
       .from('cuadro_q')
       .select('*')
@@ -267,20 +279,20 @@ export const obtenerRegistrosCuadroQ = async () => {
 
     const normalizados = (data || []).map(normalizarRegistroCuadroQ);
 
-    if (normalizados.length > 0 && localDb.cuadro_q) {
-      await localDb.cuadro_q.bulkPut(normalizados);
+    if (localDb.cuadro_q) {
+      // Reemplazo completo: así Dexie no conserva registros que ya se borraron en el servidor
+      // (Cuadro Q no tiene escrituras offline pendientes que proteger).
+      await localDb.transaction('rw', localDb.cuadro_q, async () => {
+        await localDb.cuadro_q.clear();
+        if (normalizados.length > 0) await localDb.cuadro_q.bulkPut(normalizados);
+      });
+      marcarFresco('cuadro_q');
     }
 
     return normalizados;
   } catch (err) {
     console.warn(`Modo Offline o error de red: ${err.message}. Leyendo caché...`);
-    if (localDb.cuadro_q) {
-      const registrosLocales = await localDb.cuadro_q.toArray();
-      return registrosLocales
-        .map(normalizarRegistroCuadroQ)
-        .sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro));
-    }
-    return [];
+    return leerCuadroQLocal();
   }
 };
 

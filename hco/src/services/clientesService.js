@@ -1,3 +1,4 @@
+import { invalidarConsultas } from './cacheConsultas';
 
 import { supabase } from '../config/supabaseClient';
 
@@ -15,6 +16,7 @@ export const obtenerClientes = async () => {
 };
 
 export const crearCliente = async (payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('clientes')
     .insert([payload])
@@ -25,6 +27,7 @@ export const crearCliente = async (payload) => {
 };
 
 export const actualizarCliente = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('clientes')
     .update(payload)
@@ -36,6 +39,7 @@ export const actualizarCliente = async (id, payload) => {
 };
 
 export const cambiarEstadoCliente = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('clientes')
     .update(payload)

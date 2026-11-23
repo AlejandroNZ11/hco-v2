@@ -1,8 +1,125 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../config/supabaseClient';
 import { emitir, EVENTOS } from '../services/eventBus';
+import { avisarCanal } from '../services/cacheConsultas';
 
 let contadorCanales = 0;
+
+// ------------------------------------------------------------------------------------------
+// Registro de canales COMPARTIDOS: una sola suscripción (y un solo canal en el WebSocket) por
+// conjunto de tablas, aunque varios componentes la usen a la vez o React la monte dos veces
+// (StrictMode). Cada componente se registra como "oyente"; el canal se cierra con
+// supabase.removeChannel cuando se va el último (con una pequeña espera para no cerrar y
+// reabrir el canal en remontajes inmediatos).
+// ------------------------------------------------------------------------------------------
+const canales = new Map(); // claveTablas → entrada
+const ESPERA_CIERRE_MS = 1500;
+
+// setAuth una sola vez para todo el cliente (supabase-js lo mantiene al día al renovar token)
+let authListo = null;
+const prepararAuth = () => {
+  authListo ??= (async () => {
+    try {
+      await supabase.auth.getSession(); // refresca si el token venció
+      await supabase.realtime.setAuth();
+    } catch (err) {
+      authListo = null; // se reintenta en la próxima suscripción
+      console.warn('[realtime] No se pudo preparar el token', err);
+    }
+  })();
+  return authListo;
+};
+
+// Recarga tras reconectar. Si la app está en segundo plano (iOS/Android suspenden el WebSocket
+// cada vez que cambias de app), se espera a que vuelva a estar visible y se hace UNA sola
+// recarga, en vez de una por cada micro-reconexión mientras nadie mira la pantalla.
+function avisarReconexion(entrada) {
+  if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+    entrada.oyentes.forEach((o) => o.onReconectar());
+    return;
+  }
+  if (entrada.esperandoVisible) return;
+  entrada.esperandoVisible = () => {
+    if (document.visibilityState === 'hidden') return;
+    document.removeEventListener('visibilitychange', entrada.esperandoVisible);
+    entrada.esperandoVisible = null;
+    if (!entrada.cerrado) entrada.oyentes.forEach((o) => o.onReconectar());
+  };
+  document.addEventListener('visibilitychange', entrada.esperandoVisible);
+}
+
+function abrirCanal(entrada) {
+  const { clave, tablas } = entrada;
+  prepararAuth().then(() => {
+    if (entrada.cerrado) return; // se liberó mientras esperábamos el token
+    const canal = supabase.channel(`rt-${tablas.join('-')}-${++contadorCanales}`);
+    entrada.canal = canal;
+
+    tablas.forEach((nombreTabla) => {
+      canal.on('postgres_changes', { event: '*', schema: 'public', table: nombreTabla }, (payload) => {
+        const cambio = {
+          tabla: nombreTabla,
+          tipo: payload.eventType, // 'INSERT' | 'UPDATE' | 'DELETE'
+          nuevo: payload.new && Object.keys(payload.new).length ? payload.new : null,
+          anterior: payload.old && Object.keys(payload.old).length ? payload.old : null,
+        };
+        entrada.oyentes.forEach((o) => {
+          // Un error procesando un evento nunca debe tumbar la pantalla (incluye errores async)
+          Promise.resolve()
+            .then(() => o.onCambio(cambio))
+            .catch((err) => console.error(`[realtime:${nombreTabla}] Error procesando evento`, err));
+        });
+        emitir(EVENTOS.CAMBIO_REMOTO, cambio); // una vez por evento, no una por componente
+      });
+    });
+
+    canal.subscribe((status, err) => {
+      if (entrada.cerrado) return;
+      if (status === 'SUBSCRIBED') {
+        entrada.estado = 'en_vivo';
+        avisarCanal(tablas, true);
+        entrada.oyentes.forEach((o) => o.onEstado('en_vivo'));
+        if (entrada.huboCaida) {
+          entrada.huboCaida = false;
+          avisarReconexion(entrada);
+        }
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        avisarCanal(tablas, false);
+        entrada.huboCaida = true;
+        entrada.estado = 'desconectado';
+        entrada.oyentes.forEach((o) => o.onEstado('desconectado'));
+        console.warn(`[realtime:${clave}] ${status}`, err?.message || err || '');
+      }
+    });
+  });
+}
+
+function suscribir(clave, oyente) {
+  let entrada = canales.get(clave);
+  if (entrada) {
+    clearTimeout(entrada.timerCierre);
+    entrada.timerCierre = null;
+  } else {
+    entrada = { clave, tablas: clave.split(','), oyentes: new Set(), estado: 'conectando', huboCaida: false, canal: null, cerrado: false, timerCierre: null };
+    canales.set(clave, entrada);
+    abrirCanal(entrada);
+  }
+  entrada.oyentes.add(oyente);
+  oyente.onEstado(entrada.estado);
+
+  return () => {
+    entrada.oyentes.delete(oyente);
+    if (entrada.oyentes.size) return;
+    entrada.timerCierre = setTimeout(() => {
+      if (entrada.oyentes.size) return;
+      entrada.cerrado = true;
+      canales.delete(clave);
+      avisarCanal(entrada.tablas, false);
+      if (entrada.esperandoVisible) document.removeEventListener('visibilitychange', entrada.esperandoVisible);
+      if (entrada.canal) supabase.removeChannel(entrada.canal);
+    }, ESPERA_CIERRE_MS);
+  };
+}
 
 /**
  * Se suscribe a los cambios (INSERT / UPDATE / DELETE) de una o varias tablas de Supabase en tiempo real.
@@ -14,6 +131,7 @@ let contadorCanales = 0;
  * - `onReconectar()` se llama cuando el canal se recupera tras una caída de red
  *   (ahí conviene recargar la lista para no perder eventos ocurridos mientras estaba caído).
  * - Cada evento también se publica en el bus interno como EVENTOS.CAMBIO_REMOTO.
+ * - Componentes que escuchan las mismas tablas COMPARTEN un único canal.
  *
  * Devuelve el estado de la conexión: 'conectando' | 'en_vivo' | 'desconectado'.
  */
@@ -31,65 +149,15 @@ export function useSupabaseRealtime(tabla, onCambio, { enabled = true, onReconec
 
   useEffect(() => {
     if (!enabled || !claveTablas) return undefined;
-
-    let activo = true; // evita que avisos de un canal ya cerrado (p. ej. StrictMode) pisen el estado
-    let huboCaida = false;
-    let canal = null;
-    const tablas = claveTablas.split(',');
-
-    const iniciar = async () => {
-      // Asegura que el canal se una con el token vigente del usuario (refresca si venció).
-      // Con un token vencido Supabase rechaza la suscripción y quedaría "Sin tiempo real".
-      try {
-        await supabase.auth.getSession();
-        // Sin argumento: toma el token de la sesión y lo sigue renovando solo
-        await supabase.realtime.setAuth();
-      } catch (err) {
-        console.warn('[realtime] No se pudo preparar el token', err);
-      }
-      if (!activo) return;
-
-      // Nombre único: dos pantallas abiertas sobre la misma tabla no comparten (ni rompen) el canal
-      canal = supabase.channel(`rt-${tablas.join('-')}-${++contadorCanales}`);
-
-      tablas.forEach((nombreTabla) => {
-        canal.on('postgres_changes', { event: '*', schema: 'public', table: nombreTabla }, (payload) => {
-          if (!activo) return;
-          const cambio = {
-            tabla: nombreTabla,
-            tipo: payload.eventType, // 'INSERT' | 'UPDATE' | 'DELETE'
-            nuevo: payload.new && Object.keys(payload.new).length ? payload.new : null,
-            anterior: payload.old && Object.keys(payload.old).length ? payload.old : null,
-          };
-          // Un error procesando un evento nunca debe tumbar la pantalla (incluye errores async)
-          Promise.resolve()
-            .then(() => onCambioRef.current?.(cambio))
-            .catch((err) => console.error(`[realtime:${nombreTabla}] Error procesando evento`, err));
-          emitir(EVENTOS.CAMBIO_REMOTO, cambio);
-        });
-      });
-
-      canal.subscribe((status, err) => {
-        if (!activo) return;
-        if (status === 'SUBSCRIBED') {
-          setEstado('en_vivo');
-          if (huboCaida) {
-            huboCaida = false;
-            onReconectarRef.current?.();
-          }
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          huboCaida = true;
-          setEstado('desconectado');
-          console.warn(`[realtime:${claveTablas}] ${status}`, err?.message || err || '');
-        }
-      });
-    };
-
-    iniciar();
-
+    let activo = true; // evita que avisos tardíos pisen el estado tras desmontar
+    const quitar = suscribir(claveTablas, {
+      onCambio: (cambio) => activo && onCambioRef.current?.(cambio),
+      onEstado: (e) => activo && setEstado(e),
+      onReconectar: () => activo && onReconectarRef.current?.(),
+    });
     return () => {
       activo = false;
-      if (canal) supabase.removeChannel(canal);
+      quitar();
     };
   }, [claveTablas, enabled]);
 

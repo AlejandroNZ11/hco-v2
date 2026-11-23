@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
+import { estaFresco, marcarFresco } from './cacheConsultas';
 
 const TABLA = 'toma_lotes';
 const BLOQUE = 500; // filas por petición al subir
@@ -283,6 +284,8 @@ const marcarSincronizadas = async () => {
  */
 export const refrescarTomaLotes = async () => {
   if (!navigator.onLine) return { ok: false, offline: true };
+  // Canal en vivo sin caídas desde la última descarga → Dexie ya está al día
+  if (estaFresco(TABLA)) return { ok: true, cache: true };
 
   await sincronizarTomaLotesPendientes();
 
@@ -312,6 +315,7 @@ export const refrescarTomaLotes = async () => {
       remotas.filter((f) => !sinSubir.has(f.id)).map((f) => ({ ...f, _sincronizado: true })),
     );
   });
+  marcarFresco(TABLA);
   return { ok: true };
 };
 

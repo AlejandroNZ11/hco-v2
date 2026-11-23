@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FaCheck, FaExternalLinkAlt, FaMinus, FaPlus, FaSyncAlt } from 'react-icons/fa';
 import { aplicarCambioEnLista, useSupabaseRealtime } from '../../hooks/useSupabaseRealtime';
 import {
+  aforoEnCache,
+  guardarCacheAforo,
   inicioDeHoyISO,
+  LIMITE_VISION,
+  listarAforoIncremental,
   listarHoy,
   marcarEppRevisado,
   registrarAjusteAforo,
@@ -30,38 +34,50 @@ function FotoDrive({ url, alt }) {
  * Se monta con key={modulo}, así que al cambiar de módulo arranca limpio.
  */
 export default function PanelVision({ modulo, area, camaraId }) {
-  const [filas, setFilas] = useState([]);
-  const [cargando, setCargando] = useState(true);
+  const esAforo = modulo === 'aforo';
+  // Aforo: se pinta al instante lo guardado en caché y luego se piden solo los eventos nuevos
+  const [filas, setFilas] = useState(() => (esAforo ? aforoEnCache() || [] : []));
+  const [cargando, setCargando] = useState(() => !(esAforo && aforoEnCache()));
   const [error, setError] = useState('');
 
-  // Aforo necesita TODOS los eventos del día para sumar bien (son filas pequeñas)
-  const limite = modulo === 'aforo' ? 5000 : 200;
+  // completo=true → botón "Recargar" (trae todo el día). En reconexión basta el incremental.
+  const cargar = useCallback(
+    (completo) => (esAforo ? listarAforoIncremental({ completo }) : listarHoy(modulo, LIMITE_VISION[modulo])),
+    [esAforo, modulo],
+  );
 
-  const recargar = useCallback(async () => {
+  const recargar = useCallback(async (completo = true) => {
     try {
-      setFilas(await listarHoy(modulo, limite));
+      setFilas(await cargar(completo));
       setError('');
     } catch (err) {
       setError(err.message);
     }
-  }, [modulo, limite]);
+  }, [cargar]);
 
   // Carga inicial (el setState ocurre al resolver la promesa, no dentro del efecto)
   useEffect(() => {
     let activo = true;
-    listarHoy(modulo, limite)
+    cargar(false)
       .then((datos) => activo && setFilas(datos))
       .catch((err) => activo && setError(err.message))
       .finally(() => activo && setCargando(false));
     return () => {
       activo = false;
     };
-  }, [modulo, limite]);
+  }, [cargar]);
+
+  // Mantiene la caché de aforo al día con lo que llega en tiempo real (sin pedir nada extra)
+  useEffect(() => {
+    if (!esAforo || cargando) return undefined;
+    const t = setTimeout(() => guardarCacheAforo(filas), 1500); // agrupa ráfagas de eventos
+    return () => clearTimeout(t);
+  }, [esAforo, cargando, filas]);
 
   const estadoRt = useSupabaseRealtime(
     TABLAS_VISION[modulo],
     (cambio) => setFilas((prev) => aplicarCambioEnLista(prev, cambio)),
-    { onReconectar: recargar },
+    { onReconectar: () => recargar(false) },
   );
 
   // Solo lo de hoy (si la pantalla queda abierta pasada la medianoche)
@@ -76,7 +92,7 @@ export default function PanelVision({ modulo, area, camaraId }) {
     <div className="via-panel">
       <div className="via-panel-head">
         <span className={`via-chip via-rt-${estadoRt}`}>{ESTADO_RT[estadoRt] || estadoRt}</span>
-        <button type="button" className="via-btn via-btn-ghost" onClick={recargar} title="Recargar">
+        <button type="button" className="via-btn via-btn-ghost" onClick={() => recargar(true)} title="Recargar">
           <FaSyncAlt /> Recargar
         </button>
       </div>

@@ -89,7 +89,7 @@ const buscar = (valor, lista) => {
 /* ---------- Componente ---------- */
 export default function Login() {
   const navigate = useNavigate();
-  const dispositivo = useMemo(detectarDispositivo, []);
+  const dispositivo = useMemo(() => detectarDispositivo(), []);
 
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
@@ -114,9 +114,30 @@ export default function Login() {
   };
 
   useEffect(() => {
+    let activo = true;
     (async () => {
+      // ¿Ya hay sesión válida y perfil guardado? (p. ej. al abrir la PWA, que arranca en "/")
+      // Entramos directo sin volver a llamar a signInWithPassword ni a `empleados`.
+      // getSession() lee el almacenamiento local; solo va a la red si el token venció.
+      const guardadoAuth = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
+      if (guardadoAuth) {
+        try {
+          const sesion = await obtenerSesionActiva();
+          if (!activo) return;
+          if (sesion) {
+            navigate('/menu', { replace: true });
+            return;
+          }
+        } catch {
+          // sin sesión utilizable: se muestra el login normal
+        }
+      }
+
       try {
-        const data = await obtenerUsuariosParaCache();
+        const data = await obtenerUsuariosParaCache({
+          onActualizado: (nuevos) => activo && setUsuariosCache(nuevos),
+        });
+        if (!activo) return;
         setUsuariosCache(data);
         const guardado = localStorage.getItem(KEY_RECORDAR);
         if (guardado) {
@@ -135,6 +156,9 @@ export default function Login() {
         .then(setBioSoportado)
         .catch(() => setBioSoportado(false));
     }
+    return () => {
+      activo = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

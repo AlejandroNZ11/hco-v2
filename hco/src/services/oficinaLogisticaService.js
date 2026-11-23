@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
+import { consultaCacheada, estaFresco, marcarFresco, MIN } from './cacheConsultas';
 
 const TABLA = 'oficina_puestos';
 
@@ -47,6 +48,7 @@ export const sincronizarPuestosPendientes = async () => {
  */
 export const refrescarPuestos = async () => {
   if (!navigator.onLine) return { ok: false, offline: true };
+  if (estaFresco(TABLA)) return { ok: true, cache: true }; // canal en vivo sin caídas: Dexie al día
 
   await sincronizarPuestosPendientes();
 
@@ -62,6 +64,7 @@ export const refrescarPuestos = async () => {
   await localDb.oficina_puestos.bulkPut(
     data.filter((p) => !sinSubir.has(p.id)).map((p) => ({ ...p, _sincronizado: true }))
   );
+  marcarFresco(TABLA);
   return { ok: true };
 };
 
@@ -83,14 +86,18 @@ const conCargoYArea = (lista, cargos, areas) => {
 export const obtenerEmpleadosOficina = async () => {
   if (navigator.onLine) {
     try {
-      const [emp, cargos, areas] = await Promise.all([
-        supabase
-          .from('empleados')
-          .select('id, nombre, usuario, dni, foto_url, estado, rol, cargo_id, area_id, fch_salida')
-          .order('nombre'),
-        supabase.from('cargos').select('id, nombre'),
-        supabase.from('areas').select('id, nombre'),
-      ]);
+      const [emp, cargos, areas] = await consultaCacheada('catalogos:oficina', async () => {
+        const r = await Promise.all([
+          supabase
+            .from('empleados')
+            .select('id, nombre, usuario, dni, foto_url, estado, rol, cargo_id, area_id, fch_salida')
+            .order('nombre'),
+          supabase.from('cargos').select('id, nombre'),
+          supabase.from('areas').select('id, nombre'),
+        ]);
+        if (r[0].error) throw new Error(r[0].error.message);
+        return r;
+      }, 10 * MIN);
       if (!emp.error && emp.data?.length) {
         if (!cargos.error && cargos.data) await localDb.cargos.bulkPut(cargos.data);
         if (!areas.error && areas.data) await localDb.areas.bulkPut(areas.data);

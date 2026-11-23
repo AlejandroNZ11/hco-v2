@@ -1,3 +1,4 @@
+import { invalidarConsultas } from './cacheConsultas';
 import { supabase } from '../config/supabaseClient';
 
 export const obtenerPlacas = async () => {
@@ -27,6 +28,7 @@ export const obtenerEmpresasCatalogo = async () => {
 };
 
 export const crearPlaca = async (payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('placas')
     .insert([payload])
@@ -37,6 +39,7 @@ export const crearPlaca = async (payload) => {
 };
 
 export const actualizarPlaca = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('placas')
     .update(payload)
@@ -48,6 +51,7 @@ export const actualizarPlaca = async (id, payload) => {
 };
 
 export const cambiarEstadoPlaca = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('placas')
     .update(payload)

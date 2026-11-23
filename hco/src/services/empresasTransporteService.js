@@ -1,3 +1,4 @@
+import { invalidarConsultas } from './cacheConsultas';
 import { supabase } from '../config/supabaseClient';
 
 export const obtenerEmpresasTransporte = async () => {
@@ -14,6 +15,7 @@ export const obtenerEmpresasTransporte = async () => {
 };
 
 export const crearEmpresaTransporte = async (payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('empresas_transporte')
     .insert([payload])
@@ -24,6 +26,7 @@ export const crearEmpresaTransporte = async (payload) => {
 };
 
 export const actualizarEmpresaTransporte = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('empresas_transporte')
     .update(payload)
@@ -35,6 +38,7 @@ export const actualizarEmpresaTransporte = async (id, payload) => {
 };
 
 export const cambiarEstadoEmpresaTransporte = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('empresas_transporte')
     .update(payload)

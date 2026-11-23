@@ -1,3 +1,4 @@
+import { invalidarConsultas } from './cacheConsultas';
 // Asegúrate de importar tu cliente de Supabase desde donde lo tengas configurado.
 // Cambia esta ruta según la estructura de tu proyecto (ej: '../config/supabase', '../supabaseClient', etc.)
 import { supabase } from '../config/supabaseClient';
@@ -41,6 +42,7 @@ export const obtenerEmpresasCatalogo = async () => {
  * Crea un nuevo conductor
  */
 export const crearConductor = async (payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('conductores')
     .insert([payload])
@@ -57,6 +59,7 @@ export const crearConductor = async (payload) => {
  * Actualiza los datos de un conductor existente
  */
 export const actualizarConductor = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('conductores')
     .update(payload)
@@ -74,6 +77,7 @@ export const actualizarConductor = async (id, payload) => {
  * Cambia el estado (Activar / Desactivar) de un conductor
  */
 export const cambiarEstadoConductor = async (id, payload) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('conductores')
     .update(payload)

@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
+import { estaFresco, marcarFresco } from './cacheConsultas';
 
 /**
  * Función interna para mantener sincronizado el estado_operativo en la tabla 'equipos'
@@ -149,7 +150,9 @@ const obtenerTodasInspeccionesRemotas = async () => {
  * Obtiene todas las inspecciones combinando las pendientes de envío (Offline) + las de Supabase
  */
 export const obtenerUltimasInspecciones = async () => {
-  if (navigator.onLine) {
+  // Si el canal en vivo de inspecciones/equipos no se cayó desde la última descarga, Dexie ya
+  // está al día: no se vuelve a bajar TODO el historial (puede ser de miles de filas).
+  if (navigator.onLine && !estaFresco('inspecciones')) {
     // Si hay red, primero intentamos subir cualquier pendiente de envío
     await sincronizarInspeccionesPendientes();
 
@@ -176,6 +179,7 @@ export const obtenerUltimasInspecciones = async () => {
         if (!resAreas.error && resAreas.data) await localDb.areas.bulkPut(resAreas.data);
         if (!resEq.error && resEq.data) await localDb.equipos.bulkPut(resEq.data);
         if (!resCat.error && resCat.data) await localDb.categorias_equipos.bulkPut(resCat.data);
+        marcarFresco('inspecciones');
       }
     } catch (err) {
       console.warn("Sin conexión a Supabase, leyendo inspecciones desde Dexie local...", err);

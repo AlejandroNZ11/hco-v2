@@ -13,6 +13,7 @@ import {
   FaBuilding as Building2
 } from 'react-icons/fa';
 import { supabase } from '../../config/supabaseClient';
+import { consultaCacheada, MIN } from '../../services/cacheConsultas';
 import './DashboardLup.css';
 import Loading from '../../layouts/Loading';
 
@@ -176,7 +177,12 @@ function DashboardLupContenido() {
     try {
       const [resLup, resEmp] = await Promise.all([
         supabase.from('lup').select('*'),
-        supabase.from('empleados').select('id, nombre, foto_url, area_id')
+        // Fotos/nombres de empleados: se comparten 10 min (no cambian entre visitas al dashboard)
+        consultaCacheada('catalogos:lup-fotos', async () => {
+          const r = await supabase.from('empleados').select('id, nombre, foto_url, area_id');
+          if (r.error) throw r.error;
+          return r;
+        }, 10 * MIN).catch(() => ({ data: [] }))
       ]);
 
       const empMap = {};

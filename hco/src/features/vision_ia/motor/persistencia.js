@@ -44,24 +44,29 @@ async function usuarioId() {
 
 async function ejecutar(op) {
   if (op.tipo === 'insert') {
-    // Evento capturado sin sesión: se firma con el usuario actual al reenviarlo
-    if (op.fila && !op.fila.registrado_por) {
+    // La política RLS exige registrado_por = auth.uid(). Se firma SIEMPRE con el usuario actual:
+    // un evento capturado sin sesión o por otro usuario en este mismo celular no debe quedar
+    // rechazado (403) para siempre bloqueando la cola.
+    if (op.fila) {
       const uid = await usuarioId();
-      if (!uid) throw Object.assign(new Error('Sesión vencida: vuelve a iniciar sesión'), { code: '42501' });
+      if (!uid) throw Object.assign(new Error('Sesión vencida: vuelve a iniciar sesión'), { code: '42501', status: 401 });
       op.fila.registrado_por = uid;
     }
-    const { error } = await supabase.from(op.tabla).insert(op.fila);
-    if (error) throw error;
+    const { error, status } = await supabase.from(op.tabla).insert(op.fila);
+    if (error) throw Object.assign(error, { status });
   } else if (op.tipo === 'rpc') {
-    const { error } = await supabase.rpc(op.fn, op.params);
-    if (error) throw error;
+    const { error, status } = await supabase.rpc(op.fn, op.params);
+    if (error) throw Object.assign(error, { status });
   }
 }
 
-// Errores de datos (columna/valor inválido) no se arreglan reintentando. Un rechazo de RLS
-// (42501) sí puede arreglarse: sesión vencida o SQL aún no actualizado → se deja en cola.
-const esPermanente = (err) =>
-  Boolean(err?.code && String(err.code) !== '42501' && /^(22|23|42|PGRST)/.test(String(err.code)));
+// 401/403, RLS (42501) o JWT inválido/vencido (PGRST301/302): reintentar no sirve hasta que
+// cambie la sesión. Se PAUSA la cola (sin descartar nada) y se reanuda al renovar/iniciar sesión.
+const esErrorAuth = (err) =>
+  err?.status === 401 || err?.status === 403 || ['42501', 'PGRST301', 'PGRST302'].includes(String(err?.code || ''));
+
+// Errores de datos (columna/valor inválido) no se arreglan reintentando → se descartan.
+const esPermanente = (err) => !esErrorAuth(err) && Boolean(err?.code && /^(22|23|42|PGRST)/.test(String(err.code)));
 
 export class Persistencia {
   constructor({ onEstado } = {}) {
@@ -71,6 +76,17 @@ export class Persistencia {
     this.timer = setInterval(() => this.reintentar(), 20000);
     this.ocupado = false;
     this.ultimoError = '';
+    // true tras un 401/403: no se toca la red hasta que la sesión cambie (evita ráfagas de 403)
+    this.pausadoPorAuth = false;
+    const { data } = supabase.auth.onAuthStateChange((evento) => {
+      if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(evento) && this.pausadoPorAuth) {
+        this.pausadoPorAuth = false;
+        setTimeout(() => this.reintentar(), 0); // fuera del callback de auth (evita bloqueo del lock)
+      }
+    });
+    this.subAuth = data?.subscription;
+    this.alVolverRed = () => this.reintentar();
+    if (typeof window !== 'undefined') window.addEventListener('online', this.alVolverRed);
   }
 
   get pendientes() {
@@ -78,16 +94,23 @@ export class Persistencia {
   }
 
   _avisar() {
-    this.onEstado?.({ pendientes: this.pendientes, error: this.ultimoError });
+    this.onEstado?.({ pendientes: this.pendientes, error: this.ultimoError, pausado: this.pausadoPorAuth });
   }
 
   async _enviar(op) {
+    // Pausado por permisos: el evento va directo a la cola, sin petición (no más 403 seguidos)
+    if (this.pausadoPorAuth) return false;
     try {
       await ejecutar(op);
       this.ultimoError = '';
       return true;
     } catch (err) {
       this.ultimoError = err.message || String(err);
+      if (esErrorAuth(err)) {
+        this.pausadoPorAuth = true;
+        console.warn('[vision] Supabase rechazó por permisos/sesión; cola en pausa hasta renovar sesión', err);
+        return false;
+      }
       if (esPermanente(err)) {
         console.error('[vision] evento rechazado por Supabase', err, op);
         return true; // se descarta para no trabar la cola
@@ -130,7 +153,8 @@ export class Persistencia {
   async guardarEpp({ fila, imagen, nombre }) {
     const uid = await usuarioId();
     const item = { fila: { ...fila, registrado_por: uid }, imagen, nombre, intentos: 0 };
-    if (!(await this._subirEpp(item))) this.fotos.push(item);
+    // En pausa por permisos no se sube la foto a Drive (se hará al reanudar)
+    if (this.pausadoPorAuth || !(await this._subirEpp(item))) this.fotos.push(item);
     this._avisar();
   }
 
@@ -154,7 +178,7 @@ export class Persistencia {
   }
 
   async reintentar() {
-    if (this.ocupado || !this.pendientes || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+    if (this.ocupado || this.pausadoPorAuth || !this.pendientes || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
     this.ocupado = true;
     try {
       const fotos = this.fotos;
@@ -175,5 +199,7 @@ export class Persistencia {
 
   cerrar() {
     clearInterval(this.timer);
+    this.subAuth?.unsubscribe();
+    if (typeof window !== 'undefined') window.removeEventListener('online', this.alVolverRed);
   }
 }

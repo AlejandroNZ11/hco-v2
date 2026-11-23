@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabaseClient';
 import { subirImagenDrive } from './driveService';
+import { invalidarConsultas } from './cacheConsultas';
 
 // =========================================================================
 // SUBIDA A GOOGLE DRIVE (FOTOS DE PERSONAL) vía Edge Function `subir-drive`
@@ -46,6 +47,7 @@ export const obtenerEmpleadoPorId = async (id) => {
 };
 
 export const crearEmpleado = async (empleadoData) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('empleados')
     .insert([empleadoData])
@@ -58,6 +60,7 @@ export const crearEmpleado = async (empleadoData) => {
 };
 
 export const actualizarEmpleado = async (id, empleadoData) => {
+  invalidarConsultas('catalogos:');
   // Extraemos 'id' para no intentar sobreescribir la Primary Key en el UPDATE
   const { id: _ignoreId, ...datosActualizar } = empleadoData;
 
@@ -76,6 +79,7 @@ export const actualizarEmpleado = async (id, empleadoData) => {
 };
 
 export const cambiarEstadoEmpleado = async (id, nuevoEstado) => {
+  invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('empleados')
     .update({ estado: nuevoEstado })

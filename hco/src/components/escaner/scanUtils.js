@@ -420,3 +420,25 @@ export function pickWordAtCross(blocks, cx, cy) {
     alternativas: words.map((x) => x.text).filter((t) => t !== w.text && !isLabelToken(t) && t.length >= 3),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Variante para el lector de barras: código inclinado
+// ---------------------------------------------------------------------------
+// Recorte girado (códigos 1D inclinados; ZXing por sí solo solo prueba giros de 90°)
+export function recorteGirado(origen, grados, canvas) {
+  const rad = (grados * Math.PI) / 180;
+  const w = origen.width;
+  const h = origen.height;
+  const W = Math.round(Math.abs(w * Math.cos(rad)) + Math.abs(h * Math.sin(rad)));
+  const H = Math.round(Math.abs(w * Math.sin(rad)) + Math.abs(h * Math.cos(rad)));
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate(rad);
+  ctx.drawImage(origen, -w / 2, -h / 2);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return ctx.getImageData(0, 0, W, H);
+}

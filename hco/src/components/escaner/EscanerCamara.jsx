@@ -18,13 +18,22 @@ import {
   elegirLectura,
   preprocessForOcr,
   sharpness,
+  recorteGirado,
 } from './scanUtils';
 import { nativeDecode, obtenerOcrWorker, useMotoresEscaner, zxingDecode } from './motoresEscaner';
 import { sonarEscaneo } from './sonidoEscaneo';
 import './escaner.css';
 
-const SCAN_INTERVAL_MS = 110;
-const LOCK_MS = 600; // tiempo que hay que mantener el código en el láser
+// Barras: se lee cada frame nuevo de la cámara (sin pausas). Formatos con dígito de control
+// (Code128, EAN/UPC, QR, DataMatrix, PDF417…) se aceptan en la PRIMERA lectura válida, como una
+// pistola Zebra. Formatos sin control (Code39, Codabar, ITF) necesitan 2 lecturas iguales seguidas.
+const LECTURAS_FORMATO_DEBIL = 2;
+const FLASH_OK_MS = 170; // el recuadro se pinta de verde este tiempo antes de cerrar
+// Variantes del recorte que se alternan frame a frame para ZXing:
+// normal · limpieza de ruido con umbral global (borroso / brillos) · limpieza de ruido con umbral
+// local (poca luz: imagen granulada) · girado ±20° (código inclinado)
+// (Probado con códigos generados: en poca luz lo que rescata es quitar el ruido, no subir el contraste.)
+const VARIANTES_BARRAS = ['normal', 'denoise', 'giro+', 'ruido', 'normal', 'denoise', 'giro-', 'ruido'];
 const OCR_VOTOS = 2; // lecturas iguales seguidas bajo la mira para aceptar el texto
 const OCR_CONF_MIN = 50; // confianza mínima de la palabra para contarla
 const OCR_MARGEN_X = 1.5; // se lee 50% más ancho que el recuadro visible (palabras largas)
@@ -42,6 +51,18 @@ const IS_IOS =
   typeof navigator !== 'undefined' &&
   (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Espera el próximo frame de la cámara (así no se procesa dos veces la misma imagen)
+const esperarFrame = (video) =>
+  new Promise((resolve) => {
+    const t = setTimeout(resolve, 40);
+    if (video?.requestVideoFrameCallback) {
+      video.requestVideoFrameCallback(() => {
+        clearTimeout(t);
+        resolve();
+      });
+    }
+  });
 
 // Enfoque automático al recuadro: cada AF_TICK_MS se mide la nitidez SOLO dentro del recuadro.
 // Si cae bastante respecto a lo mejor visto hace poco, se reenfoca apuntando al centro del recuadro.
@@ -71,6 +92,8 @@ export default function EscanerCamara({ onCapture, onClose }) {
   const [exposure, setExposure] = useState(0);
   const [focusPoint, setFocusPoint] = useState(null);
   const [enfocandoAuto, setEnfocandoAuto] = useState(false);
+  const [capturado, setCapturado] = useState(null); // valor aceptado (flash verde)
+  const linternaManualRef = useRef(false); // si el usuario tocó la linterna, ya no se automatiza
   const ultimoEnfoqueRef = useRef(0);
 
   const videoRef = useRef(null);
@@ -114,10 +137,14 @@ export default function EscanerCamara({ onCapture, onClose }) {
   const acceptValue = useCallback((capture) => {
     if (doneRef.current) return;
     doneRef.current = true;
+    // Pitido y vibración al instante; el recuadro queda en verde un momento y se cierra
     sonarEscaneo(capture.metodo.startsWith('OCR') ? 'texto' : 'ok');
     if (navigator.vibrate) navigator.vibrate(capture.metodo.startsWith('OCR') ? [70, 40, 70] : 100);
-    onCaptureRef.current?.(capture);
-    onCloseRef.current?.();
+    setCapturado(capture.valor);
+    setTimeout(() => {
+      onCaptureRef.current?.(capture);
+      onCloseRef.current?.();
+    }, FLASH_OK_MS);
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -128,10 +155,10 @@ export default function EscanerCamara({ onCapture, onClose }) {
     let stream = null;
     let tick = 0;
     let attempts = 0;
-    // "Fijación": el mismo código debe verse dentro del láser durante LOCK_MS antes de aceptarse.
-    // Así, al pasar la cámara por una etiqueta con varios códigos, no se dispara con el primero que aparece.
-    let lock = null; // { text, format, engine, first, last, count }
+    // Formatos sin dígito de control: hay que verlos 2 veces iguales seguidas
+    let lock = null; // { text, count, last }
     const cropCanvas = makeCanvas();
+    const giroCanvas = makeCanvas();
     openedAtRef.current = performance.now();
 
     // Entre varios códigos en el recorte, elegimos el más cercano al láser (centro del recuadro)
@@ -146,23 +173,22 @@ export default function EscanerCamara({ onCapture, onClose }) {
       const text = String(hit?.text || '').trim();
       if (!text) return false;
 
-      if (!lock || lock.text !== text || now - lock.last > 450) {
-        lock = { text, format: hit.format, engine, first: now, last: now, count: 1 };
-      } else {
-        lock.last = now;
-        lock.count++;
+      if (isWeakFormat(hit.format)) {
+        lock =
+          lock && lock.text === text && now - lock.last < 500
+            ? { ...lock, count: lock.count + 1, last: now }
+            : { text, count: 1, last: now };
+        if (lock.count < LECTURAS_FORMATO_DEBIL) {
+          setLockInfo({ text, progress: lock.count / LECTURAS_FORMATO_DEBIL });
+          return false;
+        }
       }
 
-      const needCount = isWeakFormat(hit.format) ? 3 : 2;
-      const progress = Math.min(1, (now - lock.first) / LOCK_MS);
-      setLockInfo({ text, progress });
-
-      if (now - lock.first < LOCK_MS || lock.count < needCount) return false;
-
+      setLockInfo({ text, progress: 1 });
       acceptValue({
         metodo: `BARRAS · ${normalizeFormat(hit.format).toUpperCase()}`,
         motor: engine,
-        modo: `${modo} · fijado ${Math.round(now - lock.first)} ms`,
+        modo,
         valor: text,
         raw: text,
         tiempoMs: Math.round(now - openedAtRef.current),
@@ -175,57 +201,65 @@ export default function EscanerCamara({ onCapture, onClose }) {
 
     const scanLoop = async () => {
       while (active) {
-        const started = performance.now();
         const video = videoRef.current;
         const box = scanBoxRef.current;
 
         if (
           video && box && video.readyState >= 2 && video.videoWidth &&
-          !isProcessingRef.current && scanModeRef.current === 'barras'
+          !isProcessingRef.current && !doneRef.current && scanModeRef.current === 'barras'
         ) {
           attempts++;
-          const mode = tick++ % 2;
+          const variante = VARIANTES_BARRAS[tick++ % VARIANTES_BARRAS.length];
           try {
             // SOLO lo que está dentro del recuadro (un poco de margen vertical para códigos altos)
             const rect = boxToVideoRect(video, box, 1.04, 1.6);
-            const imageData = drawRegion(video, rect, cropCanvas, 1400, 2);
+            const imageData = drawRegion(video, rect, cropCanvas, 1280, 2);
             const { width: w, height: h } = imageData;
 
-            if (tick % 18 === 0 && brightness(imageData) < 55) {
-              setLiveHint(trackRef.current?.getCapabilities?.().torch
-                ? 'Poca luz: activa la linterna 🔦'
-                : 'Poca luz: acerca a una fuente de luz');
+            if (tick % 24 === 0 && brightness(imageData) < 45 && !trackRef.current?.getCapabilities?.().torch) {
+              setLiveHint('Poca luz: acerca a una fuente de luz');
             }
+
+            // Imagen para ZXing según la variante de este frame
+            let zxImg;
+            let zxOpts = {};
+            if (variante === 'giro+' || variante === 'giro-') {
+              zxImg = recorteGirado(cropCanvas, variante === 'giro+' ? 20 : -20, giroCanvas);
+            } else {
+              if (variante === 'denoise') zxOpts = { denoise: true, binarizer: 'GlobalHistogram' };
+              if (variante === 'ruido') zxOpts = { denoise: true };
+              zxImg = new ImageData(new Uint8ClampedArray(imageData.data), w, h); // copia: el worker se queda con el buffer
+            }
+            const zxW = zxImg.width;
+            const zxH = zxImg.height;
+
+            // Nativo (Android / ML Kit: lee en cualquier ángulo) y ZXing EN PARALELO
+            const [nativos, zx] = await Promise.all([nativeDecode(cropCanvas), zxingDecode(zxImg, zxOpts)]);
+            if (!active || doneRef.current) return;
 
             let hit = null;
             let engine = '';
-            // a) Nativo (Android) sobre el recorte
-            const nativos = await nativeDecode(cropCanvas);
             if (nativos.length) {
               hit = pickCentered(nativos, w, h);
               engine = 'Nativo';
-            }
-            // b) ZXing sobre el recorte, alternando normal / con limpieza de ruido
-            if (!hit) {
-              const opts = mode === 1 ? { denoise: true, binarizer: 'GlobalHistogram' } : {};
-              hit = pickCentered(await zxingDecode(imageData, opts), w, h);
+            } else if (zx.length) {
+              hit = pickCentered(zx, zxW, zxH);
               engine = 'ZXing';
             }
-            if (!active) return;
 
             if (hit) {
-              if (onHit(hit, engine, mode === 1 ? 'recorte+denoise' : 'recorte')) return;
-            } else if (lock && performance.now() - lock.last > 450) {
+              if (onHit(hit, engine, engine === 'Nativo' ? 'nativo' : variante)) return;
+            } else if (lock && performance.now() - lock.last > 500) {
               lock = null;
               setLockInfo(null);
             }
           } catch {
             // frame fallido: seguimos
           }
+          await esperarFrame(video);
+        } else {
+          await sleep(80);
         }
-
-        const elapsed = performance.now() - started;
-        await sleep(Math.max(0, SCAN_INTERVAL_MS - elapsed));
       }
     };
 
@@ -333,11 +367,41 @@ export default function EscanerCamara({ onCapture, onClose }) {
       };
     };
 
-    const nitidezRecuadro = () => {
+    let oscuros = 0;
+    let quemados = 0;
+    let linternaAuto = false;
+    const leerRecuadro = () => {
       const video = videoRef.current;
       const box = scanBoxRef.current;
       if (!video || !box || video.readyState < 2 || !video.videoWidth) return null;
-      return sharpness(drawRegion(video, boxToVideoRect(video, box, 1, 1), canvas, 420, 1));
+      return drawRegion(video, boxToVideoRect(video, box, 1, 1), canvas, 420, 1);
+    };
+    const nitidezRecuadro = () => {
+      const img = leerRecuadro();
+      return img ? sharpness(img) : null;
+    };
+
+    // Poca luz ~1 s → enciende la linterna sola. Si con ella la etiqueta queda quemada (brillo), la apaga.
+    const revisarLuz = async (track, img) => {
+      if (linternaManualRef.current || !track.getCapabilities?.().torch) return;
+      const b = brightness(img);
+      oscuros = b < 60 ? oscuros + 1 : 0;
+      quemados = linternaAuto && b > 215 ? quemados + 1 : 0;
+      if (!linternaAuto && oscuros >= 4) {
+        oscuros = 0;
+        if (await aplicar(track, { torch: true })) {
+          linternaAuto = true;
+          setTorchOn(true);
+          setLiveHint('Poca luz: linterna encendida');
+        }
+      } else if (linternaAuto && quemados >= 4) {
+        quemados = 0;
+        if (await aplicar(track, { torch: false })) {
+          linternaAuto = false;
+          setTorchOn(false);
+          setLiveHint('Mucho brillo: linterna apagada');
+        }
+      }
     };
 
     const aplicar = async (track, cons) => {
@@ -398,8 +462,10 @@ export default function EscanerCamara({ onCapture, onClose }) {
     const id = setInterval(() => {
       const track = trackRef.current;
       if (!active || !track || enfocando || isProcessingRef.current || document.hidden) return;
-      const n = nitidezRecuadro();
-      if (n == null) return;
+      const img = leerRecuadro();
+      if (!img) return;
+      const n = sharpness(img);
+      revisarLuz(track, img);
 
       // Primera vez con imagen: enfocar el recuadro de entrada
       if (!preparado) {
@@ -508,8 +574,10 @@ export default function EscanerCamara({ onCapture, onClose }) {
                   consenso.text.endsWith(lectura.text));
               const texto = mismaPalabra && !cortada ? consenso.text : lectura.text;
               const votos = cortada ? 0 : mismaPalabra ? consenso.votos : 1;
-              // Nítido y seguro → 2 lecturas; borroso o dudoso → 3
-              const necesarios = lectura.conf >= 80 && mejor.s >= 60 ? OCR_VOTOS : OCR_VOTOS + 1;
+              // Las 3 lecturas de este frame (general + palabra ampliada en gris y en B/N) coinciden
+              // → se acepta YA. 2 de 3 y segura → 2 frames. Dudosa o borrosa → 3 frames.
+              const unanime = lectura.votos >= 3 && lectura.conf >= 70 && mejor.s >= 25;
+              const necesarios = unanime ? 1 : lectura.votos >= 2 && lectura.conf >= 75 ? OCR_VOTOS : OCR_VOTOS + 1;
 
               const aPct = (x, y) => ({
                 x: ((rect.sx + x * kx - visible.sx) / visible.sw) * 100,
@@ -534,7 +602,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
               setOcrLive(live);
               setLiveHint(cortada ? 'La palabra se sale: aleja un poco el equipo' : '');
 
-              if (!cortada && votos >= necesarios) {
+              if (!cortada && votos >= necesarios && !doneRef.current) {
                 aceptarLecturaMira(live, `${votos} lecturas coinciden`);
                 return;
               }
@@ -555,7 +623,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
           }
         }
 
-        await sleep(Math.max(0, 60 - (performance.now() - started)));
+        await sleep(Math.max(0, 16 - (performance.now() - started)));
       }
     };
 
@@ -622,6 +690,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
 
   const toggleTorch = async () => {
     if (!caps.torch) return;
+    linternaManualRef.current = true; // desde aquí la linterna la maneja el usuario
     const next = !torchOn;
     if (await applyAdvanced({ torch: next })) setTorchOn(next);
   };
@@ -886,6 +955,8 @@ export default function EscanerCamara({ onCapture, onClose }) {
         ? `Se sale del recuadro: ${ocrLive.text}…`
         : `Leyendo: ${ocrLive.text} (${ocrLive.votos}/${ocrLive.necesarios})`
       : liveHint || 'Texto: apunta la cruz al lote'
+    : capturado
+    ? `✓ ${capturado}`
     : lockInfo
     ? `Mantén… ${lockInfo.text}`
     : liveHint ||
@@ -925,7 +996,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
           ref={scanBoxRef}
           className={`tl-scan-box ${scanMode === 'texto' ? 'modo-texto' : ''} ${isProcessing ? 'busy' : ''} ${
             lockInfo ? 'locking' : ''
-          } ${ocrLive ? 'leyendo' : ''} ${enfocandoAuto ? 'enfocando' : ''}`}
+          } ${ocrLive ? 'leyendo' : ''} ${enfocandoAuto && !capturado ? 'enfocando' : ''} ${capturado ? 'capturado' : ''}`}
         >
           <span className="tl-corner tl-tl" />
           <span className="tl-corner tl-tr" />

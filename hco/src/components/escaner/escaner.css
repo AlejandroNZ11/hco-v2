@@ -570,3 +570,8 @@
 /* Enfoque automático en curso: las esquinas parpadean en celeste */
 .tl-scan-box.enfocando .tl-corner { border-color: #38bdf8; animation: tl-enfocando 0.45s ease-in-out infinite alternate; }
 @keyframes tl-enfocando { from { opacity: 1; } to { opacity: 0.35; } }
+
+/* Lectura aceptada: todo el recuadro se pinta de verde un instante (como el LED de la pistola) */
+.tl-scan-box.capturado { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.58), inset 0 0 0 3px #22c55e, 0 0 24px 6px rgba(34, 197, 94, 0.85) !important; background: rgba(34, 197, 94, 0.22); }
+.tl-scan-box.capturado .tl-corner { border-color: #22c55e !important; animation: none; opacity: 1; }
+.tl-scan-box.capturado .tl-scan-line { display: none; }

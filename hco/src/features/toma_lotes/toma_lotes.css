@@ -571,3 +571,29 @@
     .filters-actions-row { grid-template-columns: repeat(2, 1fr); }
   }
 }
+
+/* ===== v3: columnas según pantalla + cliente recortado ===== */
+.hco-toma-lotes .col-solo-movil { display: none; }
+.hco-toma-lotes .table-container td.tl-cliente { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 600px) {
+  .hco-toma-lotes .col-ocultar-movil { display: none; }
+  .hco-toma-lotes .col-solo-movil { display: table-cell; }
+  .hco-toma-lotes .table-container td.tl-cliente { max-width: 130px; }
+}
+
+/* ===== v4: en celular solo se registran lotes: sin KPI ni filtros; Exportar en gris
+   (los filtros siguen en el día de hoy) ===== */
+@media (max-width: 600px) {
+  .hco-toma-lotes .kpi-container-card,
+  .hco-toma-lotes .filters-card { display: none !important; }
+  /* Exportar se ve, pero bloqueado en gris */
+  .hco-toma-lotes .btn-exportar-excel {
+    pointer-events: none;
+    background: #e2e8f0 !important;
+    background-image: none !important;
+    color: #94a3b8 !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: none !important;
+  }
+  .hco-toma-lotes .btn-exportar-excel .excel-icon-box { background: #cbd5e1 !important; color: #fff !important; }
+}

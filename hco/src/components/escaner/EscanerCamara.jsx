@@ -20,6 +20,7 @@ import {
   sharpness,
 } from './scanUtils';
 import { nativeDecode, obtenerOcrWorker, useMotoresEscaner, zxingDecode } from './motoresEscaner';
+import { sonarEscaneo } from './sonidoEscaneo';
 import './escaner.css';
 
 const SCAN_INTERVAL_MS = 110;
@@ -102,6 +103,7 @@ export default function EscanerCamara({ onCapture, onClose }) {
   const acceptValue = useCallback((capture) => {
     if (doneRef.current) return;
     doneRef.current = true;
+    sonarEscaneo(capture.metodo.startsWith('OCR') ? 'texto' : 'ok');
     if (navigator.vibrate) navigator.vibrate(capture.metodo.startsWith('OCR') ? [70, 40, 70] : 100);
     onCaptureRef.current?.(capture);
     onCloseRef.current?.();

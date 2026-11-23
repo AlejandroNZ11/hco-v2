@@ -5,6 +5,7 @@
 // - Si el OCR dudó entre varias lecturas, muestra chips para elegir la correcta.
 import { forwardRef, lazy, Suspense, useState } from 'react';
 import { useMotoresEscaner } from './motoresEscaner';
+import { prepararSonido } from './sonidoEscaneo';
 import './escaner.css';
 
 // La cámara solo se descarga cuando se usa por primera vez (la pantalla abre más rápido)
@@ -59,7 +60,10 @@ const CampoEscaner = forwardRef(function CampoEscaner(
         <button
           type="button"
           className="tl-scan-btn"
-          onClick={() => setAbierto(true)}
+          onClick={() => {
+            prepararSonido(); // habilita el pitido en celulares (requiere un toque del usuario)
+            setAbierto(true);
+          }}
           disabled={disabled}
           title="Escanear con la cámara"
           aria-label="Escanear con la cámara"

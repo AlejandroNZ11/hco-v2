@@ -29,7 +29,6 @@ import ModalResumenExcel from './ModalResumenExcel';
 import './toma_lotes.css';
 
 const ITEMS_POR_PAGINA = 50;
-const FILTROS_INICIALES = { buscar: '', ruta: 'Todas', estado: 'Todos', fechaIni: '', fechaFin: '' };
 
 function getStoredAuthUser() {
   const raw = localStorage.getItem('authUser') || sessionStorage.getItem('authUser');
@@ -51,6 +50,12 @@ const fechaISO = (fecha) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// La toma de lotes es por día: los filtros siempre arrancan (y se limpian) en el día de hoy
+const filtrosDeHoy = () => {
+  const hoy = fechaISO(new Date());
+  return { buscar: '', ruta: 'Todas', estado: 'Todos', fechaIni: hoy, fechaFin: hoy };
+};
+
 function TomaLotesContenido() {
   const [currentUser] = useState(() => getStoredAuthUser());
   const usuario = useMemo(
@@ -62,8 +67,8 @@ function TomaLotesContenido() {
   const registros = useLiveQuery(() => localDb.toma_lotes.toArray(), [], null);
   const [actualizando, setActualizando] = useState(false);
 
-  const [filtrosForm, setFiltrosForm] = useState(FILTROS_INICIALES);
-  const [filtros, setFiltros] = useState(FILTROS_INICIALES);
+  const [filtrosForm, setFiltrosForm] = useState(filtrosDeHoy);
+  const [filtros, setFiltros] = useState(filtrosDeHoy);
   const [pagina, setPagina] = useState(1);
 
   const [seleccionado, setSeleccionado] = useState(null); // fila abierta en el modal
@@ -119,10 +124,17 @@ function TomaLotesContenido() {
     [ordenados],
   );
 
+  // KPI del rango de fechas filtrado (por defecto, el día de hoy)
   const kpis = useMemo(() => {
-    const conLotes = ordenados.filter((r) => (r.lotes || []).length > 0).length;
-    return { total: ordenados.length, conLotes, sinLotes: ordenados.length - conLotes };
-  }, [ordenados]);
+    const delRango = ordenados.filter(
+      (r) =>
+        !r.fecha_registro ||
+        ((!filtros.fechaIni || fechaISO(r.fecha_registro) >= filtros.fechaIni) &&
+          (!filtros.fechaFin || fechaISO(r.fecha_registro) <= filtros.fechaFin)),
+    );
+    const conLotes = delRango.filter((r) => (r.lotes || []).length > 0).length;
+    return { total: delRango.length, conLotes, sinLotes: delRango.length - conLotes };
+  }, [ordenados, filtros.fechaIni, filtros.fechaFin]);
 
   const filtrados = useMemo(() => {
     const q = filtros.buscar.trim().toLowerCase();
@@ -154,9 +166,15 @@ function TomaLotesContenido() {
     setPagina(1);
   };
 
+  const cambiarFiltro = (campo, valor) => {
+    const nuevos = { ...filtrosForm, [campo]: valor };
+    setFiltrosForm(nuevos);
+  };
+
   const limpiarFiltros = () => {
-    setFiltrosForm(FILTROS_INICIALES);
-    aplicarFiltros(FILTROS_INICIALES);
+    const hoy = filtrosDeHoy();
+    setFiltrosForm(hoy);
+    aplicarFiltros(hoy);
   };
 
   // ----- Excel -----
@@ -228,24 +246,15 @@ function TomaLotesContenido() {
   const exportar = async () => {
     if (!filtrados.length) return alert('No hay registros para exportar.');
     const XLSX = await import('xlsx');
-    const datos = filtrados.map((r, i) => ({
-      'N°': i + 1,
-      'F. Registro': formatearFecha(r.fecha_registro),
-      Ruta: r.ruta || '',
-      Cliente: r.cliente || '',
-      Pedido: r.pedido,
-      SKU: r.sku,
-      'Registrado por': r.registrado_por_nombre || '',
-      'Cant. Lotes': (r.lotes || []).length,
-      Lotes: (r.lotes || []).join(', '),
-      'Lotes (fecha/hora)': detalleDeFila(r)
-        .map((d) => `${d.lote} (${formatearFecha(d.fecha)}${d.origen ? ' · ' + d.origen : ''})`)
-        .join(', '),
-      'Lotes por': r.lotes_por_nombre || '',
-      'Lotes el': formatearFecha(r.lotes_actualizado_en),
-    }));
-    const hoja = XLSX.utils.json_to_sheet(datos);
-    hoja['!cols'] = [6, 16, 8, 34, 12, 16, 24, 10, 40, 60, 24, 16].map((wch) => ({ wch }));
+    // Mismo formato que la plantilla de subida (Ruta, Cliente, Pedido, SKU, Lote): una fila por lote,
+    // y una fila con Lote vacío si el SKU aún no tiene lotes. El archivo se puede volver a cargar tal cual.
+    const filas = [['Ruta', 'Cliente', 'Pedido', 'SKU', 'Lote']];
+    filtrados.forEach((r) => {
+      const lotes = detalleDeFila(r).map((d) => d.lote);
+      (lotes.length ? lotes : ['']).forEach((lote) => filas.push([r.ruta || '', r.cliente || '', r.pedido, r.sku, lote]));
+    });
+    const hoja = XLSX.utils.aoa_to_sheet(filas);
+    hoja['!cols'] = [10, 40, 14, 16, 20].map((wch) => ({ wch }));
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, 'Toma de Lotes');
     XLSX.writeFile(libro, `Toma_Lotes_${fechaISO(new Date())}.xlsx`);
@@ -290,15 +299,16 @@ function TomaLotesContenido() {
             <label>Buscar</label>
             <input
               type="text"
-              placeholder="Pedido, SKU, cliente, lote..."
+              placeholder="Buscar pedido, SKU, cliente, lote..."
+              aria-label="Buscar"
               value={filtrosForm.buscar}
-              onChange={(e) => setFiltrosForm({ ...filtrosForm, buscar: e.target.value })}
+              onChange={(e) => cambiarFiltro('buscar', e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && aplicarFiltros()}
             />
           </div>
           <div className="filter-group">
             <label>Ruta</label>
-            <select value={filtrosForm.ruta} onChange={(e) => setFiltrosForm({ ...filtrosForm, ruta: e.target.value })}>
+            <select aria-label="Ruta" value={filtrosForm.ruta} onChange={(e) => cambiarFiltro('ruta', e.target.value)}>
               <option value="Todas">Todas</option>
               {listaRutas.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -307,20 +317,20 @@ function TomaLotesContenido() {
           </div>
           <div className="filter-group">
             <label>Lotes</label>
-            <select value={filtrosForm.estado} onChange={(e) => setFiltrosForm({ ...filtrosForm, estado: e.target.value })}>
+            <select aria-label="Lotes" value={filtrosForm.estado} onChange={(e) => cambiarFiltro('estado', e.target.value)}>
               <option value="Todos">Todos</option>
               <option value="SIN">Sin lotes</option>
               <option value="CON">Con lotes</option>
               <option value="PENDIENTE">Pendiente de envío</option>
             </select>
           </div>
-          <div className="filter-group mobile-hidden-filter">
+          <div className="filter-group">
             <label>Fecha ini</label>
-            <input type="date" value={filtrosForm.fechaIni} onChange={(e) => setFiltrosForm({ ...filtrosForm, fechaIni: e.target.value })} />
+            <input type="date" aria-label="Fecha inicio" value={filtrosForm.fechaIni} onChange={(e) => cambiarFiltro('fechaIni', e.target.value)} />
           </div>
-          <div className="filter-group mobile-hidden-filter">
+          <div className="filter-group">
             <label>Fecha fin</label>
-            <input type="date" value={filtrosForm.fechaFin} onChange={(e) => setFiltrosForm({ ...filtrosForm, fechaFin: e.target.value })} />
+            <input type="date" aria-label="Fecha fin" value={filtrosForm.fechaFin} onChange={(e) => cambiarFiltro('fechaFin', e.target.value)} />
           </div>
         </div>
 
@@ -342,6 +352,7 @@ function TomaLotesContenido() {
             type="button"
             className="btn-action-secondary btn-plantilla"
             onClick={descargarPlantillaTomaLotes}
+           
             title="Descargar plantilla de Excel (Ruta, Cliente, Pedido, SKU, Lote)"
           >
             <FaFileDownload />
@@ -387,7 +398,7 @@ function TomaLotesContenido() {
               <FaChevronRight className="nav-chevron" />
             </button>
           </div>
-          <button type="button" className="btn-exportar-excel" onClick={exportar} title="Exportar a Excel (.xlsx)">
+          <button type="button" className="btn-exportar-excel" onClick={exportar} title="Exportar a Excel (.xlsx)" tabIndex={window.matchMedia("(max-width: 600px)").matches ? -1 : undefined}>
             <span className="excel-icon-box">X</span>
             <span>Exportar</span>
           </button>
@@ -398,24 +409,25 @@ function TomaLotesContenido() {
             <thead>
               <tr>
                 <th style={{ width: 40 }}>N°</th>
-                <th>F. Registro</th>
+                <th className="col-solo-movil">Lotes</th>
+                <th className="col-ocultar-movil">F. Registro</th>
                 <th>Ruta</th>
                 <th>Cliente</th>
                 <th>Pedido</th>
                 <th>SKU</th>
-                <th>Registrado por</th>
-                <th>Lotes</th>
+                <th className="col-ocultar-movil">Registrado por</th>
+                <th className="col-ocultar-movil">Lotes</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {cargandoInicial ? (
                 <tr>
-                  <td colSpan="9" className="tl-vacio">Cargando…</td>
+                  <td colSpan="10" className="tl-vacio">Cargando…</td>
                 </tr>
               ) : visibles.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="tl-vacio">
+                  <td colSpan="10" className="tl-vacio">
                     {ordenados.length ? 'No hay registros con los filtros seleccionados.' : 'Aún no hay pedidos. Usa «Cargar Excel» para empezar.'}
                   </td>
                 </tr>
@@ -423,27 +435,26 @@ function TomaLotesContenido() {
                 visibles.map((r, i) => {
                   const n = (r.lotes || []).length;
                   const pendiente = r._sincronizado === false;
+                  const badgeLotes = (
+                    <span className={`tl-lotes-badge ${n ? 'con' : 'sin'}`} title={n ? (r.lotes || []).join(', ') : 'Sin lotes'}>
+                      {n ? <FaCheck /> : <FaExclamation />}
+                      <strong>{n}</strong>
+                    </span>
+                  );
                   return (
                     <tr key={r.id} className="tl-fila" onClick={() => abrirDesdeFila(r)} title="Click para ingresar lotes">
-                      <td className="tl-num">{inicio + i + 1}</td>
-                      <td>
-                        {formatearFecha(r.fecha_registro)}
+                      <td className="tl-num">
+                        {inicio + i + 1}
                         {pendiente && <span className="tl-dot-pendiente" title="Pendiente de envío" />}
                       </td>
+                      <td className="col-solo-movil">{badgeLotes}</td>
+                      <td className="col-ocultar-movil">{formatearFecha(r.fecha_registro)}</td>
                       <td>{r.ruta || '-'}</td>
                       <td className="tl-cliente" title={r.cliente}>{r.cliente || '-'}</td>
                       <td className="tl-fuerte">{r.pedido}</td>
                       <td className="tl-fuerte">{r.sku}</td>
-                      <td>{r.registrado_por_nombre || '-'}</td>
-                      <td>
-                        <span
-                          className={`tl-lotes-badge ${n ? 'con' : 'sin'}`}
-                          title={n ? (r.lotes || []).join(', ') : 'Sin lotes'}
-                        >
-                          {n ? <FaCheck /> : <FaExclamation />}
-                          <strong>{n}</strong>
-                        </span>
-                      </td>
+                      <td className="col-ocultar-movil">{r.registrado_por_nombre || '-'}</td>
+                      <td className="col-ocultar-movil">{badgeLotes}</td>
                       <td>
                         <button
                           type="button"

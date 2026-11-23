@@ -6,6 +6,7 @@ import { sincronizarInspeccionesPendientes } from '../services/mheService';
 import { sincronizarSugerenciasPendientes } from '../services/sugerenciasService';
 import { sincronizarPrestamosPendientes } from '../services/prestamosService';
 import { sincronizarPuestosPendientes } from '../services/oficinaLogisticaService';
+import { sincronizarTomaLotesPendientes } from '../services/tomaLotesService';
 import { emitir, EVENTOS } from '../services/eventBus';
 
 // Módulos con su propia lógica de sincronización. Cada uno corre aislado:
@@ -15,6 +16,7 @@ const SINCRONIZADORES = [
   { tabla: 'tarjetas_sugerencias', nombre: 'Sugerencias', fn: sincronizarSugerenciasPendientes },
   { tabla: 'prestamos', nombre: 'Préstamos', fn: sincronizarPrestamosPendientes },
   { tabla: 'oficina_puestos', nombre: 'Oficina', fn: sincronizarPuestosPendientes },
+  { tabla: 'toma_lotes', nombre: 'Toma de Lotes', fn: sincronizarTomaLotesPendientes },
 ];
 const TABLAS_CON_SINCRONIZADOR = new Set(SINCRONIZADORES.map(s => s.tabla));
 

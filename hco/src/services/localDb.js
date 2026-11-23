@@ -35,3 +35,9 @@ localDb.version(5).stores({
 localDb.version(6).stores({
   oficina_puestos: 'id, empleado_id, estado, _sincronizado'
 });
+
+// v7: Toma de Lotes (pedido + SKU cargados por Excel, lotes tomados en piso)
+// Clave = 'PEDIDO|SKU' → un pedido no puede repetir SKU. Cambios offline van a sync_queue.
+localDb.version(7).stores({
+  toma_lotes: 'id, pedido, sku, ruta, fecha_registro, _sincronizado'
+});

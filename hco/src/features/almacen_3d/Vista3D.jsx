@@ -99,6 +99,39 @@ const texturaRotulo = (texto, flechaDerecha) => {
   return tex;
 };
 
+// Apilador (montacargas retráctil) como el de la foto: cuerpo amarillo, techo protector,
+// mástil alto, brazos tijera y uñas. Mira hacia +Z.
+const crearApilador = () => {
+  const g = new THREE.Group();
+  const amarillo = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.5 });
+  const negro = new THREE.MeshStandardMaterial({ color: '#1f2937', roughness: 0.6, metalness: 0.3 });
+  const pieza = (sx, sy, sz, mat, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+    m.position.set(x, y, z);
+    g.add(m);
+  };
+  pieza(1.05, 0.25, 1.3, negro, 0, 0.13, -0.55); // base
+  pieza(1.0, 1.05, 1.0, amarillo, 0, 0.75, -0.6); // cuerpo (batería)
+  pieza(0.5, 0.35, 0.4, negro, 0, 1.45, -0.55); // asiento
+  [[-0.45, -0.15], [0.45, -0.15], [-0.45, -1.05], [0.45, -1.05]].forEach(([x, z]) => pieza(0.05, 1.1, 0.05, negro, x, 1.85, z)); // postes del techo
+  pieza(1.0, 0.06, 1.0, negro, 0, 2.42, -0.6); // techo protector
+  pieza(0.12, 0.1, 0.12, new THREE.MeshBasicMaterial({ color: '#fbbf24' }), 0.35, 2.5, -0.95); // baliza
+  [-0.45, 0.45].forEach((x) => pieza(0.14, 0.14, 1.5, negro, x, 0.07, 0.75)); // patas delanteras
+  [-0.32, 0.32].forEach((x) => pieza(0.12, 3.4, 0.12, negro, x, 1.75, 0.05)); // mástil
+  pieza(0.76, 0.1, 0.12, negro, 0, 3.4, 0.05);
+  pieza(0.76, 0.1, 0.12, negro, 0, 2.2, 0.05);
+  // brazos tijera
+  [-1, 1].forEach((s) => {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.75), negro);
+    b.position.set(0, 0.85, 0.45);
+    b.rotation.x = s * 0.5;
+    g.add(b);
+  });
+  pieza(0.9, 0.7, 0.08, negro, 0, 0.7, 0.85); // placa porta uñas
+  [-0.25, 0.25].forEach((x) => pieza(0.12, 0.05, 1.1, negro, x, 0.38, 1.42)); // uñas
+  return g;
+};
+
 const liberar = (obj) => {
   obj.traverse((o) => {
     o.geometry?.dispose?.();
@@ -700,12 +733,23 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       });
     }
 
+    // ---------- Apiladores en los pasillos ----------
+    dist.apiladores.forEach((a) => {
+      const ap = crearApilador();
+      ap.position.set(a.x, 0, a.z);
+      if (a.mira < 0) ap.rotation.y = Math.PI;
+      grupo.add(ap);
+      const t = etiqueta(`Apilador ${a.numero}`, { escala: 0.55, fondo: 'rgba(180,83,9,0.92)' });
+      t.position.set(a.x, 3.2, a.z);
+      grupo.add(t);
+    });
+
     // ---------- Etiquetas de rack y de puentes ----------
     racks.forEach((r) => {
       const x = xRack[r] + F / 2;
       const [pD, pH] = rangoProfundidades(cfg, r);
       const pel = esRackPeligrosos(r);
-      const yEt = (pel ? infos[r][pD].altura * H : altoMax) + 0.9;
+      const yEt = (pel ? infos[r][pD].altura * H : altoMax) + 2.2; // bien arriba del rack
       [(filaDe(cfg, r, pD) - 1) * A - 1.2, filaDe(cfg, r, pH) * A + 1.2].forEach((z) => {
         const s = etiqueta(codRack(r), pel ? { fondo: 'rgba(185,28,28,0.92)' } : undefined);
         s.position.set(x, Math.max(yEt, 2.5), z);

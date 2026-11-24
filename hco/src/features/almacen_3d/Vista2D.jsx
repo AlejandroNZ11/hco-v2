@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   alturaMaxima, codProf, codRack, codigoUbicacion, colorCliente, colorOcupacion, distribucion,
   columnasDeRack, esProfundidadDePuente, esRackPeligrosos, filaDe, infoProfundidad, maxProfundidades, ocupacionProfundidad,
@@ -12,6 +12,57 @@ const PX = 20; // píxeles por metro en el ancho (racks y pasillos)
 const FILA = 16; // alto de cada profundidad en px
 const MARGEN = { izq: 44, arr: 30 };
 
+// Arrastrar con la mano para moverse (sin usar las barras de scroll).
+// Si el mouse se movió, el clic que viene después no selecciona nada.
+const useArrastre = () => {
+  const ref = useRef(null);
+  const estado = useRef(null);
+  const movio = useRef(false);
+  const [arrastrando, setArrastrando] = useState(false);
+  useEffect(() => {
+    const mover = (e) => {
+      const s = estado.current;
+      if (!s || !ref.current) return;
+      const dx = e.clientX - s.x;
+      const dy = e.clientY - s.y;
+      if (!movio.current && Math.abs(dx) + Math.abs(dy) > 4) {
+        movio.current = true;
+        setArrastrando(true);
+      }
+      if (movio.current) {
+        ref.current.scrollLeft = s.left - dx;
+        ref.current.scrollTop = s.top - dy;
+      }
+    };
+    const soltar = () => {
+      estado.current = null;
+      setArrastrando(false);
+    };
+    window.addEventListener('mousemove', mover);
+    window.addEventListener('mouseup', soltar);
+    return () => {
+      window.removeEventListener('mousemove', mover);
+      window.removeEventListener('mouseup', soltar);
+    };
+  }, []);
+  return {
+    ref,
+    className: `alm-scroll alm-arrastre ${arrastrando ? 'arrastrando' : ''}`,
+    onMouseDown: (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault(); // que no seleccione texto
+      movio.current = false;
+      estado.current = { x: e.clientX, y: e.clientY, left: ref.current.scrollLeft, top: ref.current.scrollTop };
+    },
+    onClickCapture: (e) => {
+      if (movio.current) {
+        e.stopPropagation();
+        movio.current = false;
+      }
+    },
+  };
+};
+
 const colorNiveles = (n, min, max) => {
   // más niveles = azul más oscuro
   const t = max === min ? 0.5 : (n - min) / (max - min);
@@ -21,6 +72,7 @@ const colorNiveles = (n, min, max) => {
 
 export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHover }) {
   const dist = useMemo(() => distribucion(cfg), [cfg]);
+  const arrastre = useArrastre();
   // "Como el plano": 001 abajo y el almacén girado 180° (igual que el plano en papel)
   const [comoPlano, setComoPlano] = useState(() => localStorage.getItem('almacen3d.comoPlano') !== '0');
   const cambiarOrientacion = () => {
@@ -125,7 +177,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
           <input type="checkbox" checked={comoPlano} onChange={cambiarOrientacion} /> Ver como el plano (001 abajo)
         </label>
       </div>
-      <div className="alm-scroll">
+      <div {...arrastre}>
         <svg width={ancho} height={alto} className="alm-svg">
           <defs>
             <pattern id="alm-rayas" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -217,6 +269,16 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
               className="alm-txt-rack" fill={esRackPeligrosos(rack) ? '#b91c1c' : undefined}>{codRack(rack)}</text>
           ))}
           {celdas}
+          {/* Apiladores */}
+          {dist.apiladores.map((a) => {
+            const rc = R(a.x - 0.55, a.x + 0.55, a.z - 1.1, a.z + 1.1);
+            return (
+              <g key={a.numero} onMouseMove={(e) => onHover?.(`Apilador ${a.numero} · pasillo ${a.pasillo}`, e.clientX, e.clientY)} onMouseLeave={() => onHover?.(null)}>
+                <rect {...rc} rx={3} fill="#f59e0b" stroke="#1f2937" strokeWidth="1.2" />
+                <text x={rc.x + rc.width / 2} y={rc.y + rc.height / 2 + 3.5} textAnchor="middle" className="alm-txt-apilador">A{a.numero}</text>
+              </g>
+            );
+          })}
         </svg>
       </div>
     </div>
@@ -232,6 +294,7 @@ const CW = 34;
 const UH = 26; // px por nivel base
 
 export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccionProf, onSeleccionar, onSeleccionarProf, onHover }) {
+  const arrastre = useArrastre();
   const [pD, pH] = rangoProfundidades(cfg, rack);
   const profs = Math.max(0, pH - pD + 1);
   // x de cada profundidad (las columnas del edificio dejan un hueco)
@@ -304,7 +367,7 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
   });
 
   return (
-    <div className="alm-scroll">
+    <div {...arrastre}>
       <svg width={ancho} height={alto + 14} className="alm-svg">
         <defs>
           <pattern id="alm-rayas2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">

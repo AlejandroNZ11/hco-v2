@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { FaPlus, FaTrash } from 'react-icons/fa';
-import { claveProf, codRack, leerAlturas, pasillosImpares, pasillosPares, profundidadesDeRack } from './almacenModelo';
+import { claveProf, codRack, distribucion, leerAlturas, nombrePasillo, pasillosImpares, pasillosPares, profundidadesDeRack } from './almacenModelo';
 
 const OPC_PALLETS = [1, 2, 3, 4];
 
@@ -130,6 +130,7 @@ export default function EditorConfig({ cfg, setCfg }) {
     });
 
   const puntuales = Object.entries(cfg.posiciones).sort(([a], [b]) => a.localeCompare(b));
+  const pasillosPrincipales = distribucion(cfg).pasillos;
 
   return (
     <div className="alm-editor">
@@ -180,13 +181,37 @@ export default function EditorConfig({ cfg, setCfg }) {
               </span>
             );
           })}
-          <span className="alm-pas-pas" title="Pasillo">pasillo</span>
+          <button type="button" className={`alm-pas-corte ${cfg.pasilloAlFinal ? 'pasillo' : ''}`}
+            title={cfg.pasilloAlFinal ? `Pasillo después del ${codRack(cfg.racks)}` : `El ${codRack(cfg.racks)} va pegado al muro`}
+            onClick={() => set('pasilloAlFinal', !cfg.pasilloAlFinal)}>{cfg.pasilloAlFinal ? 'pasillo' : 'muro'}</button>
         </div>
         <div className="alm-presets">
           <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('pasillosDespuesDe', pasillosImpares(cfg.racks))}>01 | 02·03 | 04·05 …</button>
           <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('pasillosDespuesDe', pasillosPares(cfg.racks))}>01·02 | 03·04 … {cfg.racks % 2 ? `${codRack(cfg.racks)} solo` : ''}</button>
           <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('pasillosDespuesDe', Array.from({ length: cfg.racks - 1 }, (_, i) => i + 1))}>Pasillo entre todos</button>
         </div>
+      </section>
+
+      <section className="alm-card">
+        <h3>Apiladores ({cfg.apiladores.reduce((s, a) => s + a.cantidad, 0)})</h3>
+        <p className="alm-ayuda">Cuántos apiladores hay en cada pasillo. Se reparten a lo largo del pasillo (en 3D y en la planta).</p>
+        <table className="alm-tabla">
+          <thead><tr><th>Pasillo</th><th>Cantidad</th><th /></tr></thead>
+          <tbody>
+            {cfg.apiladores.map((a, i) => (
+              <tr key={`${i}-${cfg.apiladores.length}`}>
+                <td>
+                  <select value={a.antesDe} onChange={(e) => setCfg((c) => ({ ...c, apiladores: c.apiladores.map((x, j) => (j === i ? { ...x, antesDe: +e.target.value } : x)) }))}>
+                    {pasillosPrincipales.map((p) => <option key={p.antesDe} value={p.antesDe}>{nombrePasillo(cfg, p.antesDe)}</option>)}
+                  </select>
+                </td>
+                <td><input type="number" min="0" value={a.cantidad} onChange={(e) => { const v = entero(e.target.value, 0); if (v != null) setCfg((c) => ({ ...c, apiladores: c.apiladores.map((x, j) => (j === i ? { ...x, cantidad: v } : x)) })); }} /></td>
+                <td><button type="button" className="alm-btn-icono" title="Quitar" onClick={() => set('apiladores', cfg.apiladores.filter((_, j) => j !== i))}><FaTrash /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('apiladores', [...cfg.apiladores, { antesDe: pasillosPrincipales[0]?.antesDe ?? 1, cantidad: 1 }])}><FaPlus /> Agregar apilador</button>
       </section>
 
       <section className="alm-card">

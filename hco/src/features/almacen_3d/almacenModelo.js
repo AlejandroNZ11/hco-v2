@@ -79,6 +79,13 @@ export const CONFIG_INICIAL = {
   columnas: [],
   // Rótulo colgado en la punta de cada rack (número con flecha hacia su pasillo).
   rotulos: { activo: true, altura: 4.5, atras: true },
+  // ¿Pasillo después del último rack? (el 35 va pegado al muro)
+  pasilloAlFinal: false,
+  // Apiladores (montacargas retráctiles): cuántos en cada pasillo. antesDe = rack que está después del pasillo.
+  apiladores: [
+    { antesDe: 3, cantidad: 1 },
+    { antesDe: 23, cantidad: 2 },
+  ],
   // Ubicaciones con enrejado (jaula), por rack y rango de profundidades.
   enrejados: [{ rack: 'P6', desde: 1, hasta: 12 }],
   medidas: {
@@ -208,6 +215,11 @@ export const completarConfig = (c) => {
     columnas,
     palletsPorUbicacion: Math.min(4, Math.max(1, Math.round(+base.palletsPorUbicacion || 1))),
     rotulos: { ...CONFIG_INICIAL.rotulos, ...(c?.rotulos || {}) },
+    pasilloAlFinal: !!base.pasilloAlFinal,
+    apiladores: (Array.isArray(c?.apiladores) ? c.apiladores : CONFIG_INICIAL.apiladores).map((a) => ({
+      antesDe: Math.max(1, Math.round(+a.antesDe || 1)),
+      cantidad: Math.max(0, Math.round(+a.cantidad || 0)),
+    })),
     pasillosDespuesDe: pasillos,
     stage: { ...CONFIG_INICIAL.stage, ...(c?.stage || {}) },
     peligrosos: pel,
@@ -384,6 +396,33 @@ export const maxProfundidades = (cfg) => {
 export const pasilloAntesDe = (cfg, r) =>
   esRackPeligrosos(r) ? rackPeligrosos(cfg, r)?.pasilloAntes !== false : r === 1 || cfg.pasillosDespuesDe.includes(r - 1);
 
+/** Nombre de un pasillo del almacén principal por los racks que lo rodean. */
+export const nombrePasillo = (cfg, antesDe) => {
+  if (antesDe <= 1) return 'Antes del 01';
+  if (antesDe > cfg.racks) return `Después del ${codRack(cfg.racks)}`;
+  return `Entre ${codRack(antesDe - 1)} y ${codRack(antesDe)}`;
+};
+
+/** Apiladores repartidos a lo largo de su pasillo: [{ numero, x, z, antesDe, pasillo }]. */
+const ubicarApiladores = (cfg, pasillos, largo) => {
+  const lista = [];
+  (cfg.apiladores || []).forEach((a) => {
+    const p = pasillos.find((x) => x.antesDe === a.antesDe);
+    if (!p) return;
+    for (let i = 0; i < a.cantidad; i++) {
+      lista.push({
+        numero: lista.length + 1,
+        x: (p.x0 + p.x1) / 2,
+        z: (largo * (i + 1)) / (a.cantidad + 1),
+        antesDe: a.antesDe,
+        pasillo: nombrePasillo(cfg, a.antesDe),
+        mira: i % 2 ? -1 : 1, // hacia el fondo o hacia el frente
+      });
+    }
+  });
+  return lista;
+};
+
 /**
  * Posición (metros) de todo: racks, pasillos, stage, rampas y peligrosos.
  * X = racks uno al lado del otro, Z = profundidad (001 al frente), el stage queda en Z negativo.
@@ -403,8 +442,10 @@ export const distribucion = (cfg) => {
     racks.push({ rack: r, x0: x, x1: x + fondoRack });
     x += fondoRack;
   }
-  pasillos.push({ x0: x, x1: x + pasillo, antesDe: null });
-  x += pasillo;
+  if (cfg.pasilloAlFinal) {
+    pasillos.push({ x0: x, x1: x + pasillo, antesDe: cfg.racks + 1 });
+    x += pasillo;
+  } else x += 0.3; // el último rack va pegado al muro
   const anchoPrincipal = x;
   let filasMax = 0;
   for (let r = 1; r <= cfg.racks; r++) filasMax = Math.max(filasMax, filaDe(cfg, r, profundidadesDeRack(cfg, r)));
@@ -489,6 +530,7 @@ export const distribucion = (cfg) => {
   const xMax = Math.max(anchoPrincipal, peligrosos?.x1 ?? 0);
   return {
     racks, pasillos, peligrosos, stage, frente,
+    apiladores: ubicarApiladores(cfg, pasillos, largo),
     ancho: anchoPrincipal, largo,
     xMin, xMax, zMin: stage ? stage.z0 - 4 : -2, zMax: Math.max(largo, peligrosos?.z1 ?? 0) + 2,
   };

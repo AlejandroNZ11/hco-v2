@@ -145,3 +145,11 @@
 /* Sin permiso para configurar */
 .alm-tabs > button.bloqueado { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; display: inline-flex; align-items: center; gap: 5px; }
 .alm-sin-acceso { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #64748b; background: #f1f5f9; border-radius: 8px; padding: 6px 8px; margin: 8px 0; }
+
+/* Arrastrar con la mano en 2D */
+.alm-arrastre { cursor: grab; }
+.alm-arrastre.arrastrando { cursor: grabbing; user-select: none; }
+.alm-arrastre.arrastrando .alm-celda { cursor: grabbing; }
+
+/* Apiladores en la planta */
+.alm-txt-apilador { font-size: 10px; font-weight: 800; fill: #1f2937; pointer-events: none; }

@@ -1,10 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FaWarehouse, FaSave, FaSearch, FaFileExcel, FaFileUpload, FaTimes, FaUndoAlt } from 'react-icons/fa';
+import { FaWarehouse, FaSave, FaSearch, FaFileExcel, FaFileUpload, FaLock, FaTimes, FaUndoAlt } from 'react-icons/fa';
 import * as XLSX from 'xlsx';
 import { cargarConfigAlmacen, guardarConfigAlmacen } from '../../services/almacenService';
 import {
   claveProf, codProf, codRack, codigoUbicacion, colorCliente, generarCatalogo, infoProfundidad,
-  leerAlturas, normalizarUbicacion, separarCodigo,
+  esRackPeligrosos, leerAlturas, leerRack, listaRacks, normalizarUbicacion, separarCodigo,
 } from './almacenModelo';
 import { AlzadoRack, Planta } from './Vista2D';
 import EditorConfig from './EditorConfig';
@@ -18,6 +18,19 @@ const VISTAS = [
   ['3d', '3D'],
   ['config', 'Configurar'],
 ];
+
+const MSG_SIN_ACCESO = 'No tienes acceso: solo el rol Superadministrador puede configurar el almacén.';
+
+// Rol del usuario con sesión (mismo origen que el menú: authUser en local/sessionStorage)
+const esSuperAdmin = () => {
+  try {
+    const u = JSON.parse(localStorage.getItem('authUser') || sessionStorage.getItem('authUser') || 'null');
+    const rol = String(u?.rol || u?.role || u?.roles?.nombre || '').toUpperCase().replace(/[\s_-]+/g, '');
+    return rol === 'SUPERADMIN';
+  } catch {
+    return false;
+  }
+};
 
 const sinTildes = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -56,7 +69,12 @@ export default function Almacen3D() {
   const [origen, setOrigen] = useState('');
   const [aviso, setAviso] = useState('');
   const [guardando, setGuardando] = useState(false);
-  const [vista, setVista] = useState(() => localStorage.getItem('almacen3d.vista') || 'planta');
+  // Solo el rol SUPERADMIN configura el almacén; los demás solo miran.
+  const [puedeConfigurar] = useState(esSuperAdmin);
+  const [vista, setVista] = useState(() => {
+    const v = localStorage.getItem('almacen3d.vista') || 'planta';
+    return v === 'config' && !esSuperAdmin() ? 'planta' : v;
+  });
   const [rack, setRack] = useState(1);
   const [seleccion, setSeleccion] = useState(null); // código de ubicación RR-PPP-N
   const [selProf, setSelProf] = useState(null); // { rack, prof }
@@ -128,7 +146,7 @@ export default function Almacen3D() {
   const buscar = (e) => {
     e.preventDefault();
     const cod = normalizarUbicacion(busqueda);
-    if (!cod) return setAviso('Formato: RR-PPP-N, ej. 07-007-3');
+    if (!cod) return setAviso('Formato: RR-PPP-N, ej. 07-007-3 o P2-007-1');
     if (!validas.has(cod)) return setAviso(`${cod} no existe en la configuración actual.`);
     setAviso('');
     seleccionarUbicacion(cod);
@@ -196,10 +214,12 @@ export default function Almacen3D() {
           </button>
           <input ref={archivoRef} type="file" accept=".xlsx,.xls,.csv" hidden onChange={cargarArchivo} />
           <button type="button" className="alm-btn alm-btn-sec" onClick={exportarCatalogo}><FaFileExcel /> Exportar ubicaciones</button>
-          {sucia && <button type="button" className="alm-btn alm-btn-sec" onClick={descartar}><FaUndoAlt /> Descartar</button>}
-          <button type="button" className="alm-btn" disabled={!sucia || guardando} onClick={guardar}>
-            <FaSave /> {guardando ? 'Guardando…' : sucia ? 'Guardar cambios' : 'Guardado'}
-          </button>
+          {puedeConfigurar && sucia && <button type="button" className="alm-btn alm-btn-sec" onClick={descartar}><FaUndoAlt /> Descartar</button>}
+          {puedeConfigurar && (
+            <button type="button" className="alm-btn" disabled={!sucia || guardando} onClick={guardar}>
+              <FaSave /> {guardando ? 'Guardando…' : sucia ? 'Guardar cambios' : 'Guardado'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -213,12 +233,20 @@ export default function Almacen3D() {
       )}
 
       <nav className="alm-tabs">
-        {VISTAS.map(([k, t]) => (
-          <button key={k} type="button" className={vista === k ? 'activo' : ''} onClick={() => setVista(k)}>{t}</button>
-        ))}
+        {VISTAS.map(([k, t]) => {
+          const bloqueado = k === 'config' && !puedeConfigurar;
+          return (
+            <button key={k} type="button" title={bloqueado ? MSG_SIN_ACCESO : undefined}
+              className={`${vista === k ? 'activo' : ''} ${bloqueado ? 'bloqueado' : ''}`}
+              aria-disabled={bloqueado || undefined}
+              onClick={() => (bloqueado ? setAviso(MSG_SIN_ACCESO) : setVista(k))}>
+              {bloqueado && <FaLock />} {t}
+            </button>
+          );
+        })}
         {vista === 'rack' && (
-          <select value={rack} onChange={(e) => setRack(+e.target.value)} className="alm-sel-rack">
-            {Array.from({ length: cfg.racks }, (_, i) => i + 1).map((r) => <option key={r} value={r}>Rack {codRack(r)}</option>)}
+          <select value={rack} onChange={(e) => setRack(leerRack(e.target.value))} className="alm-sel-rack">
+            {listaRacks(cfg).map((r) => <option key={r} value={r}>{esRackPeligrosos(r) ? `Peligrosos ${r}` : `Rack ${codRack(r)}`}</option>)}
           </select>
         )}
         {(vista === '3d' || vista === 'rack') && clientes.length > 0 && (
@@ -261,10 +289,9 @@ export default function Almacen3D() {
             <Suspense fallback={<p className="alm-cargando">Cargando 3D…</p>}>
               <Vista3D cfg={cfg} ocupacion={ocupacion} clientes={clientes} modoColor={modoColor}
                 seleccion={seleccion} onSeleccionar={seleccionarUbicacion} onHover={hover3d} />
-              <div className="alm-3d-ayuda">Arrastra para girar · rueda para zoom · clic derecho para mover</div>
             </Suspense>
           )}
-          {vista === 'config' && <EditorConfig cfg={cfg} setCfg={setCfg} />}
+          {vista === 'config' && puedeConfigurar && <EditorConfig cfg={cfg} setCfg={setCfg} />}
         </main>
 
         {selProf && vista !== 'config' && infoSel && (
@@ -277,8 +304,10 @@ export default function Almacen3D() {
               Rack {codRack(selProf.rack)} · Profundidad {codProf(selProf.prof)}
               {` · Altura ${infoSel.altura} niveles base`}
               {infoSel.puente && ` · Puente: existe desde el nivel ${infoSel.desde}`}
+              {infoSel.enrejado && ' · Enrejado'}
             </p>
-            <div className="alm-panel-edit">
+            {!puedeConfigurar && <p className="alm-sin-acceso"><FaLock /> Solo lectura. No tienes acceso para editar.</p>}
+            {puedeConfigurar && <div className="alm-panel-edit">
               <label>Niveles
                 <input type="number" min="1" value={infoSel.niveles}
                   onChange={(e) => { const n = parseInt(e.target.value, 10); if (n >= 1) editarProf({ niveles: n, alturas: null }); }} />
@@ -304,7 +333,7 @@ export default function Almacen3D() {
                 <input type="checkbox" checked={infoSel.inactiva} onChange={(e) => editarProf({ inactiva: e.target.checked })} /> Inactiva
               </label>
               {infoSel.cambiada && <button type="button" className="alm-btn alm-btn-sec" onClick={() => editarProf({ niveles: null, inactiva: null, alturas: null })}>Volver al general</button>}
-            </div>
+            </div>}
             <ul className="alm-niveles">
               {Array.from({ length: infoSel.niveles }, (_, i) => infoSel.niveles - i).map((n) => {
                 const cod = codigoUbicacion(selProf.rack, selProf.prof, n);
@@ -319,7 +348,7 @@ export default function Almacen3D() {
                 );
               })}
             </ul>
-            {sucia && <p className="alm-msg">Hay cambios sin guardar.</p>}
+            {puedeConfigurar && sucia && <p className="alm-msg">Hay cambios sin guardar.</p>}
           </aside>
         )}
       </div>

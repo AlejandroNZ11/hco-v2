@@ -122,3 +122,26 @@
 .alm-pas-corte.pasillo { border: 0; background: #facc15; color: #713f12; font-weight: 700; padding: 0 6px; }
 .alm-pas-pas { background: #facc15; color: #713f12; font-size: 0.7rem; font-weight: 700; border-radius: 6px; padding: 7px 6px; }
 .alm-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Planta: zonas */
+.alm-txt-zona { font-size: 15px; font-weight: 800; letter-spacing: 2px; font-family: inherit; }
+.alm-txt-rampa { font-size: 9px; font-weight: 700; fill: #fff; font-family: inherit; pointer-events: none; }
+.alm-check-linea { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; margin-bottom: 8px; }
+
+/* 3D: modo caminar */
+.alm-3d-cont { position: relative; }
+.alm-3d-barra { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
+.alm-3d-pad { position: absolute; right: 14px; bottom: 40px; display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; user-select: none; }
+.alm-3d-pad-alt { right: 172px; grid-template-columns: 44px; }
+.alm-3d-pad button { width: 44px; height: 44px; border-radius: 10px; border: 0; background: rgba(15, 23, 42, 0.72); color: #fff; font-size: 1.1rem; cursor: pointer; touch-action: none; }
+.alm-3d-pad button:active { background: #0e7490; }
+
+.alm-subtitulo { margin: 14px 0 6px; font-size: 0.9rem; }
+.alm-btn-orden { color: #475569; }
+.alm-btn-orden:disabled { opacity: 0.25; cursor: default; }
+.alm-planta-barra { padding: 6px 10px 0; }
+.alm-txt-aire { font-style: italic; fill: #94a3b8; }
+
+/* Sin permiso para configurar */
+.alm-tabs > button.bloqueado { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; display: inline-flex; align-items: center; gap: 5px; }
+.alm-sin-acceso { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #64748b; background: #f1f5f9; border-radius: 8px; padding: 6px 8px; margin: 8px 0; }

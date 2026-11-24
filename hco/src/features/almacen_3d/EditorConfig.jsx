@@ -10,15 +10,16 @@ const decimal = (v) => {
   const n = parseFloat(String(v).replace(',', '.'));
   return Number.isFinite(n) && n > 0 ? n : null;
 };
-// "1,2,7-9" → [1,2,7,8,9]
+// "1,2,7-9, P2, P3" → [1,2,7,8,9,"P2","P3"]
 const listaRacks = (t) => {
   const out = new Set();
   String(t || '').split(/[,;\s]+/).filter(Boolean).forEach((p) => {
     const m = p.match(/^(\d+)-(\d+)$/);
     if (m) for (let i = +m[1]; i <= +m[2]; i++) out.add(i);
+    else if (/^[A-Za-z][A-Za-z0-9]{0,3}$/.test(p)) out.add(p.toUpperCase());
     else if (entero(p, 1)) out.add(entero(p, 1));
   });
-  return [...out].sort((a, b) => a - b);
+  return [...out].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
 };
 
 export default function EditorConfig({ cfg, setCfg }) {
@@ -39,6 +40,20 @@ export default function EditorConfig({ cfg, setCfg }) {
       else delete racksDetalle[k];
       return { ...c, racksDetalle };
     });
+
+  const setStage = (campo, valor) => setCfg((c) => ({ ...c, stage: { ...c.stage, [campo]: valor } }));
+  const setPel = (campo, valor) => setCfg((c) => ({ ...c, peligrosos: { ...c.peligrosos, [campo]: valor } }));
+  const setPelRack = (i, cambios) =>
+    setCfg((c) => ({ ...c, peligrosos: { ...c.peligrosos, racks: c.peligrosos.racks.map((x, j) => (j === i ? { ...x, ...cambios } : x)) } }));
+
+  const moverPel = (i, d) =>
+    setCfg((c) => {
+      const racks = [...c.peligrosos.racks];
+      [racks[i], racks[i + d]] = [racks[i + d], racks[i]];
+      return { ...c, peligrosos: { ...c.peligrosos, racks } };
+    });
+  const setEnrejado = (i, cambios) =>
+    setCfg((c) => ({ ...c, enrejados: c.enrejados.map((x, j) => (j === i ? { ...x, ...cambios } : x)) }));
 
   const togglePasillo = (r) =>
     setCfg((c) => ({
@@ -160,8 +175,94 @@ export default function EditorConfig({ cfg, setCfg }) {
       </section>
 
       <section className="alm-card">
+        <h3>Stage y rampas (al frente)</h3>
+        <p className="alm-ayuda">Zona de preparación delante de la profundidad 001, con las rampas (andenes) en el muro del frente.</p>
+        <label className="alm-check-linea">
+          <input type="checkbox" checked={cfg.stage.activo} onChange={(e) => setStage('activo', e.target.checked)} /> Mostrar stage
+        </label>
+        <div className="alm-grid-form">
+          <label>Fondo del stage (m)<input type="number" min="1" step="0.5" value={cfg.stage.fondo} onChange={(e) => decimal(e.target.value) && setStage('fondo', decimal(e.target.value))} /></label>
+          <label>Cantidad de rampas<input type="number" min="0" value={cfg.stage.rampas} onChange={(e) => entero(e.target.value, 0) != null && setStage('rampas', entero(e.target.value, 0))} /></label>
+          <label>Ancho de rampa (m)<input type="number" min="1" step="0.1" value={cfg.stage.anchoRampa} onChange={(e) => decimal(e.target.value) && setStage('anchoRampa', decimal(e.target.value))} /></label>
+        </div>
+      </section>
+
+      <section className="alm-card alm-card-ancha">
+        <h3>Almacén de peligrosos</h3>
+        <p className="alm-ayuda">
+          Ubicaciones como <code>P2-007-1</code>: rack P2, profundidad 007, nivel 1. Los racks van de la pared hacia afuera en el orden de la tabla.
+          <b> Fila</b> = dónde arranca su primera profundidad (P1 arranca en la fila 7, a la altura del 007 de P2).
+          Sin <b>pasillo antes</b> = espalda con espalda con el anterior.
+        </p>
+        <label className="alm-check-linea">
+          <input type="checkbox" checked={cfg.peligrosos.activo} onChange={(e) => setPel('activo', e.target.checked)} /> Mostrar peligrosos
+        </label>
+        <div className="alm-grid-form">
+          <label>Lado
+            <select value={cfg.peligrosos.lado} onChange={(e) => setPel('lado', e.target.value)}>
+              <option value="izquierda">Pegado al rack 01</option>
+              <option value="derecha">Después del rack {codRack(cfg.racks)}</option>
+            </select>
+          </label>
+          <label>Separación de la pared (m)<input type="number" min="0" step="0.5" value={cfg.peligrosos.separacion} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('separacion', v); }} /></label>
+          <label>Zona de ingreso (ancho m)<input type="number" min="0" step="0.5" value={cfg.peligrosos.zonaIngreso} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('zonaIngreso', v); }} /></label>
+          <label>Zona de puertas (fondo m)<input type="number" min="0" step="0.5" value={cfg.peligrosos.antesala} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('antesala', v); }} /></label>
+          <label>Pasillo entre puertas (ancho m, 0 = sin pasillo)<input type="number" min="0" step="0.5" value={cfg.peligrosos.anchoPasilloIngreso ?? 3} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('anchoPasilloIngreso', v); }} /></label>
+        </div>
+        <table className="alm-tabla">
+          <thead><tr><th>Rack</th><th>Desde</th><th>Hasta</th><th>Altura</th><th>Fila</th><th>Pasillo antes</th><th /></tr></thead>
+          <tbody>
+            {cfg.peligrosos.racks.map((x, i) => (
+              <tr key={x.codigo}>
+                <td><input type="text" defaultValue={x.codigo} onBlur={(e) => {
+                  const v = e.target.value.trim().toUpperCase();
+                  if (/^[A-Z][A-Z0-9]{0,3}$/.test(v) && !cfg.peligrosos.racks.some((o, j) => j !== i && o.codigo === v)) setPelRack(i, { codigo: v });
+                  else e.target.value = x.codigo;
+                }} /></td>
+                <td><input type="number" min="1" value={x.desde} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setPelRack(i, { desde: v, hasta: Math.max(v, x.hasta) }); }} /></td>
+                <td><input type="number" min="1" value={x.hasta} onChange={(e) => { const v = entero(e.target.value, 1); if (v && v >= x.desde) setPelRack(i, { hasta: v }); }} /></td>
+                <td><input type="number" min="1" value={x.niveles} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setPelRack(i, { niveles: v }); }} /></td>
+                <td><input type="number" min="1" value={x.fila} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setPelRack(i, { fila: v }); }} /></td>
+                <td style={{ textAlign: 'center' }}>{i === 0 ? '—' : <input type="checkbox" style={{ width: 'auto' }} checked={x.pasilloAntes} onChange={(e) => setPelRack(i, { pasilloAntes: e.target.checked })} />}</td>
+                <td>
+                  <button type="button" className="alm-btn-icono alm-btn-orden" title="Subir" disabled={i === 0} onClick={() => moverPel(i, -1)}>▲</button>
+                  <button type="button" className="alm-btn-icono alm-btn-orden" title="Bajar" disabled={i === cfg.peligrosos.racks.length - 1} onClick={() => moverPel(i, 1)}>▼</button>
+                  <button type="button" className="alm-btn-icono" title="Quitar" onClick={() => setPel('racks', cfg.peligrosos.racks.filter((_, j) => j !== i))}><FaTrash /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => {
+          let k = 1;
+          while (cfg.peligrosos.racks.some((x) => x.codigo === `P${k}`)) k++;
+          setPel('racks', [...cfg.peligrosos.racks, { codigo: `P${k}`, desde: 1, hasta: 18, niveles: 5, fila: 1, pasilloAntes: true }]);
+        }}><FaPlus /> Agregar rack de peligrosos</button>
+
+        <h4 className="alm-subtitulo">Enrejados (ubicaciones con jaula)</h4>
+        <table className="alm-tabla">
+          <thead><tr><th>Rack</th><th>Desde</th><th>Hasta</th><th /></tr></thead>
+          <tbody>
+            {cfg.enrejados.map((x, i) => (
+              <tr key={`${i}-${cfg.enrejados.length}`}>
+                <td><input type="text" defaultValue={codRack(x.rack)} onBlur={(e) => {
+                  const v = e.target.value.trim();
+                  if (!v) { e.target.value = codRack(x.rack); return; }
+                  setEnrejado(i, { rack: /^\d+$/.test(v) ? +v : v.toUpperCase() });
+                }} /></td>
+                <td><input type="number" min="1" value={x.desde} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setEnrejado(i, { desde: v, hasta: Math.max(v, x.hasta) }); }} /></td>
+                <td><input type="number" min="1" value={x.hasta} onChange={(e) => { const v = entero(e.target.value, 1); if (v && v >= x.desde) setEnrejado(i, { hasta: v }); }} /></td>
+                <td><button type="button" className="alm-btn-icono" title="Quitar" onClick={() => set('enrejados', cfg.enrejados.filter((_, j) => j !== i))}><FaTrash /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('enrejados', [...cfg.enrejados, { rack: 'P6', desde: 1, hasta: 1 }])}><FaPlus /> Agregar enrejado</button>
+      </section>
+
+      <section className="alm-card">
         <h3>Puentes (paso por debajo del rack)</h3>
-        <p className="alm-ayuda">De la profundidad "desde" a "hasta" se quita la parte de abajo (alto libre en niveles base). Racks vacío = todos. Ej.: <code>1-10, 15</code></p>
+        <p className="alm-ayuda">De la profundidad "desde" a "hasta" se quita la parte de abajo (alto libre en niveles base). Racks vacío = todos los del almacén principal; en peligrosos se nombran. Ej.: <code>1-10, 15</code> o <code>P2, P3, P4, P5</code></p>
         <table className="alm-tabla">
           <thead><tr><th>Desde</th><th>Hasta</th><th>Alto libre</th><th>Racks</th><th /></tr></thead>
           <tbody>

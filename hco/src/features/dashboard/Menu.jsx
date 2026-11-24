@@ -415,7 +415,7 @@ function MenuContenido() {
             buttonText: "Entrar",
             image: "/img/almacen_3d.png",
             url: "/almacen/3d",
-            estado: "En proceso",
+            estado: "Activo",
           },
           {
             title: "Conteos Cíclico",

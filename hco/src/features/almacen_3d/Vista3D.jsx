@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   alturaMaxima, codProf, codRack, colorCliente, distribucion, esRackPeligrosos, generarCatalogo,
-  filaDe, infoProfundidad, listaRacks, pasilloAntesDe, rangoProfundidades,
+  columnasDeRack, filaDe, infoProfundidad, listaRacks, pasilloAntesDe, rangoProfundidades,
 } from './almacenModelo';
 
 // Vista 3D del almacén (three.js).
@@ -52,6 +52,51 @@ const etiqueta = (texto, { escala = 1, fondo = 'rgba(15,23,42,0.85)' } = {}) => 
   s.scale.set(0.8 * escala * (w / 64), 0.8 * escala, 1);
   s.renderOrder = 10;
   return s;
+};
+
+// ¿De qué lado del rack está su pasillo? -1 = hacia X menor, +1 = hacia X mayor
+const ladoDe = (cfg, dist, r) => {
+  if (!esRackPeligrosos(r)) return pasilloAntesDe(cfg, r) ? -1 : 1;
+  // peligrosos crece desde la pared hacia afuera (s): el pasillo queda hacia la pared,
+  // salvo los que van espalda con espalda con el anterior (P3, P5), que miran hacia afuera
+  const i = cfg.peligrosos.racks.findIndex((x) => x.codigo === r);
+  const s = dist.peligrosos?.s ?? 1;
+  const haciaPared = i <= 0 || cfg.peligrosos.racks[i].pasilloAntes;
+  return haciaPared ? -s : s;
+};
+
+// Rótulo de rack como en la foto: cartel blanco, número negro y flecha roja hacia el pasillo.
+const texturaRotulo = (texto, flechaDerecha) => {
+  const c = document.createElement('canvas');
+  c.width = 320;
+  c.height = 200;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 320, 200);
+  g.strokeStyle = '#cbd5e1';
+  g.lineWidth = 6;
+  g.strokeRect(3, 3, 314, 194);
+  // flecha (chevron) roja
+  const xf = flechaDerecha ? 262 : 58;
+  const d = flechaDerecha ? 1 : -1;
+  g.strokeStyle = '#dc2626';
+  g.lineWidth = 22;
+  g.lineCap = 'round';
+  g.lineJoin = 'round';
+  g.beginPath();
+  g.moveTo(xf - d * 22, 58);
+  g.lineTo(xf + d * 18, 100);
+  g.lineTo(xf - d * 22, 142);
+  g.stroke();
+  g.fillStyle = '#0f172a';
+  g.font = `bold ${texto.length > 2 ? 92 : 116}px Segoe UI, Arial`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(texto, flechaDerecha ? 135 : 185, 106);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
 };
 
 const liberar = (obj) => {
@@ -121,10 +166,11 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
     };
     motor.current = m;
 
-    const reloj = new THREE.Clock();
+    const reloj = new THREE.Timer();
     const dir = new THREE.Vector3();
     let raf;
     const loop = () => {
+      reloj.update();
       const dt = Math.min(reloj.getDelta(), 0.05);
       const w = m.walk;
       if (w.activo) {
@@ -296,6 +342,19 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       });
     });
 
+    // ---------- Pasillo al frente de los racks (llega a la puerta de peligrosos) ----------
+    if (dist.frente) {
+      const f = dist.frente;
+      const w = f.x1 - f.x0;
+      grupo.add(plano(w, f.z1 - f.z0, '#94a3b8', (f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2, 0.007));
+      [f.z0 + 0.05, f.z1 - 0.05].forEach((z) => {
+        const linea = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.08), matLinea);
+        linea.rotation.x = -Math.PI / 2;
+        linea.position.set((f.x0 + f.x1) / 2, 0.013, z);
+        grupo.add(linea);
+      });
+    }
+
     // ---------- Stage y rampas (al frente) ----------
     if (dist.stage) {
       const s = dist.stage;
@@ -382,8 +441,7 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
           grupo.add(dintel);
         });
       };
-      const a = p.antesala;
-      const zPuerta = (a.z0 + a.z1) / 2;
+      const zPuerta = p.zPuerta;
       const hueco = [[zPuerta - PUERTA / 2, zPuerta + PUERTA / 2]];
       // Pasillo al aire libre: de la puerta del almacén a la puerta de peligrosos
       const pi = p.pasilloIngreso;
@@ -441,7 +499,7 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
     let nVigas = 0;
     racks.forEach((r) => {
       const [pD, pH] = rangoProfundidades(cfg, r);
-      nParantes += (pH - pD + 2) * 2;
+      nParantes += (pH - pD + 2 + columnasDeRack(cfg, r).length) * 2;
       for (let p = pD; p <= pH; p++) {
         const i = infos[r][p];
         if (!i.inactiva) nVigas += (i.niveles - i.desde + 2) * 2;
@@ -465,18 +523,28 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
         const a = infos[r][p];
         return a && !a.inactiva && a.puente ? a.libres : 0;
       };
-      for (let b = pD - 1; b <= pH; b++) {
-        const h = Math.max(alto(b), alto(b + 1)) * H || 0.01;
-        // Entre dos profundidades del mismo puente no hay parante en el paso de personas:
-        // arranca arriba del paso libre. En los bordes del puente sí llega al piso.
-        const y0 = Math.min(libre(b), libre(b + 1)) * H;
+      const parante = (z, h, y0 = 0) => {
         const hp = Math.max(h - y0, 0.01);
         [x0 + 0.04, x0 + F - 0.04].forEach((x) => {
-          tmp.position.set(x, y0 + hp / 2, filaDe(cfg, r, b) * A);
+          tmp.position.set(x, y0 + hp / 2, z * A);
           tmp.scale.set(0.08, hp, 0.08);
           tmp.updateMatrix();
           parantes.setMatrixAt(ip++, tmp.matrix);
         });
+      };
+      for (let b = pD - 1; b <= pH; b++) {
+        const zFin = b >= pD ? filaDe(cfg, r, b) : null; // donde termina b
+        const zIni = b + 1 <= pH ? filaDe(cfg, r, b + 1) - 1 : null; // donde empieza b+1
+        if (zFin != null && zIni != null && Math.abs(zFin - zIni) > 0.001) {
+          // hay una columna en medio: cada lado lleva su propio parante
+          parante(zFin, alto(b) * H || 0.01);
+          parante(zIni, alto(b + 1) * H || 0.01);
+          continue;
+        }
+        const h = Math.max(alto(b), alto(b + 1)) * H || 0.01;
+        // Entre dos profundidades del mismo puente no hay parante en el paso de personas:
+        // arranca arriba del paso libre. En los bordes del puente sí llega al piso.
+        parante(zFin ?? zIni, h, Math.min(libre(b), libre(b + 1)) * H);
       }
       for (let p = pD; p <= pH; p++) {
         const i = infos[r][p];
@@ -500,10 +568,12 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
     grupo.add(parantes, vigas);
 
     // ---------- Cargas + cajas invisibles de clic ----------
+    // Cada ubicación lleva 1 a 4 pallets, uno al lado del otro a lo largo de la profundidad.
     const total = Math.max(catalogo.length, 1);
-    const cargas = new THREE.InstancedMesh(geoCaja, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85 }), total);
+    const totalPallets = Math.max(catalogo.reduce((s, u) => s + (u.pallets || 1), 0), 1);
+    const cargas = new THREE.InstancedMesh(geoCaja, new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85 }), totalPallets);
     const clic = new THREE.InstancedMesh(geoCaja, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }), total);
-    cargas.count = catalogo.length;
+    let ic = 0;
     clic.count = catalogo.length;
     cargas.frustumCulled = false;
     clic.frustumCulled = false;
@@ -524,20 +594,27 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       clic.setMatrixAt(i, tmp.matrix);
 
       const dato = ocupacion[u.codigo];
+      const np = u.pallets || 1;
       if (hayOcupacion && !dato) {
-        cargas.setMatrixAt(i, cero);
-        cargas.setColorAt(i, COLOR_VACIA);
+        for (let k = 0; k < np; k++) {
+          cargas.setMatrixAt(ic, cero);
+          cargas.setColorAt(ic++, COLOR_VACIA);
+        }
         return;
       }
       const hc = Math.max(hN - 0.3, hN * 0.6);
-      tmp.position.set(cx, cy + 0.14 + hc / 2, cz);
-      tmp.scale.set(F * 0.85, hc, A * 0.85);
-      tmp.updateMatrix();
-      cargas.setMatrixAt(i, tmp.matrix);
+      const anchoP = A / np;
       if (hayOcupacion && modoColor === 'cliente') col.set(colorCliente(clientes, dato.cliente));
       else col.copy(esRackPeligrosos(u.rack) ? COLOR_CARTON_PEL : COLOR_CARTON);
-      cargas.setColorAt(i, col);
+      for (let k = 0; k < np; k++) {
+        tmp.position.set(cx, cy + 0.14 + hc / 2, cz - A / 2 + anchoP * (k + 0.5));
+        tmp.scale.set(F * 0.85, hc, anchoP * 0.85);
+        tmp.updateMatrix();
+        cargas.setMatrixAt(ic, tmp.matrix);
+        cargas.setColorAt(ic++, col);
+      }
     });
+    cargas.count = ic;
     if (cargas.instanceColor) cargas.instanceColor.needsUpdate = true;
     grupo.add(cargas, clic);
 
@@ -577,6 +654,52 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       grupo.add(malla);
     }
 
+    // ---------- Columnas del edificio (cortan el rack) ----------
+    const matColumna = new THREE.MeshStandardMaterial({ color: '#6b7280', metalness: 0.5, roughness: 0.5 });
+    const altoTecho = Math.max(altoMax + 2, 7);
+    racks.forEach((r) => {
+      const [pD, pH] = rangoProfundidades(cfg, r);
+      columnasDeRack(cfg, r).forEach((k) => {
+        if (k.desde > filaDe(cfg, r, pH) || pD > pH) return; // fuera del rack
+        const z0 = (k.desde - 1) * A;
+        const lz = k.ocupa * A;
+        const col3 = new THREE.Mesh(new THREE.BoxGeometry(Math.min(F * 0.6, 0.7), altoTecho, Math.min(lz * 0.6, 0.8)), matColumna);
+        col3.position.set(xRack[r] + F / 2, altoTecho / 2, z0 + lz / 2);
+        grupo.add(col3);
+        // base naranja como en la foto
+        grupo.add(caja(Math.min(F * 0.6, 0.7) + 0.12, 0.5, Math.min(lz * 0.6, 0.7) + 0.12, '#f97316', xRack[r] + F / 2, 0.25, z0 + lz / 2));
+      });
+    });
+
+    // ---------- Rótulos de rack (cartel con flecha hacia el pasillo) ----------
+    if (cfg.rotulos?.activo) {
+      const geoRot = new THREE.PlaneGeometry(Math.min(F * 0.95, 1.1), Math.min(F * 0.95, 1.1) * 0.625);
+      const hRot = Math.max(+cfg.rotulos.altura || 4.5, 1);
+      racks.forEach((r) => {
+        const [pD, pH] = rangoProfundidades(cfg, r);
+        const lado = ladoDe(cfg, dist, r);
+        const x = xRack[r] + F / 2;
+        const alto = Math.max(infos[r][pD]?.altura ?? 1, 1) * H;
+        const y = Math.min(hRot, alto - 0.4);
+        const caras = [{ z: (filaDe(cfg, r, pD) - 1) * A - 0.06, frente: true }];
+        if (cfg.rotulos.atras) caras.push({ z: filaDe(cfg, r, pH) * A + 0.06, frente: false });
+        caras.forEach(({ z, frente }) => {
+          // Al frente se mira hacia +Z: la derecha es X menor. Atrás es al revés.
+          const flechaDerecha = frente ? lado < 0 : lado > 0;
+          const mat = new THREE.MeshBasicMaterial({ map: texturaRotulo(codRack(r), flechaDerecha), side: THREE.FrontSide });
+          const cartel = new THREE.Mesh(geoRot, mat);
+          cartel.position.set(x, y, z);
+          if (frente) cartel.rotation.y = Math.PI;
+          grupo.add(cartel);
+          // reverso gris
+          const reverso = new THREE.Mesh(geoRot, new THREE.MeshBasicMaterial({ color: '#94a3b8' }));
+          reverso.position.set(x, y, z + (frente ? 0.01 : -0.01));
+          if (!frente) reverso.rotation.y = Math.PI;
+          grupo.add(reverso);
+        });
+      });
+    }
+
     // ---------- Etiquetas de rack y de puentes ----------
     racks.forEach((r) => {
       const x = xRack[r] + F / 2;
@@ -596,7 +719,10 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       const aplica = b.racks?.length ? racks.filter((r) => b.racks.some((x) => String(x) === String(r))) : [];
       if (aplica.length) {
         const xs = aplica.map((r) => xRack[r] + F / 2);
-        const zc = ((filaDe(cfg, aplica[0], b.desde) + filaDe(cfg, aplica[0], b.hasta)) / 2 - 0.5) * A;
+        const r0 = aplica[0];
+        const fD = esRackPeligrosos(r0) ? filaDe(cfg, r0, b.desde) : b.desde; // principal: posición física
+        const fH = esRackPeligrosos(r0) ? filaDe(cfg, r0, b.hasta) : b.hasta;
+        const zc = ((fD + fH) / 2 - 0.5) * A;
         s.position.set((Math.min(...xs) + Math.max(...xs)) / 2, Math.max(b.nivelesLibres * H - 0.3, 0.5), zc);
       } else {
         const p0 = dist.pasillos[0];
@@ -639,16 +765,7 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
     m.walk.pitch = 0;
   };
 
-  // ¿De qué lado del rack está su pasillo? -1 = hacia X menor, +1 = hacia X mayor
-  const ladoPasillo = (m, r) => {
-    if (!esRackPeligrosos(r)) return pasilloAntesDe(cfg, r) ? -1 : 1;
-    // peligrosos crece desde la pared hacia afuera (s): el pasillo queda hacia la pared,
-    // salvo los que van espalda con espalda con el anterior (P3, P5), que miran hacia afuera
-    const i = cfg.peligrosos.racks.findIndex((x) => x.codigo === r);
-    const s = m.dims.dist.peligrosos?.s ?? 1;
-    const haciaPared = i <= 0 || cfg.peligrosos.racks[i].pasilloAntes;
-    return haciaPared ? -s : s;
-  };
+  const ladoPasillo = (m, r) => ladoDe(cfg, m.dims.dist, r);
 
   // ---- Marcar la ubicación seleccionada y llevar la cámara ----
   useEffect(() => {

@@ -167,7 +167,7 @@ export default function Almacen3D() {
   };
 
   const exportarCatalogo = () => {
-    const filas = catalogo.map((u) => ({ Ubicacion: u.codigo, Rack: codRack(u.rack), Profundidad: codProf(u.prof), Nivel: u.nivel }));
+    const filas = catalogo.map((u) => ({ Ubicacion: u.codigo, Rack: codRack(u.rack), Profundidad: codProf(u.prof), Nivel: u.nivel, Pallets: u.pallets }));
     const ws = XLSX.utils.json_to_sheet(filas);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Ubicaciones');
@@ -305,6 +305,7 @@ export default function Almacen3D() {
               {` · Altura ${infoSel.altura} niveles base`}
               {infoSel.puente && ` · Puente: existe desde el nivel ${infoSel.desde}`}
               {infoSel.enrejado && ' · Enrejado'}
+              {` · ${infoSel.pallets} pallet${infoSel.pallets > 1 ? 's' : ''} por ubicación`}
             </p>
             {!puedeConfigurar && <p className="alm-sin-acceso"><FaLock /> Solo lectura. No tienes acceso para editar.</p>}
             {puedeConfigurar && <div className="alm-panel-edit">
@@ -329,10 +330,15 @@ export default function Almacen3D() {
                     editarProf({ alturas: a });
                   }} />
               </label>
+              <label>Pallets por ubicación
+                <select value={infoSel.pallets} onChange={(e) => editarProf({ pallets: +e.target.value })}>
+                  {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
               <label className="alm-check">
                 <input type="checkbox" checked={infoSel.inactiva} onChange={(e) => editarProf({ inactiva: e.target.checked })} /> Inactiva
               </label>
-              {infoSel.cambiada && <button type="button" className="alm-btn alm-btn-sec" onClick={() => editarProf({ niveles: null, inactiva: null, alturas: null })}>Volver al general</button>}
+              {infoSel.cambiada && <button type="button" className="alm-btn alm-btn-sec" onClick={() => editarProf({ niveles: null, inactiva: null, alturas: null, pallets: null })}>Volver al general</button>}
             </div>}
             <ul className="alm-niveles">
               {Array.from({ length: infoSel.niveles }, (_, i) => infoSel.niveles - i).map((n) => {

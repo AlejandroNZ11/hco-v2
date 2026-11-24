@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
   alturaMaxima, codProf, codRack, codigoUbicacion, colorCliente, colorOcupacion, distribucion,
-  esProfundidadDePuente, esRackPeligrosos, filaDe, infoProfundidad, maxProfundidades, ocupacionProfundidad, rangoProfundidades,
+  columnasDeRack, esProfundidadDePuente, esRackPeligrosos, filaDe, infoProfundidad, maxProfundidades, ocupacionProfundidad,
+  rangoProfundidades,
 } from './almacenModelo';
 
 // =========================================================================
@@ -70,6 +71,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
         fill = colorOcupacion(o.total ? o.ocupadas / o.total : null);
         titulo += ` · ocupadas ${o.ocupadas}/${o.total}`;
       } else fill = pel ? '#fecaca' : colorNiveles(info.niveles, minN, maxN);
+      if (info.pallets > 1) titulo += ` · ${info.pallets} pallets c/u`;
       if (info.puente) titulo += ` · puente (desde nivel ${info.desde})`;
       if (info.enrejado) titulo += ' · enrejado';
       if (info.inactiva) titulo += ' · inactiva';
@@ -81,6 +83,10 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
             strokeWidth={sel ? 2.5 : 0.6} strokeDasharray={info.inactiva ? '3 2' : undefined} />
           {info.puente && !info.inactiva && <rect x={rc.x} y={rc.y + 1} width={rc.width} height={rc.height - 2} fill="url(#alm-rayas)" pointerEvents="none" />}
           {info.enrejado && !info.inactiva && <rect x={rc.x} y={rc.y + 1} width={rc.width} height={rc.height - 2} fill="url(#alm-reja)" pointerEvents="none" />}
+          {info.pallets > 1 && !info.inactiva && Array.from({ length: info.pallets - 1 }, (_, k) => {
+            const yy = rc.y + ((k + 1) * rc.height) / info.pallets;
+            return <line key={k} x1={rc.x + 1} x2={rc.x + 4} y1={yy} y2={yy} stroke="#0f172a" strokeWidth="1" pointerEvents="none" />;
+          })}
           {info.cambiada && !info.inactiva && <circle cx={rc.x + rc.width - 4} cy={rc.y + 5} r={2.2} fill="#db2777" pointerEvents="none" />}
           {!hayOcupacion && !info.inactiva && (
             <text x={rc.x + rc.width / 2} y={rc.y + rc.height / 2 + 3.5} textAnchor="middle" className="alm-txt-n">{pel ? codProf(p) : info.niveles}</text>
@@ -88,6 +94,17 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
         </g>,
       );
     }
+    // columnas del edificio que cortan el rack
+    columnasDeRack(cfg, r).forEach((k, i) => {
+      if (pD > pH || k.desde > filaDe(cfg, r, pH)) return;
+      const z0 = (k.desde - 1) * A;
+      const rc = R(x0, x0 + F, z0, z0 + k.ocupa * A);
+      celdas.push(
+        <g key={`col-${codRack(r)}-${i}`} onMouseMove={(e) => onHover?.(`Columna en rack ${codRack(r)} · ocupa ${k.ocupa} profundidad${k.ocupa > 1 ? 'es' : ''}`, e.clientX, e.clientY)} onMouseLeave={() => onHover?.(null)}>
+          <rect x={rc.x + rc.width * 0.15} y={rc.y + 1} width={rc.width * 0.7} height={Math.max(rc.height - 2, 2)} fill="#4b5563" rx={1} />
+        </g>,
+      );
+    });
   });
 
   const s = dist.stage;
@@ -137,6 +154,19 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
             </g>
           )}
 
+          {/* Pasillo al frente de los racks (entre el stage y el 001) */}
+          {dist.frente && (() => {
+            const rc = R(dist.frente.x0, dist.frente.x1, dist.frente.z0, dist.frente.z1);
+            return (
+              <g>
+                <rect {...rc} fill="#cbd5e1" />
+                <line x1={rc.x} x2={rc.x + rc.width} y1={rc.y + 0.5} y2={rc.y + 0.5} stroke="#facc15" strokeWidth="1.5" />
+                <line x1={rc.x} x2={rc.x + rc.width} y1={rc.y + rc.height - 0.5} y2={rc.y + rc.height - 0.5} stroke="#facc15" strokeWidth="1.5" />
+                {rc.height >= 10 && <text x={rc.x + rc.width / 2} y={rc.y + rc.height / 2 + 3.5} textAnchor="middle" className="alm-txt-eje alm-txt-mini">Pasillo {cfg.pasilloFrente} m</text>}
+              </g>
+            );
+          })()}
+
           {/* Peligrosos: recinto, pasillos y puertas */}
           {pel && (
             <g>
@@ -159,7 +189,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
                 <rect key={i} {...R(p.x0, p.x1, pel.z0 + 0.2, pel.z1 - 0.2)} fill="#fee2e2" />
               ))}
               {(() => {
-                const zc = (pel.antesala.z0 + pel.antesala.z1) / 2;
+                const zc = pel.zPuerta;
                 return [[pel.pared, 'Salida'], [pel.lineaIngreso, 'Ingreso']].map(([xp, t]) => {
                   const rc = R(xp - 0.25, xp + 0.25, zc - PUERTA / 2, zc + PUERTA / 2);
                   return (
@@ -175,7 +205,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
           )}
 
           {dist.pasillos.map((p, i) => (
-            <rect key={i} {...R(p.x0, p.x1, -0.3, maxP * A + 0.3)} fill="#e2e8f0" />
+            <rect key={i} {...R(p.x0, p.x1, -0.3, dist.largo + 0.3)} fill="#e2e8f0" />
           ))}
           {/* Profundidades del almacén principal */}
           {Array.from({ length: maxP }, (_, i) => i + 1).map((p) => (
@@ -204,18 +234,22 @@ const UH = 26; // px por nivel base
 export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccionProf, onSeleccionar, onSeleccionarProf, onHover }) {
   const [pD, pH] = rangoProfundidades(cfg, rack);
   const profs = Math.max(0, pH - pD + 1);
+  // x de cada profundidad (las columnas del edificio dejan un hueco)
+  const f0 = pD <= pH ? filaDe(cfg, rack, pD) : 1;
+  const xDe = (p) => (filaDe(cfg, rack, p) - f0) * CW;
+  const largoCols = profs ? filaDe(cfg, rack, pH) - f0 + 1 : 0;
   const altoMax = esRackPeligrosos(rack) ? Math.max(infoProfundidad(cfg, rack, pD).altura, 1) : alturaMaxima(cfg);
   const hayOcupacion = Object.keys(ocupacion).length > 0;
   const izq = 40;
   const arr = 10;
   const piso = arr + altoMax * UH;
-  const ancho = izq + profs * CW + 10;
+  const ancho = izq + largoCols * CW + 10;
   const alto = piso + 30;
 
   const cols = [];
   for (let p = pD; p <= pH; p++) {
     const info = infoProfundidad(cfg, rack, p);
-    const x = izq + (p - pD) * CW;
+    const x = izq + xDe(p);
     const clave = `${codRack(rack)}-${codProf(p)}`;
     if (info.inactiva) {
       cols.push(<rect key={`in${p}`} x={x + 1} y={piso - info.altura * UH} width={CW - 2} height={info.altura * UH} fill="#f8fafc" stroke="#cbd5e1" strokeDasharray="3 2" />);
@@ -232,12 +266,16 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
       let fill = '#dbeafe';
       if (hayOcupacion) fill = dato ? colorCliente(clientes, dato.cliente) : '#ffffff';
       const sel = seleccion === cod;
-      const titulo = dato ? `${cod} · ${dato.cliente || 'Sin cliente'} · ${dato.skus.length} SKU · ${dato.unidades} und` : `${cod}${hayOcupacion ? ' · vacía' : ''}`;
+      const titulo = (info.pallets > 1 ? `[${info.pallets} pallets] ` : '') + (dato ? `${cod} · ${dato.cliente || 'Sin cliente'} · ${dato.skus.length} SKU · ${dato.unidades} und` : `${cod}${hayOcupacion ? ' · vacía' : ''}`);
       cols.push(
         <g key={cod} className="alm-celda" onClick={() => onSeleccionar(cod)}
           onMouseMove={(e) => onHover?.(titulo, e.clientX, e.clientY)} onMouseLeave={() => onHover?.(null)}>
           <rect x={x + 1} y={y + 1} width={CW - 2} height={h - 2} rx={2} fill={fill}
             stroke={sel ? '#db2777' : '#64748b'} strokeWidth={sel ? 2.5 : 0.6} />
+          {info.pallets > 1 && Array.from({ length: info.pallets - 1 }, (_, k) => (
+            <line key={k} x1={x + ((k + 1) * CW) / info.pallets} x2={x + ((k + 1) * CW) / info.pallets} y1={y + 3} y2={y + h - 3}
+              stroke="#64748b" strokeWidth="0.8" strokeDasharray="2 2" pointerEvents="none" />
+          ))}
           {h >= 16 && <text x={x + CW / 2} y={y + h / 2 + 3.5} textAnchor="middle" className="alm-txt-n">{n}</text>}
         </g>,
       );
@@ -252,6 +290,18 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
         onClick={() => onSeleccionarProf(rack, p)}>{info.niveles}</text>,
     );
   }
+  columnasDeRack(cfg, rack).forEach((k, i) => {
+    if (pD > pH || k.desde > filaDe(cfg, rack, pH)) return;
+    const x = izq + (k.desde - f0) * CW;
+    const w = k.ocupa * CW;
+    cols.push(
+      <g key={`col${i}`}>
+        <rect x={x + w * 0.2} y={arr - 6} width={w * 0.6} height={piso - arr + 6} fill="#6b7280" />
+        <rect x={x + w * 0.1} y={piso - 10} width={w * 0.8} height={10} fill="#f97316" />
+        <text x={x + w / 2} y={arr + 14} textAnchor="middle" className="alm-txt-eje alm-txt-mini" fill="#fff">C</text>
+      </g>,
+    );
+  });
 
   return (
     <div className="alm-scroll">
@@ -271,9 +321,9 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
               {u > 0 && <text x={izq - 7} y={piso - u * UH + 12} textAnchor="end" className="alm-txt-eje alm-txt-mini">{u}</text>}
             </g>
           ))}
-          <line x1={izq} x2={izq + profs * CW} y1={piso} y2={piso} stroke="#334155" strokeWidth="2" />
+          <line x1={izq} x2={izq + largoCols * CW} y1={piso} y2={piso} stroke="#334155" strokeWidth="2" />
           {Array.from({ length: profs }, (_, i) => i + pD).map((p) => (
-            <text key={p} x={izq + (p - pD + 0.5) * CW} y={piso + 16} textAnchor="middle"
+            <text key={p} x={izq + xDe(p) + CW / 2} y={piso + 16} textAnchor="middle"
               className={`alm-txt-eje alm-txt-mini ${esProfundidadDePuente(cfg, p, rack) ? 'alm-txt-puente' : ''}`}>{codProf(p)}</text>
           ))}
           {cols}

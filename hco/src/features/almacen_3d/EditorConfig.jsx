@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { FaPlus, FaTrash } from 'react-icons/fa';
-import { claveProf, codRack, leerAlturas, pasillosImpares, profundidadesDeRack } from './almacenModelo';
+import { claveProf, codRack, leerAlturas, pasillosImpares, pasillosPares, profundidadesDeRack } from './almacenModelo';
+
+const OPC_PALLETS = [1, 2, 3, 4];
 
 const entero = (v, min = 0) => {
   const n = parseInt(v, 10);
@@ -23,7 +25,7 @@ const listaRacks = (t) => {
 };
 
 export default function EditorConfig({ cfg, setCfg }) {
-  const [rango, setRango] = useState({ rDesde: '', rHasta: '', pDesde: '', pHasta: '', accion: 'niveles', niveles: '', alturas: '' });
+  const [rango, setRango] = useState({ rDesde: '', rHasta: '', pDesde: '', pHasta: '', accion: 'niveles', niveles: '', alturas: '', pallets: '2' });
   const [msgRango, setMsgRango] = useState('');
 
   const set = (campo, valor) => setCfg((c) => ({ ...c, [campo]: valor }));
@@ -63,6 +65,10 @@ export default function EditorConfig({ cfg, setCfg }) {
         : [...c.pasillosDespuesDe, r].sort((a, b) => a - b),
     }));
 
+  const setRotulo = (campo, valor) => setCfg((c) => ({ ...c, rotulos: { ...c.rotulos, [campo]: valor } }));
+  const setColumna = (i, cambios) =>
+    setCfg((c) => ({ ...c, columnas: c.columnas.map((x, j) => (j === i ? { ...x, ...cambios } : x)) }));
+
   const setPuente = (i, campo, valor) =>
     setCfg((c) => ({ ...c, puentes: c.puentes.map((b, j) => (j === i ? { ...b, [campo]: valor } : b)) }));
 
@@ -94,12 +100,17 @@ export default function EditorConfig({ cfg, setCfg }) {
             if (alturas) d.alturas = alturas;
             else delete d.alturas;
           }
+          if (rango.accion === 'pallets') {
+            if (+rango.pallets > 1) d.pallets = +rango.pallets;
+            else delete d.pallets;
+          }
           if (rango.accion === 'desactivar') d.inactiva = true;
           if (rango.accion === 'activar') delete d.inactiva;
           if (rango.accion === 'limpiar') {
             delete d.niveles;
             delete d.alturas;
             delete d.inactiva;
+            delete d.pallets;
           }
           if (Object.keys(d).length) posiciones[k] = d;
           else delete posiciones[k];
@@ -128,8 +139,27 @@ export default function EditorConfig({ cfg, setCfg }) {
           <label>Racks<input type="number" min="1" value={cfg.racks} onChange={(e) => entero(e.target.value, 1) && set('racks', entero(e.target.value, 1))} /></label>
           <label>Profundidades por rack<input type="number" min="1" value={cfg.profundidades} onChange={(e) => entero(e.target.value, 1) && set('profundidades', entero(e.target.value, 1))} /></label>
           <label>Altura del rack (niveles base)<input type="number" min="1" value={cfg.nivelesBase} onChange={(e) => entero(e.target.value, 1) && set('nivelesBase', entero(e.target.value, 1))} /></label>
+          <label>Pallets por ubicación
+            <select value={cfg.palletsPorUbicacion} onChange={(e) => set('palletsPorUbicacion', +e.target.value)}>
+              {OPC_PALLETS.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
         </div>
-        <p className="alm-ayuda">La altura del rack es fija. Si una profundidad tiene más o menos niveles, se reparten dentro de esa altura.</p>
+        <p className="alm-ayuda">La altura del rack es fija. Si una profundidad tiene más o menos niveles, se reparten dentro de esa altura. Los pallets por ubicación se pueden cambiar por rack, por puente, por rango o en una sola profundidad.</p>
+      </section>
+
+      <section className="alm-card">
+        <h3>Rótulos de rack</h3>
+        <p className="alm-ayuda">Cartel blanco en la punta de cada rack con su número y una flecha roja hacia su pasillo.</p>
+        <label className="alm-check-linea">
+          <input type="checkbox" checked={cfg.rotulos.activo} onChange={(e) => setRotulo('activo', e.target.checked)} /> Mostrar rótulos
+        </label>
+        <label className="alm-check-linea">
+          <input type="checkbox" checked={cfg.rotulos.atras} onChange={(e) => setRotulo('atras', e.target.checked)} /> También en el fondo del rack
+        </label>
+        <div className="alm-grid-form">
+          <label>Altura del rótulo (m)<input type="number" min="1" step="0.5" value={cfg.rotulos.altura} onChange={(e) => decimal(e.target.value) && setRotulo('altura', decimal(e.target.value))} /></label>
+        </div>
       </section>
 
       <section className="alm-card alm-card-ancha">
@@ -154,7 +184,7 @@ export default function EditorConfig({ cfg, setCfg }) {
         </div>
         <div className="alm-presets">
           <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('pasillosDespuesDe', pasillosImpares(cfg.racks))}>01 | 02·03 | 04·05 …</button>
-          <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('pasillosDespuesDe', Array.from({ length: cfg.racks - 1 }, (_, i) => i + 1).filter((r) => r % 2 === 0))}>01·02 | 03·04 …</button>
+          <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('pasillosDespuesDe', pasillosPares(cfg.racks))}>01·02 | 03·04 … {cfg.racks % 2 ? `${codRack(cfg.racks)} solo` : ''}</button>
           <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('pasillosDespuesDe', Array.from({ length: cfg.racks - 1 }, (_, i) => i + 1))}>Pasillo entre todos</button>
         </div>
       </section>
@@ -181,6 +211,7 @@ export default function EditorConfig({ cfg, setCfg }) {
           <input type="checkbox" checked={cfg.stage.activo} onChange={(e) => setStage('activo', e.target.checked)} /> Mostrar stage
         </label>
         <div className="alm-grid-form">
+          <label>Pasillo al frente de los racks (m, 0 = sin pasillo)<input type="number" min="0" step="0.5" value={cfg.pasilloFrente} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) set('pasilloFrente', v); }} /></label>
           <label>Fondo del stage (m)<input type="number" min="1" step="0.5" value={cfg.stage.fondo} onChange={(e) => decimal(e.target.value) && setStage('fondo', decimal(e.target.value))} /></label>
           <label>Cantidad de rampas<input type="number" min="0" value={cfg.stage.rampas} onChange={(e) => entero(e.target.value, 0) != null && setStage('rampas', entero(e.target.value, 0))} /></label>
           <label>Ancho de rampa (m)<input type="number" min="1" step="0.1" value={cfg.stage.anchoRampa} onChange={(e) => decimal(e.target.value) && setStage('anchoRampa', decimal(e.target.value))} /></label>
@@ -206,11 +237,12 @@ export default function EditorConfig({ cfg, setCfg }) {
           </label>
           <label>Separación de la pared (m)<input type="number" min="0" step="0.5" value={cfg.peligrosos.separacion} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('separacion', v); }} /></label>
           <label>Zona de ingreso (ancho m)<input type="number" min="0" step="0.5" value={cfg.peligrosos.zonaIngreso} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('zonaIngreso', v); }} /></label>
-          <label>Zona de puertas (fondo m)<input type="number" min="0" step="0.5" value={cfg.peligrosos.antesala} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('antesala', v); }} /></label>
+          <label title="Solo se usa si no hay pasillo al frente de los racks">Zona de puertas (fondo m)<input type="number" min="0" step="0.5" value={cfg.peligrosos.antesala} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('antesala', v); }} /></label>
+          <label>Correr hacia el frente (m)<input type="number" step="0.5" value={cfg.peligrosos.adelante ?? 0} onChange={(e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) setPel('adelante', v); }} /></label>
           <label>Pasillo entre puertas (ancho m, 0 = sin pasillo)<input type="number" min="0" step="0.5" value={cfg.peligrosos.anchoPasilloIngreso ?? 3} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setPel('anchoPasilloIngreso', v); }} /></label>
         </div>
         <table className="alm-tabla">
-          <thead><tr><th>Rack</th><th>Desde</th><th>Hasta</th><th>Altura</th><th>Fila</th><th>Pasillo antes</th><th /></tr></thead>
+          <thead><tr><th>Rack</th><th>Desde</th><th>Hasta</th><th>Altura</th><th>Fila</th><th>Pallets</th><th>Pasillo antes</th><th /></tr></thead>
           <tbody>
             {cfg.peligrosos.racks.map((x, i) => (
               <tr key={x.codigo}>
@@ -223,6 +255,7 @@ export default function EditorConfig({ cfg, setCfg }) {
                 <td><input type="number" min="1" value={x.hasta} onChange={(e) => { const v = entero(e.target.value, 1); if (v && v >= x.desde) setPelRack(i, { hasta: v }); }} /></td>
                 <td><input type="number" min="1" value={x.niveles} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setPelRack(i, { niveles: v }); }} /></td>
                 <td><input type="number" min="1" value={x.fila} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setPelRack(i, { fila: v }); }} /></td>
+                <td><input type="number" min="1" max="4" placeholder={cfg.palletsPorUbicacion} value={x.pallets ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setPelRack(i, { pallets: v ? Math.min(v, 4) : null }); }} /></td>
                 <td style={{ textAlign: 'center' }}>{i === 0 ? '—' : <input type="checkbox" style={{ width: 'auto' }} checked={x.pasilloAntes} onChange={(e) => setPelRack(i, { pasilloAntes: e.target.checked })} />}</td>
                 <td>
                   <button type="button" className="alm-btn-icono alm-btn-orden" title="Subir" disabled={i === 0} onClick={() => moverPel(i, -1)}>▲</button>
@@ -262,9 +295,10 @@ export default function EditorConfig({ cfg, setCfg }) {
 
       <section className="alm-card">
         <h3>Puentes (paso por debajo del rack)</h3>
-        <p className="alm-ayuda">De la profundidad "desde" a "hasta" se quita la parte de abajo (alto libre en niveles base). Racks vacío = todos los del almacén principal; en peligrosos se nombran. Ej.: <code>1-10, 15</code> o <code>P2, P3, P4, P5</code></p>
+        <p className="alm-ayuda">De la profundidad "desde" a "hasta" se quita la parte de abajo (alto libre en niveles base). Racks vacío = todos los del almacén principal; en peligrosos se nombran. Ej.: <code>1-10, 15</code>, <code>23-32</code> o <code>P2, P3, P4, P5</code>.
+          <b> Ubic. arriba</b> = cuántas ubicaciones hay sobre el paso (2, 3 o 4; vacío = las que salgan de la altura). <b>Pallets</b> = pallets por ubicación en el puente.</p>
         <table className="alm-tabla">
-          <thead><tr><th>Desde</th><th>Hasta</th><th>Alto libre</th><th>Racks</th><th /></tr></thead>
+          <thead><tr><th>Desde</th><th>Hasta</th><th>Alto libre</th><th>Ubic. arriba</th><th>Pallets</th><th>Racks</th><th /></tr></thead>
           <tbody>
             {cfg.puentes.map((b, i) => (
               <tr key={`${i}-${cfg.puentes.length}`}>
@@ -277,13 +311,38 @@ export default function EditorConfig({ cfg, setCfg }) {
                   if (v && v >= b.desde) setPuente(i, 'hasta', v);
                 }} /></td>
                 <td><input type="number" min="0" value={b.nivelesLibres} onChange={(e) => setPuente(i, 'nivelesLibres', entero(e.target.value, 0) ?? 0)} /></td>
+                <td><input type="number" min="1" max="10" placeholder="auto" value={b.nivelesArriba ?? ''} onChange={(e) => setPuente(i, 'nivelesArriba', entero(e.target.value, 1))} /></td>
+                <td><input type="number" min="1" max="4" placeholder="rack" value={b.pallets ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setPuente(i, 'pallets', v ? Math.min(v, 4) : null); }} /></td>
                 <td><input type="text" placeholder="todos" defaultValue={(b.racks || []).join(', ')} onBlur={(e) => setPuente(i, 'racks', listaRacks(e.target.value))} /></td>
                 <td><button type="button" className="alm-btn-icono" title="Quitar" onClick={() => set('puentes', cfg.puentes.filter((_, j) => j !== i))}><FaTrash /></button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('puentes', [...cfg.puentes, { desde: 1, hasta: 1, nivelesLibres: 2, racks: [] }])}><FaPlus /> Agregar puente</button>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('puentes', [...cfg.puentes, { desde: 1, hasta: 1, nivelesLibres: 2, racks: [], nivelesArriba: null, pallets: null }])}><FaPlus /> Agregar puente</button>
+      </section>
+
+      <section className="alm-card">
+        <h3>Columnas del edificio</h3>
+        <p className="alm-ayuda">
+          La columna ocupa el lugar de una o más profundidades. El rack no se alarga ni se mueven los puentes:
+          la numeración sigue sin saltarse y el rack termina antes (ej. 044 con una columna de 1 → llega a 043).
+          <b> En la posición</b> = posición física donde empieza la columna (como si no hubiera columnas). Racks vacío = todos.
+        </p>
+        <table className="alm-tabla">
+          <thead><tr><th>Racks</th><th>En la posición</th><th>Ocupa (profundidades)</th><th /></tr></thead>
+          <tbody>
+            {cfg.columnas.map((k, i) => (
+              <tr key={`${i}-${cfg.columnas.length}`}>
+                <td><input type="text" placeholder="todos" defaultValue={(k.racks || []).join(', ')} onBlur={(e) => setColumna(i, { racks: listaRacks(e.target.value) })} /></td>
+                <td><input type="number" min="1" value={k.desde} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setColumna(i, { desde: v }); }} /></td>
+                <td><input type="number" min="1" value={k.ocupa} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setColumna(i, { ocupa: v }); }} /></td>
+                <td><button type="button" className="alm-btn-icono" title="Quitar" onClick={() => set('columnas', cfg.columnas.filter((_, j) => j !== i))}><FaTrash /></button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('columnas', [...cfg.columnas, { racks: [], desde: 10, ocupa: 1 }])}><FaPlus /> Agregar columna</button>
       </section>
 
       <section className="alm-card">
@@ -297,6 +356,7 @@ export default function EditorConfig({ cfg, setCfg }) {
           <label>Acción
             <select value={rango.accion} onChange={(e) => setRango({ ...rango, accion: e.target.value })}>
               <option value="niveles">Fijar cantidad de niveles</option>
+              <option value="pallets">Fijar pallets por ubicación</option>
               <option value="desactivar">Desactivar (no existe)</option>
               <option value="activar">Activar</option>
               <option value="limpiar">Quitar cambios (volver al general)</option>
@@ -308,6 +368,13 @@ export default function EditorConfig({ cfg, setCfg }) {
               <label>Alturas (opcional)<input type="text" placeholder="iguales" value={rango.alturas} onChange={(e) => setRango({ ...rango, alturas: e.target.value })} /></label>
             </>
           )}
+          {rango.accion === 'pallets' && (
+            <label>Pallets
+              <select value={rango.pallets} onChange={(e) => setRango({ ...rango, pallets: e.target.value })}>
+                {OPC_PALLETS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
         </div>
         <button type="button" className="alm-btn" onClick={aplicarRango}>Aplicar</button>
         {msgRango && <span className="alm-msg">{msgRango}</span>}
@@ -315,10 +382,10 @@ export default function EditorConfig({ cfg, setCfg }) {
 
       <section className="alm-card">
         <h3>Por rack</h3>
-        <p className="alm-ayuda">Vacío = usa el valor general ({cfg.profundidades} profundidades, altura {cfg.nivelesBase} niveles base).</p>
+        <p className="alm-ayuda">Vacío = usa el valor general ({cfg.profundidades} profundidades, altura {cfg.nivelesBase} niveles base, {cfg.palletsPorUbicacion} pallet{cfg.palletsPorUbicacion > 1 ? 's' : ''}). Profundidades = largo del rack sin columnas (044; 23 al 32 llegan a 054). Las columnas descuentan solas.</p>
         <div className="alm-tabla-scroll">
           <table className="alm-tabla">
-            <thead><tr><th>Rack</th><th>Profundidades</th><th>Altura (niveles)</th></tr></thead>
+            <thead><tr><th>Rack</th><th>Profundidades</th><th>Llega a</th><th>Altura (niveles)</th><th>Pallets</th></tr></thead>
             <tbody>
               {Array.from({ length: cfg.racks }, (_, i) => i + 1).map((r) => {
                 const d = cfg.racksDetalle[codRack(r)] || {};
@@ -326,7 +393,9 @@ export default function EditorConfig({ cfg, setCfg }) {
                   <tr key={r}>
                     <td><b>{codRack(r)}</b></td>
                     <td><input type="number" min="1" placeholder={cfg.profundidades} value={d.profundidades ?? ''} onChange={(e) => setRack(r, 'profundidades', entero(e.target.value, 1))} /></td>
+                    <td style={{ textAlign: 'center' }}>{String(profundidadesDeRack(cfg, r)).padStart(3, '0')}</td>
                     <td><input type="number" min="1" placeholder={cfg.nivelesBase} value={d.niveles ?? ''} onChange={(e) => setRack(r, 'niveles', entero(e.target.value, 1))} /></td>
+                    <td><input type="number" min="1" max="4" placeholder={cfg.palletsPorUbicacion} value={d.pallets ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setRack(r, 'pallets', v ? Math.min(v, 4) : null); }} /></td>
                   </tr>
                 );
               })}
@@ -341,13 +410,14 @@ export default function EditorConfig({ cfg, setCfg }) {
         {!!puntuales.length && (
           <div className="alm-tabla-scroll">
             <table className="alm-tabla">
-              <thead><tr><th>Rack-Profundidad</th><th>Niveles</th><th>Alturas</th><th>Estado</th><th /></tr></thead>
+              <thead><tr><th>Rack-Profundidad</th><th>Niveles</th><th>Alturas</th><th>Pallets</th><th>Estado</th><th /></tr></thead>
               <tbody>
                 {puntuales.map(([k, d]) => (
                   <tr key={k}>
                     <td><b>{k}</b></td>
                     <td>{d.niveles ?? '—'}</td>
                     <td>{d.alturas ? d.alturas.join(', ') : 'iguales'}</td>
+                    <td>{d.pallets ?? '—'}</td>
                     <td>{d.inactiva ? 'Inactiva' : 'Activa'}</td>
                     <td><button type="button" className="alm-btn-icono" title="Quitar cambio" onClick={() => quitarPuntual(k)}><FaTrash /></button></td>
                   </tr>

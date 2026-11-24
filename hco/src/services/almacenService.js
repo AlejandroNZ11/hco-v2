@@ -55,6 +55,16 @@ export const cargarConfigAlmacen = async () => {
 export const guardarConfigAlmacen = async (config, nota = null) => {
   guardarLocal(config);
   try {
+    // Las políticas de la tabla solo dejan escribir a usuarios con sesión de Supabase.
+    // Si el token venció (o se entró sin sesión), se intenta renovarlo antes de guardar.
+    let { data: { session } } = await supabase.auth.getSession();
+    if (!session) ({ data: { session } } = await supabase.auth.refreshSession());
+    if (!session) {
+      return {
+        ok: false,
+        aviso: 'Guardado solo en este navegador: tu sesión de Supabase venció o no existe. Cierra sesión, vuelve a entrar y pulsa Guardar otra vez.',
+      };
+    }
     const { data: u } = await supabase.auth.getUser();
     const fila = {
       id: ALMACEN_ID,

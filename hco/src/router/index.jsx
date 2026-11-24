@@ -15,6 +15,7 @@ import { oficinaRoutes } from "./oficinaRoutes";
 import { lotesRoutes } from "./lotesRoutes";
 import { generar_rdrRoutes } from "./generar_rdrRoutes";
 import { visionRoutes } from "./visionRoutes";
+import { almacenRoutes } from "./almacenRoutes";
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
       ...lotesRoutes,
       ...generar_rdrRoutes,
       ...visionRoutes,
+      ...almacenRoutes,
     
     ],
   },

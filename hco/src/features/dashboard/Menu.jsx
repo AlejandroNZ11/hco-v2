@@ -408,6 +408,16 @@ function MenuContenido() {
         shortLabel: "LSI",
         items: [
           {
+            title: "Almacen 3D y 2D",
+            description: "Gestionar ubicacion y rotación.",
+            Icon: FaWarehouse,
+            accent: "accent-cyan",
+            buttonText: "Entrar",
+            image: "/img/almacen_3d.png",
+            url: "/almacen/3d",
+            estado: "En proceso",
+          },
+          {
             title: "Conteos Cíclico",
             description: "Gestionar conteos cíclicos de inventario.",
             Icon: FaWarehouse,

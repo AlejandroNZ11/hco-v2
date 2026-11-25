@@ -603,3 +603,46 @@
 .hco-toma-lotes .table-container td.tl-cliente { text-align: left; }
 .hco-toma-lotes .table-container tr.tl-fila-ok td { background-color: #e8f7ee; font-weight: 700; }
 .hco-toma-lotes .table-container tr.tl-fila-ok:hover td { background-color: #d5f0df; }
+
+/* ===== v5: requisitos por cliente (lote + cantidad / lote + fechas) ===== */
+.hco-toma-lotes {
+  .tlm-requisito {
+    margin: 8px 0 0;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    font-size: 12px;
+    color: #9a3412;
+  }
+  .tlm-extra { display: flex; gap: 8px; margin-top: 4px; }
+  .tlm-extra label { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .tlm-extra span { font-size: 10.5px; font-weight: 700; color: #475569; padding-left: 2px; }
+  .tlm-extra input {
+    height: 38px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 10px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #0f172a;
+    font-size: 14px;
+  }
+  .tlm-extra input:focus { outline: none; border-color: #0f4c81; box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.15); }
+  .tlm-extra.invalido input { border-color: #f59e0b; background: #fffbeb; }
+
+  .tl-lotes-badge.falta { background: #fef3c7; color: #92400e; }
+  .tl-lotes-badge.falta svg { background: #f59e0b; }
+  .tl-req-tag {
+    display: inline-block;
+    margin-right: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 800;
+    vertical-align: middle;
+  }
+  .tl-req-tag.cantidad { background: #e0ecfa; color: #1e3a6d; }
+  .tl-req-tag.fechas { background: #ffedd5; color: #9a3412; }
+}

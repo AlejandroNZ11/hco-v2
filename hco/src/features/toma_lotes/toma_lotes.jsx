@@ -17,6 +17,11 @@ import {
   importarExcelTomaLotes,
   descargarPlantillaTomaLotes,
   detalleDeFila,
+  fechaCorta,
+  lotesIncompletos,
+  requisitoCliente,
+  ETIQUETA_REQUISITO,
+  REQUISITO,
   guardarLotesSku,
   refrescarTomaLotes,
   registrarCambioRemotoTomaLotes,
@@ -248,13 +253,26 @@ function TomaLotesContenido() {
     const XLSX = await import('xlsx');
     // Mismo formato que la plantilla de subida (Ruta, Cliente, Pedido, SKU, Lote): una fila por lote,
     // y una fila con Lote vacío si el SKU aún no tiene lotes. El archivo se puede volver a cargar tal cual.
-    const filas = [['Ruta', 'Cliente', 'Pedido', 'SKU', 'Lote']];
+    // Cantidad / fechas solo se llenan para los clientes que las piden.
+    const filas = [['Ruta', 'Cliente', 'Pedido', 'SKU', 'Lote', 'Cantidad', 'F. Manufactura', 'F. Vencimiento']];
     filtrados.forEach((r) => {
-      const lotes = detalleDeFila(r).map((d) => d.lote);
-      (lotes.length ? lotes : ['']).forEach((lote) => filas.push([r.ruta || '', r.cliente || '', r.pedido, r.sku, lote]));
+      const req = requisitoCliente(r.cliente);
+      const det = detalleDeFila(r);
+      (det.length ? det : [{ lote: '' }]).forEach((d) =>
+        filas.push([
+          r.ruta || '',
+          r.cliente || '',
+          r.pedido,
+          r.sku,
+          d.lote,
+          req === REQUISITO.CANTIDAD && d.cantidad != null ? d.cantidad : '',
+          req === REQUISITO.FECHAS ? fechaCorta(d.f_manufactura) : '',
+          req === REQUISITO.FECHAS ? fechaCorta(d.f_vencimiento) : '',
+        ]),
+      );
     });
     const hoja = XLSX.utils.aoa_to_sheet(filas);
-    hoja['!cols'] = [10, 40, 14, 16, 20].map((wch) => ({ wch }));
+    hoja['!cols'] = [10, 40, 14, 16, 20, 10, 15, 15].map((wch) => ({ wch }));
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, 'Toma de Lotes');
     XLSX.writeFile(libro, `Toma_Lotes_${fechaISO(new Date())}.xlsx`);
@@ -353,7 +371,7 @@ function TomaLotesContenido() {
             className="btn-action-secondary btn-plantilla"
             onClick={descargarPlantillaTomaLotes}
            
-            title="Descargar plantilla de Excel (Ruta, Cliente, Pedido, SKU, Lote)"
+            title="Descargar plantilla de Excel (Ruta, Cliente, Pedido, SKU, Lote, Cantidad, F. Manufactura, F. Vencimiento)"
           >
             <FaFileDownload />
             <span>Plantilla</span>
@@ -435,14 +453,23 @@ function TomaLotesContenido() {
                 visibles.map((r, i) => {
                   const n = (r.lotes || []).length;
                   const pendiente = r._sincronizado === false;
+                  const req = requisitoCliente(r.cliente);
+                  const faltan = lotesIncompletos(r); // lotes sin la cantidad / fechas que pide el cliente
                   const badgeLotes = (
-                    <span className={`tl-lotes-badge ${n ? 'con' : 'sin'}`} title={n ? (r.lotes || []).join(', ') : 'Sin lotes'}>
-                      {n ? <FaCheck /> : <FaExclamation />}
+                    <span
+                      className={`tl-lotes-badge ${n ? (faltan ? 'falta' : 'con') : 'sin'}`}
+                      title={
+                        n
+                          ? `${(r.lotes || []).join(', ')}${faltan ? `\nFaltan datos en ${faltan} lote(s): ${ETIQUETA_REQUISITO[req]}` : ''}`
+                          : 'Sin lotes'
+                      }
+                    >
+                      {n && !faltan ? <FaCheck /> : <FaExclamation />}
                       <strong>{n}</strong>
                     </span>
                   );
                   return (
-                    <tr key={r.id} className={`tl-fila${n ? ' tl-fila-ok' : ''}`} onClick={() => abrirDesdeFila(r)} title="Click para ingresar lotes">
+                    <tr key={r.id} className={`tl-fila${n && !faltan ? ' tl-fila-ok' : ''}`} onClick={() => abrirDesdeFila(r)} title="Click para ingresar lotes">
                       <td className="tl-num">
                         {inicio + i + 1}
                         {pendiente && <span className="tl-dot-pendiente" title="Pendiente de envío" />}
@@ -450,7 +477,10 @@ function TomaLotesContenido() {
                       <td className="col-solo-movil">{badgeLotes}</td>
                       <td className="col-ocultar-movil">{formatearFecha(r.fecha_registro)}</td>
                       <td>{r.ruta || '-'}</td>
-                      <td className="tl-cliente" title={r.cliente}>{r.cliente || '-'}</td>
+                      <td className="tl-cliente" title={req ? `${r.cliente}\nRequiere: ${ETIQUETA_REQUISITO[req]}` : r.cliente}>
+                        {req && <span className={`tl-req-tag ${req.toLowerCase()}`}>{req === REQUISITO.CANTIDAD ? 'CANT' : 'FECHAS'}</span>}
+                        {r.cliente || '-'}
+                      </td>
                       <td className="tl-fuerte">{r.pedido}</td>
                       <td className="tl-fuerte">{r.sku}</td>
                       <td className="col-ocultar-movil">{r.registrado_por_nombre || '-'}</td>

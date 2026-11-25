@@ -24,6 +24,86 @@ const limpiar = (fila) => {
 
 const sinTildes = (s) => texto(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
+// ---------------------------------------------------------------------------
+// Requisitos por cliente: algunos clientes piden más datos por cada lote
+//   CANTIDAD → lote + cantidad por lote
+//   FECHAS   → lote + fecha de manufactura + fecha de vencimiento
+// Los demás clientes: solo el lote (normal).
+// ---------------------------------------------------------------------------
+export const REQUISITO = { CANTIDAD: 'CANTIDAD', FECHAS: 'FECHAS' };
+export const ETIQUETA_REQUISITO = {
+  CANTIDAD: 'Lote + cantidad por lote',
+  FECHAS: 'Lote + F. manufactura + F. vencimiento',
+};
+
+// Se compara sin tildes, espacios ni signos: "D'ONOFRIO HELADOS S.A." → "DONOFRIOHELADOSSA"
+const claveCliente = (s) => sinTildes(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const CLIENTES_CON_REQUISITO = [
+  ['ALOCENREPRESENTACIONES', REQUISITO.CANTIDAD],
+  ['COSALCOPERU', REQUISITO.CANTIDAD],
+  ['NESTLEPERU', REQUISITO.FECHAS],
+  ['QSIPERU', REQUISITO.FECHAS],
+  ['DONOFRIOHELADOS', REQUISITO.FECHAS],
+];
+
+/** Qué pide el cliente además del lote: 'CANTIDAD' | 'FECHAS' | null (normal). */
+export const requisitoCliente = (cliente) => {
+  const c = claveCliente(cliente);
+  if (!c) return null;
+  const hit = CLIENTES_CON_REQUISITO.find(([k]) => c.includes(k));
+  return hit ? hit[1] : null;
+};
+
+/** true si al lote le falta algún dato que pide el cliente. */
+export const loteIncompleto = (d, req) => {
+  if (req === REQUISITO.CANTIDAD) return !(Number(d?.cantidad) > 0);
+  if (req === REQUISITO.FECHAS) return !d?.f_manufactura || !d?.f_vencimiento;
+  return false;
+};
+
+/** Cuántos lotes de la fila no tienen los datos que pide su cliente. */
+export const lotesIncompletos = (fila) => {
+  const req = requisitoCliente(fila?.cliente);
+  return req ? detalleDeFila(fila).filter((d) => loteIncompleto(d, req)).length : 0;
+};
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/** Fecha de Excel (número de serie, Date, "dd/mm/aaaa" o "aaaa-mm-dd") → "aaaa-mm-dd" o null. */
+export const aFechaISO = (v) => {
+  if (v === '' || v == null) return null;
+  let y;
+  let m;
+  let d;
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    [y, m, d] = [v.getFullYear(), v.getMonth() + 1, v.getDate()];
+  } else if (typeof v === 'number' && Number.isFinite(v) && v > 0) {
+    const f = new Date(Math.round((v - 25569) * 86400000)); // serie de Excel → UTC
+    [y, m, d] = [f.getUTCFullYear(), f.getUTCMonth() + 1, f.getUTCDate()];
+  } else {
+    const s = texto(v);
+    let r = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (r) [y, m, d] = [+r[1], +r[2], +r[3]];
+    else if ((r = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/))) {
+      [d, m, y] = [+r[1], +r[2], r[3].length === 2 ? 2000 + +r[3] : +r[3]];
+    } else return null;
+  }
+  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31 && y >= 1900)) return null;
+  return `${y}-${pad2(m)}-${pad2(d)}`;
+};
+
+/** "aaaa-mm-dd" → "dd/mm/aaaa" (para mostrar / exportar). */
+export const fechaCorta = (iso) => {
+  const r = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return r ? `${r[3]}/${r[2]}/${r[1]}` : '';
+};
+
+const aCantidad = (v) => {
+  if (v === '' || v == null) return null;
+  const n = typeof v === 'number' ? v : Number(texto(v).replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
 // Una celda puede traer varios lotes: "L1, L2; L3 | L4" o uno por línea
 const separarLotes = (celda) =>
   texto(celda)
@@ -93,7 +173,7 @@ export const analizarExcelTomaLotes = async (archivo) => {
   let filaEnc = -1;
   let col = {};
   for (let i = 0; i < Math.min(15, matriz.length); i++) {
-    const enc = matriz[i].map(sinTildes);
+    const enc = matriz[i].map((h) => sinTildes(h).replace(/[.:_]/g, ' ').replace(/\s+/g, ' ').trim());
     const idx = (...nombres) => enc.findIndex((h) => nombres.includes(h));
     const c = {
       ruta: idx('ruta'),
@@ -101,6 +181,12 @@ export const analizarExcelTomaLotes = async (archivo) => {
       pedido: idx('pedido', 'nro pedido', 'n° pedido', 'numero pedido'),
       sku: idx('sku', 'codigo', 'codigo sku', 'material'),
       lote: idx('lote', 'lotes', 'lote(s)', 'nro lote', 'batch'),
+      cantidad: idx('cantidad', 'cant', 'cantidad lote', 'cantidad por lote', 'qty'),
+      fManufactura: idx(
+        'f manufactura', 'fecha manufactura', 'fecha de manufactura', 'f fabricacion', 'fecha fabricacion',
+        'fecha de fabricacion', 'f fab', 'manufactura', 'fabricacion',
+      ),
+      fVencimiento: idx('f vencimiento', 'fecha vencimiento', 'fecha de vencimiento', 'f venc', 'fecha venc', 'vencimiento'),
     };
     if (c.pedido >= 0 && c.sku >= 0) {
       filaEnc = i;
@@ -126,6 +212,15 @@ export const analizarExcelTomaLotes = async (archivo) => {
     const ruta = col.ruta >= 0 ? texto(f[col.ruta]).toUpperCase() : '';
     const cliente = col.cliente >= 0 ? texto(f[col.cliente]) : '';
     const lotes = conLote ? separarLotes(f[col.lote]) : [];
+    // Datos extra del lote (columnas opcionales; los usan los clientes que los piden)
+    const extra = {};
+    const cant = col.cantidad >= 0 ? aCantidad(f[col.cantidad]) : null;
+    const fMan = col.fManufactura >= 0 ? aFechaISO(f[col.fManufactura]) : null;
+    const fVen = col.fVencimiento >= 0 ? aFechaISO(f[col.fVencimiento]) : null;
+    if (cant != null) extra.cantidad = cant;
+    if (fMan) extra.f_manufactura = fMan;
+    if (fVen) extra.f_vencimiento = fVen;
+    const hayExtra = Object.keys(extra).length > 0;
 
     if (!pedido && !sku && !ruta && !cliente && !lotes.length) continue; // fila vacía
     const item = { filaExcel, ruta, cliente, pedido, sku, lotes };
@@ -137,9 +232,12 @@ export const analizarExcelTomaLotes = async (archivo) => {
     const id = claveTomaLote(pedido, sku);
     const g = grupos.get(id);
     if (!g) {
-      grupos.set(id, { ...item, id, lotes: [...new Set(lotes)] });
+      const extras = {};
+      if (hayExtra) lotes.forEach((l) => (extras[l] = extra));
+      grupos.set(id, { ...item, id, lotes: [...new Set(lotes)], extras });
       continue;
     }
+    if (hayExtra) lotes.forEach((l) => !g.extras[l] && (g.extras[l] = extra));
     // Mismo pedido + SKU otra vez: solo vale si trae lotes nuevos (una fila por lote)
     const aporta = lotes.filter((l) => !g.lotes.includes(l));
     if (aporta.length) g.lotes.push(...new Set(aporta));
@@ -175,14 +273,19 @@ export const analizarExcelTomaLotes = async (archivo) => {
 export const descargarPlantillaTomaLotes = async () => {
   const XLSX = await import('xlsx');
   const hoja = XLSX.utils.aoa_to_sheet([
-    ['Ruta', 'Cliente', 'Pedido', 'SKU', 'Lote'],
+    ['Ruta', 'Cliente', 'Pedido', 'SKU', 'Lote', 'Cantidad', 'F. Manufactura', 'F. Vencimiento'],
     ['R08', 'CLIENTE EJEMPLO S.A.C.', 311366, 'UU01263377', ''],
     ['R07', 'CLIENTE EJEMPLO S.A.C.', 315669, '7010040059', 'B26234'],
     ['R07', 'CLIENTE EJEMPLO S.A.C.', 315669, '7007070947', 'L9981, L9982'],
     ['R07', 'CLIENTE EJEMPLO S.A.C.', 315676, '7007031321', 'C55120'],
     ['R07', 'CLIENTE EJEMPLO S.A.C.', 315676, '7007031321', 'C55121'],
+    // Clientes que piden cantidad por lote (ALOCEN, COSALCO)
+    ['R05', 'COSALCO PERU S.A.C.', 315700, '7007031321', 'C55130', 120],
+    ['R05', 'COSALCO PERU S.A.C.', 315700, '7007031321', 'C55131', 80],
+    // Clientes que piden fechas por lote (NESTLE, QSI, DONOFRIO)
+    ['R03', 'NESTLE PERU S.A.', 315710, '7010040059', 'N88120', '', '01/10/2026', '01/10/2027'],
   ]);
-  hoja['!cols'] = [8, 34, 12, 16, 24].map((wch) => ({ wch }));
+  hoja['!cols'] = [8, 34, 12, 16, 24, 10, 15, 15].map((wch) => ({ wch }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, 'Toma de Lotes');
   XLSX.writeFile(libro, 'Plantilla_Toma_Lotes.xlsx');
@@ -328,16 +431,17 @@ export const refrescarTomaLotes = async () => {
  */
 export const importarExcelTomaLotes = async ({ nuevas, aActualizar }, usuario) => {
   const ahora = new Date().toISOString();
-  const det = (lote) => ({
+  const det = (lote, extra) => ({
     lote,
+    ...(extra || {}), // cantidad / f_manufactura / f_vencimiento si vinieron en el Excel
     fecha: ahora,
     por_id: usuario?.id || null,
     por_nombre: usuario?.nombre || null,
     origen: 'EXCEL',
   });
 
-  const filas = nuevas.map(({ id, ruta, cliente, pedido, sku, lotes }) => {
-    const detalle = lotes.map(det);
+  const filas = nuevas.map(({ id, ruta, cliente, pedido, sku, lotes, extras }) => {
+    const detalle = lotes.map((l) => det(l, extras?.[l]));
     return {
       id,
       ruta,
@@ -357,14 +461,14 @@ export const importarExcelTomaLotes = async ({ nuevas, aActualizar }, usuario) =
 
   // Lotes a adicionar a filas existentes (y a las nuevas, por si otro las creó antes en el servidor)
   const adiciones = [
-    ...aActualizar.map((a) => ({ id: a.id, detalle: a.lotesNuevos.map(det) })),
+    ...aActualizar.map((a) => ({ id: a.id, detalle: a.lotesNuevos.map((l) => det(l, a.extras?.[l])) })),
     ...filas.filter((f) => f.lotes_detalle.length).map((f) => ({ id: f.id, detalle: f.lotes_detalle })),
   ];
 
   // Vista local inmediata
   const previas = await localDb.toma_lotes.bulkGet(aActualizar.map((a) => a.id));
   const actualizadasLocal = aActualizar
-    .map((a, k) => previas[k] && fusionarLotes(previas[k], a.lotesNuevos.map(det)))
+    .map((a, k) => previas[k] && fusionarLotes(previas[k], a.lotesNuevos.map((l) => det(l, a.extras?.[l]))))
     .filter(Boolean);
   await localDb.toma_lotes.bulkPut([
     ...filas.map((f) => ({ ...f, _sincronizado: false })),

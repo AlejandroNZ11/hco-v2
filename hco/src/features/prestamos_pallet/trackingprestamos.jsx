@@ -154,10 +154,17 @@ function TrackingPrestamosContenido() {
     comentario_garita: ''
   });
 
-  const abrirModalGarita = (item) => {
+  // true → el modal se abre solo para ver (sin editar ni guardar)
+  const [garitaSoloLectura, setGaritaSoloLectura] = useState(false);
+
+  const abrirModalGarita = (item, soloLectura = false) => {
     setPrestamoSeleccionado(item);
+    setGaritaSoloLectura(soloLectura);
     setGaritaData({
-      estado_garita: item.estado_garita === 'No Conforme' ? 'No Conforme' : 'Conforme',
+      // En solo lectura se muestra el estado real (puede estar pendiente)
+      estado_garita: soloLectura
+        ? item.estado_garita || ''
+        : item.estado_garita === 'No Conforme' ? 'No Conforme' : 'Conforme',
       comentario_garita: item.comentario_garita || ''
     });
     setModalGaritaVisible(true);
@@ -165,7 +172,7 @@ function TrackingPrestamosContenido() {
 
    const handleGuardarGarita = async (e) => {
     e.preventDefault();
-    if (!prestamoSeleccionado) return;
+    if (!prestamoSeleccionado || garitaSoloLectura) return;
 
     if (garitaData.estado_garita === 'No Conforme' && !garitaData.comentario_garita.trim()) {
       return mostrarAviso('warning', 'Comentario obligatorio', 'Debe ingresar el motivo por el cual la salida es No Conforme.');
@@ -1057,31 +1064,24 @@ function TrackingPrestamosContenido() {
                             // Permiso de clic:
                             // SuperAdmin siempre puede editar
                             // Externo solo puede interactuar si NO está Conforme (si ya está Conforme, queda bloqueado)
-                            // Admin, Supervisor y Usuario regular nunca pueden interactuar (solo lectura/bloqueado)
+                            // Los demás (Admin, Supervisor, Usuario regular) solo pueden VISUALIZAR estado y comentario
                             const puedeEditarGarita = esSuperAdmin || (esExterno && !esConforme);
 
-                            let claseEstilo = 'btn-accion-garita inactivo';
-                            if (puedeEditarGarita) {
-                              if (esConforme) claseEstilo = 'btn-accion-garita ok';
-                              else if (esNoConforme) claseEstilo = 'btn-accion-garita alerta';
-                              else claseEstilo = 'btn-accion-garita pendiente';
-                            } else {
-                              // Bloqueado en gris
-                              claseEstilo = 'btn-accion-garita inactivo';
-                            }
+                            let claseEstilo = 'btn-accion-garita pendiente';
+                            if (esConforme) claseEstilo = 'btn-accion-garita ok';
+                            else if (esNoConforme) claseEstilo = 'btn-accion-garita alerta';
 
-                            const textoTooltip = !esExterno && !esSuperAdmin
-                              ? 'Acceso exclusivo para Garita (Externo) y SuperAdmin'
+                            const textoTooltip = puedeEditarGarita
+                              ? 'Control de Salida de Garita'
                               : esExterno && esConforme
-                                ? 'Camión con salida conforme (Bloqueado)'
-                                : 'Control de Salida de Garita';
+                                ? 'Camión con salida conforme (solo visualizar)'
+                                : 'Ver control de garita (solo visualizar)';
 
                             return (
                               <button
                                 type="button"
                                 className={`btn-tabla-accion ${claseEstilo}`}
-                                onClick={() => puedeEditarGarita && abrirModalGarita(r)}
-                                disabled={!puedeEditarGarita}
+                                onClick={() => abrirModalGarita(r, !puedeEditarGarita)}
                                 title={textoTooltip}
                               >
                                 <FaShieldAlt />
@@ -1865,6 +1865,11 @@ function TrackingPrestamosContenido() {
                 <span className="tp-badge-pill" style={{ background: '#fef3c7', color: '#b45309' }}>
                   CONTROL DE VIGILANCIA
                 </span>
+                {garitaSoloLectura && (
+                  <span className="tp-badge-pill" style={{ background: '#e2e8f0', color: '#334155', marginLeft: 6 }}>
+                    SOLO VISUALIZAR
+                  </span>
+                )}
                 <h3 className="tp-modal-title">Salida de Garita ({prestamoSeleccionado.id_prestamo})</h3>
                 <small className="tp-modal-subinfo">
                   Placa: <strong>{prestamoSeleccionado.nro_placa}</strong> &nbsp;|&nbsp; Chofer: <strong>{prestamoSeleccionado.conductor_nombre}</strong>
@@ -1884,7 +1889,7 @@ function TrackingPrestamosContenido() {
               
               {/* >>>>> AQUÍ VA EXACTAMENTE EL BLOQUE QUE ME MOSTRASTE <<<<< */}
               {/* ALERTA VISUAL SI YA EXISTE UN COMENTARIO PREVIO DE NO CONFORME */}
-              {prestamoSeleccionado.comentario_garita && (
+              {!garitaSoloLectura && prestamoSeleccionado.comentario_garita && (
                 <div style={{
                   background: '#fef2f2',
                   border: '1px solid #fecaca',
@@ -1901,11 +1906,26 @@ function TrackingPrestamosContenido() {
                 </div>
               )}
 
+              {garitaSoloLectura && !garitaData.estado_garita && (
+                <div style={{
+                  background: '#f1f5f9',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  marginBottom: '10px',
+                  fontSize: '12px',
+                  color: '#475569'
+                }}>
+                  Garita aún no registra el control de salida de este préstamo (<strong>Pendiente</strong>).
+                </div>
+              )}
+
               <div className="tp-garita-status-selector">
                 <button
                   type="button"
                   className={`btn-garita-option conforme ${garitaData.estado_garita === 'Conforme' ? 'selected' : ''}`}
                   onClick={() => setGaritaData(prev => ({ ...prev, estado_garita: 'Conforme' }))}
+                  disabled={garitaSoloLectura}
                 >
                   <span className="icon-circulo">✔</span>
                   <div>
@@ -1918,6 +1938,7 @@ function TrackingPrestamosContenido() {
                   type="button"
                   className={`btn-garita-option no-conforme ${garitaData.estado_garita === 'No Conforme' ? 'selected' : ''}`}
                   onClick={() => setGaritaData(prev => ({ ...prev, estado_garita: 'No Conforme' }))}
+                  disabled={garitaSoloLectura}
                 >
                   <span className="icon-circulo">✖</span>
                   <div>
@@ -1931,31 +1952,44 @@ function TrackingPrestamosContenido() {
               <div className="tp-form-group" style={{ marginTop: '12px' }}>
                 <div className="tp-label-row">
                   <label className="tp-label-small">Comentario / Motivo de Garita</label>
-                  <span className={`tp-tag-pill ${garitaData.estado_garita === 'No Conforme' ? 'obligatorio' : 'opcional'}`}>
-                    {garitaData.estado_garita === 'No Conforme' ? 'OBLIGATORIO' : 'OPCIONAL'}
-                  </span>
+                  {!garitaSoloLectura && (
+                    <span className={`tp-tag-pill ${garitaData.estado_garita === 'No Conforme' ? 'obligatorio' : 'opcional'}`}>
+                      {garitaData.estado_garita === 'No Conforme' ? 'OBLIGATORIO' : 'OPCIONAL'}
+                    </span>
+                  )}
                 </div>
-                <textarea
-                  className="tp-textarea-clean"
-                  value={garitaData.comentario_garita}
-                  onChange={e => setGaritaData({ ...garitaData, comentario_garita: e.target.value })}
-                  rows={3}
-                  placeholder={
-                    garitaData.estado_garita === 'No Conforme'
-                      ? 'Escriba obligatoriamente el motivo de la observación...'
-                      : 'Observaciones adicionales de garita (opcional)...'
-                  }
-                  required={garitaData.estado_garita === 'No Conforme'}
-                />
+                {garitaSoloLectura ? (
+                  <textarea
+                    className="tp-textarea-readonly"
+                    value={garitaData.comentario_garita || 'Sin comentario de garita'}
+                    rows={3}
+                    readOnly
+                  />
+                ) : (
+                  <textarea
+                    className="tp-textarea-clean"
+                    value={garitaData.comentario_garita}
+                    onChange={e => setGaritaData({ ...garitaData, comentario_garita: e.target.value })}
+                    rows={3}
+                    placeholder={
+                      garitaData.estado_garita === 'No Conforme'
+                        ? 'Escriba obligatoriamente el motivo de la observación...'
+                        : 'Observaciones adicionales de garita (opcional)...'
+                    }
+                    required={garitaData.estado_garita === 'No Conforme'}
+                  />
+                )}
               </div>
 
               <div className="tp-actions-row-end" style={{ marginTop: '10px' }}>
                 <button type="button" className="tp-btn-secondary" onClick={() => setModalGaritaVisible(false)}>
-                  Cancelar
+                  {garitaSoloLectura ? 'Cerrar' : 'Cancelar'}
                 </button>
-                <button type="submit" className="tp-btn-primary" disabled={loading}>
-                  <FaSave /> <span>Guardar Control</span>
-                </button>
+                {!garitaSoloLectura && (
+                  <button type="submit" className="tp-btn-primary" disabled={loading}>
+                    <FaSave /> <span>Guardar Control</span>
+                  </button>
+                )}
               </div>
             </form>
           </div>

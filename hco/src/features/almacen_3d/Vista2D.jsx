@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   alturaMaxima, codProf, codRack, codigoUbicacion, colorCliente, colorOcupacion, distribucion,
-  columnasDeRack, esProfundidadDePuente, esRackPeligrosos, filaDe, infoProfundidad, maxProfundidades, ocupacionProfundidad,
-  rangoProfundidades,
+  columnasDeRack, esProfundidadDePuente, esRackPeligrosos, filaDe, infoProfundidad, inicioColumna, maxProfundidades,
+  ocupacionProfundidad, rangoProfundidades, zonaDe,
 } from './almacenModelo';
 
 // =========================================================================
@@ -91,7 +91,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
   const maxN = Math.max(...nivelesUsados);
   const minN = Math.min(...nivelesUsados);
   const zMin = Math.min(dist.stage ? dist.stage.z0 - 1.6 : -1, dist.peligrosos ? dist.peligrosos.z0 - 1 : 0) - 1.5;
-  const zMax = Math.max(dist.largo, dist.peligrosos?.z1 ?? 0) + 1.5;
+  const zMax = dist.zMax - 0.5;
   const xMin = dist.xMin - 0.5;
   const xMax = dist.xMax + 0.5;
   // metros → px (con o sin giro)
@@ -109,11 +109,12 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
   const celdas = [];
   dist.racks.forEach(({ rack: r, x0 }) => {
     const pel = esRackPeligrosos(r);
+    const zona = zonaDe(cfg, r);
     const [pD, pH] = rangoProfundidades(cfg, r);
     for (let p = pD; p <= pH; p++) {
       const info = infoProfundidad(cfg, r, p);
-      const zb = (filaDe(cfg, r, p) - 1) * A;
-      const rc = R(x0, x0 + F, zb, zb + A);
+      const zb = info.span.inicio * A;
+      const rc = R(x0, x0 + F, zb, zb + info.span.ancho * A);
       const clave = `${codRack(r)}-${codProf(p)}`;
       let fill;
       let titulo = `${clave} · ${info.niveles} nivel${info.niveles === 1 ? '' : 'es'}`;
@@ -122,10 +123,11 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
         const o = ocupacionProfundidad(cfg, ocupacion, r, p);
         fill = colorOcupacion(o.total ? o.ocupadas / o.total : null);
         titulo += ` · ocupadas ${o.ocupadas}/${o.total}`;
-      } else fill = pel ? '#fecaca' : colorNiveles(info.niveles, minN, maxN);
+      } else fill = zona === 'peligrosos' ? '#fecaca' : zona === 'medicos' ? '#bae6fd' : colorNiveles(info.niveles, minN, maxN);
       if (info.pallets > 1) titulo += ` · ${info.pallets} pallets c/u`;
-      if (info.puente) titulo += ` · puente (desde nivel ${info.desde})`;
-      if (info.enrejado) titulo += ' · enrejado';
+      if (info.sinArriba) titulo += ' · puente: solo paso (sin ubicaciones arriba)';
+      else if (info.puente) titulo += ` · puente (desde nivel ${info.desde})${info.span.n > 1 ? ` · ubicación ancha ${info.span.k + 1} de ${info.span.n}` : ''}`;
+      if (info.enrejado) titulo += info.enrejadoHasta ? ` · enrejado hasta el nivel ${info.enrejadoHasta}` : ' · enrejado';
       if (info.inactiva) titulo += ' · inactiva';
       const sel = seleccionProf === clave;
       celdas.push(
@@ -141,7 +143,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
           })}
           {info.cambiada && !info.inactiva && <circle cx={rc.x + rc.width - 4} cy={rc.y + 5} r={2.2} fill="#db2777" pointerEvents="none" />}
           {!hayOcupacion && !info.inactiva && (
-            <text x={rc.x + rc.width / 2} y={rc.y + rc.height / 2 + 3.5} textAnchor="middle" className="alm-txt-n">{pel ? codProf(p) : info.niveles}</text>
+            <text x={rc.x + rc.width / 2} y={rc.y + rc.height / 2 + 3.5} textAnchor="middle" className="alm-txt-n">{info.sinArriba ? '—' : pel ? codProf(p) : info.niveles}</text>
           )}
         </g>,
       );
@@ -149,11 +151,14 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
     // columnas del edificio que cortan el rack
     columnasDeRack(cfg, r).forEach((k, i) => {
       if (pD > pH || k.desde > filaDe(cfg, r, pH)) return;
-      const z0 = (k.desde - 1) * A;
+      const z0 = inicioColumna(cfg, r, k) * A;
       const rc = R(x0, x0 + F, z0, z0 + k.ocupa * A);
+      const muro = k.tipo === 'muro';
       celdas.push(
-        <g key={`col-${codRack(r)}-${i}`} onMouseMove={(e) => onHover?.(`Columna en rack ${codRack(r)} · ocupa ${k.ocupa} profundidad${k.ocupa > 1 ? 'es' : ''}`, e.clientX, e.clientY)} onMouseLeave={() => onHover?.(null)}>
-          <rect x={rc.x + rc.width * 0.15} y={rc.y + 1} width={rc.width * 0.7} height={Math.max(rc.height - 2, 2)} fill="#4b5563" rx={1} />
+        <g key={`col-${codRack(r)}-${i}`} onMouseMove={(e) => onHover?.(`${muro ? 'Muro' : 'Columna'} en rack ${codRack(r)} · ocupa ${k.ocupa} profundidad${k.ocupa > 1 ? 'es' : ''}`, e.clientX, e.clientY)} onMouseLeave={() => onHover?.(null)}>
+          {muro
+            ? <rect x={rc.x} y={rc.y + 1} width={rc.width} height={Math.max(rc.height - 2, 2)} fill="#94a3b8" stroke="#475569" />
+            : <rect x={rc.x + rc.width * 0.15} y={rc.y + 1} width={rc.width * 0.7} height={Math.max(rc.height - 2, 2)} fill="#111827" rx={1} />}
         </g>,
       );
     });
@@ -219,6 +224,46 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
             );
           })()}
 
+          {/* Pasillos de atrás y túneles */}
+          {dist.pasillosAtras.map((f, i) => (
+            <rect key={`at${i}`} {...R(f.x0, f.x1, f.z0, f.z1)} fill="#cbd5e1" />
+          ))}
+          {dist.tuneles.map((t, i) => {
+            const rc = R(t.x0, t.x1, t.z0, t.z1);
+            return (
+              <g key={`tu${i}`}>
+                <rect {...rc} fill="#cbd5e1" stroke="#facc15" strokeWidth="1" />
+                <text x={rc.x + 4} y={rc.y - 2} className="alm-txt-eje alm-txt-mini">{t.texto}</text>
+              </g>
+            );
+          })}
+
+          {/* Médicos: recinto, pasillos, cuarto y puertas */}
+          {dist.medicos && (() => {
+            const md = dist.medicos;
+            const c = md.cuarto;
+            const puerta = (xc, z, t, abajo) => {
+              const rc = R(xc - 1.2, xc + 1.2, z - 0.25, z + 0.25);
+              return (
+                <g key={t}>
+                  <rect {...rc} fill="#facc15" stroke="#854d0e" />
+                  <text x={rc.x + rc.width / 2} y={abajo ? rc.y + rc.height + 9 : rc.y - 3} textAnchor="middle" className="alm-txt-mini alm-txt-eje">{t}</text>
+                </g>
+              );
+            };
+            return (
+              <g>
+                <rect {...R(md.x0, md.x1, md.z0, md.z1)} fill="#f0f9ff" stroke="#0284c7" strokeWidth="2" />
+                {md.pasillos.map((p, i) => <rect key={i} {...R(p.x0, p.x1, p.z0, p.z1)} fill="#e0f2fe" />)}
+                {c && <rect {...R(c.x0, c.x1, c.z0, c.z1)} fill="none" stroke="#0284c7" strokeWidth="2" />}
+                {puerta(md.xPuerta, md.z0, 'Ingreso a médicos', !comoPlano)}
+                {c && puerta(c.xPuerta, md.z0, 'Puerta 1', !comoPlano)}
+                {c && puerta(c.xPuerta, c.z1, 'Puerta', comoPlano)}
+                <text x={X((md.x0 + md.x1) / 2)} y={Math.min(Y(md.z0), Y(md.z1)) - 22} textAnchor="middle" className="alm-txt-zona" fill="#0369a1">MÉDICOS</text>
+              </g>
+            );
+          })()}
+
           {/* Peligrosos: recinto, pasillos y puertas */}
           {pel && (
             <g>
@@ -257,7 +302,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
           )}
 
           {dist.pasillos.map((p, i) => (
-            <rect key={i} {...R(p.x0, p.x1, -0.3, dist.largo + 0.3)} fill="#e2e8f0" />
+            <rect key={i} {...R(p.x0, p.x1, -0.3, p.z1 ?? dist.largo + 0.3)} fill="#e2e8f0" />
           ))}
           {/* Profundidades del almacén principal */}
           {Array.from({ length: maxP }, (_, i) => i + 1).map((p) => (
@@ -266,7 +311,7 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
           ))}
           {dist.racks.map(({ rack, x0 }) => (
             <text key={rack} x={X(x0 + F / 2)} y={topeRack(rack)} textAnchor="middle"
-              className="alm-txt-rack" fill={esRackPeligrosos(rack) ? '#b91c1c' : undefined}>{codRack(rack)}</text>
+              className="alm-txt-rack" fill={{ peligrosos: '#b91c1c', medicos: '#0369a1' }[zonaDe(cfg, rack)]}>{codRack(rack)}</text>
           ))}
           {celdas}
           {/* Apiladores */}
@@ -299,7 +344,7 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
   const profs = Math.max(0, pH - pD + 1);
   // x de cada profundidad (las columnas del edificio dejan un hueco)
   const f0 = pD <= pH ? filaDe(cfg, rack, pD) : 1;
-  const xDe = (p) => (filaDe(cfg, rack, p) - f0) * CW;
+  const centroDe = (p) => { const s = infoProfundidad(cfg, rack, p).span; return (s.inicio + s.ancho / 2 + 1 - f0) * CW; };
   const largoCols = profs ? filaDe(cfg, rack, pH) - f0 + 1 : 0;
   const altoMax = esRackPeligrosos(rack) ? Math.max(infoProfundidad(cfg, rack, pD).altura, 1) : alturaMaxima(cfg);
   const hayOcupacion = Object.keys(ocupacion).length > 0;
@@ -312,15 +357,19 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
   const cols = [];
   for (let p = pD; p <= pH; p++) {
     const info = infoProfundidad(cfg, rack, p);
-    const x = izq + xDe(p);
+    const x = izq + (info.span.inicio + 1 - f0) * CW;
+    const CWp = info.span.ancho * CW; // más ancho sobre un puente con ubicaciones anchas
     const clave = `${codRack(rack)}-${codProf(p)}`;
     if (info.inactiva) {
-      cols.push(<rect key={`in${p}`} x={x + 1} y={piso - info.altura * UH} width={CW - 2} height={info.altura * UH} fill="#f8fafc" stroke="#cbd5e1" strokeDasharray="3 2" />);
+      cols.push(<rect key={`in${p}`} x={x + 1} y={piso - info.altura * UH} width={CWp - 2} height={info.altura * UH} fill="#f8fafc" stroke="#cbd5e1" strokeDasharray="3 2" />);
       continue;
     }
     if (info.puente && info.libres > 0) {
-      cols.push(<rect key={`pu${p}`} x={x + 1} y={piso - info.libres * UH} width={CW - 2} height={info.libres * UH} fill="url(#alm-rayas2)" />);
+      cols.push(<rect key={`pu${p}`} x={x + 1} y={piso - info.libres * UH} width={CWp - 2} height={info.libres * UH} fill="url(#alm-rayas2)" />);
     }
+    // sobre un puente con ubicaciones anchas, la ubicación ocupa su parte del ancho del puente
+    const xU = izq + (info.span.inicio + 1 - f0) * CW;
+    const wU = info.span.ancho * CW;
     for (let n = info.desde; n <= info.niveles; n++) {
       const h = info.alturas[n - 1] * UH;
       const y = piso - (info.bases[n - 1] + info.alturas[n - 1]) * UH;
@@ -333,30 +382,37 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
       cols.push(
         <g key={cod} className="alm-celda" onClick={() => onSeleccionar(cod)}
           onMouseMove={(e) => onHover?.(titulo, e.clientX, e.clientY)} onMouseLeave={() => onHover?.(null)}>
-          <rect x={x + 1} y={y + 1} width={CW - 2} height={h - 2} rx={2} fill={fill}
+          <rect x={xU + 1} y={y + 1} width={wU - 2} height={h - 2} rx={2} fill={fill}
             stroke={sel ? '#db2777' : '#64748b'} strokeWidth={sel ? 2.5 : 0.6} />
           {info.pallets > 1 && Array.from({ length: info.pallets - 1 }, (_, k) => (
-            <line key={k} x1={x + ((k + 1) * CW) / info.pallets} x2={x + ((k + 1) * CW) / info.pallets} y1={y + 3} y2={y + h - 3}
+            <line key={k} x1={xU + ((k + 1) * wU) / info.pallets} x2={xU + ((k + 1) * wU) / info.pallets} y1={y + 3} y2={y + h - 3}
               stroke="#64748b" strokeWidth="0.8" strokeDasharray="2 2" pointerEvents="none" />
           ))}
-          {h >= 16 && <text x={x + CW / 2} y={y + h / 2 + 3.5} textAnchor="middle" className="alm-txt-n">{n}</text>}
+          {h >= 16 && <text x={xU + wU / 2} y={y + h / 2 + 3.5} textAnchor="middle" className="alm-txt-n">{n}</text>}
         </g>,
       );
     }
     if (info.enrejado) {
-      cols.push(<rect key={`rj${p}`} x={x + 1} y={piso - info.altura * UH} width={CW - 2} height={info.altura * UH} fill="url(#alm-reja2)" stroke="#334155" strokeWidth="1.2" pointerEvents="none" />);
+      // la jaula llega hasta el nivel indicado (o toda la altura)
+      const hn = info.enrejadoHasta && info.enrejadoHasta <= info.niveles ? info.enrejadoHasta : null;
+      const hJ = hn ? info.bases[hn - 1] + info.alturas[hn - 1] : info.altura;
+      cols.push(<rect key={`rj${p}`} x={x + 1} y={piso - hJ * UH} width={CWp - 2} height={hJ * UH} fill="url(#alm-reja2)" stroke="#334155" strokeWidth="1.2" pointerEvents="none" />);
     }
     // cantidad de niveles arriba de la columna (clic = editar la profundidad)
     cols.push(
-      <text key={`c${p}`} x={x + CW / 2} y={piso - info.altura * UH - 3} textAnchor="middle"
+      <text key={`c${p}`} x={x + CWp / 2} y={piso - info.altura * UH - 3} textAnchor="middle"
         className={`alm-txt-cuenta ${seleccionProf === clave ? 'sel' : ''} ${info.cambiada ? 'cambiada' : ''}`}
-        onClick={() => onSeleccionarProf(rack, p)}>{info.niveles}</text>,
+        onClick={() => onSeleccionarProf(rack, p)}>{info.sinArriba ? '·' : info.niveles}</text>,
     );
   }
   columnasDeRack(cfg, rack).forEach((k, i) => {
     if (pD > pH || k.desde > filaDe(cfg, rack, pH)) return;
-    const x = izq + (k.desde - f0) * CW;
+    const x = izq + (inicioColumna(cfg, rack, k) + 1 - f0) * CW;
     const w = k.ocupa * CW;
+    if (k.tipo === 'muro') {
+      cols.push(<rect key={`col${i}`} x={x + 1} y={arr - 6} width={w - 2} height={piso - arr + 6} fill="#cbd5e1" stroke="#475569" />);
+      return;
+    }
     cols.push(
       <g key={`col${i}`}>
         <rect x={x + w * 0.2} y={arr - 6} width={w * 0.6} height={piso - arr + 6} fill="#6b7280" />
@@ -386,7 +442,7 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
           ))}
           <line x1={izq} x2={izq + largoCols * CW} y1={piso} y2={piso} stroke="#334155" strokeWidth="2" />
           {Array.from({ length: profs }, (_, i) => i + pD).map((p) => (
-            <text key={p} x={izq + xDe(p) + CW / 2} y={piso + 16} textAnchor="middle"
+            <text key={p} x={izq + centroDe(p)} y={piso + 16} textAnchor="middle"
               className={`alm-txt-eje alm-txt-mini ${esProfundidadDePuente(cfg, p, rack) ? 'alm-txt-puente' : ''}`}>{codProf(p)}</text>
           ))}
           {cols}

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   alturaMaxima, codProf, codRack, colorCliente, distribucion, esRackPeligrosos, generarCatalogo,
-  columnasDeRack, filaDe, infoProfundidad, listaRacks, pasilloAntesDe, rangoProfundidades,
+  columnasDeRack, filaDe, infoProfundidad, inicioColumna, leerRack, listaRacks, pasilloAntesDe, rangoProfundidades, zonaDe,
 } from './almacenModelo';
 
 // Vista 3D del almacén (three.js).
@@ -57,6 +57,13 @@ const etiqueta = (texto, { escala = 1, fondo = 'rgba(15,23,42,0.85)' } = {}) => 
 // ¿De qué lado del rack está su pasillo? -1 = hacia X menor, +1 = hacia X mayor
 const ladoDe = (cfg, dist, r) => {
   if (!esRackPeligrosos(r)) return pasilloAntesDe(cfg, r) ? -1 : 1;
+  if (zonaDe(cfg, r) === 'medicos') {
+    // médicos crece hacia X mayor: con pasillo antes mira hacia X menor; si no, hacia X mayor
+    let d = cfg.medicos.racks.find((x) => x.codigo === r);
+    if (d?.mismaXQue) d = cfg.medicos.racks.find((x) => x.codigo === d.mismaXQue) || d;
+    const enLinea = cfg.medicos.racks.filter((x) => !x.mismaXQue);
+    return enLinea.indexOf(d) > 0 && d.pasilloAntes ? -1 : 1;
+  }
   // peligrosos crece desde la pared hacia afuera (s): el pasillo queda hacia la pared,
   // salvo los que van espalda con espalda con el anterior (P3, P5), que miran hacia afuera
   const i = cfg.peligrosos.racks.findIndex((x) => x.codigo === r);
@@ -359,7 +366,8 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
     // Pasillos del almacén principal y de peligrosos
     const matLinea = new THREE.MeshBasicMaterial({ color: '#facc15' });
     const franjas = [
-      ...dist.pasillos.map((p) => ({ ...p, z0: -0.5, z1: dist.largo + 0.5 })),
+      ...dist.pasillos.map((p) => ({ ...p, z0: -0.5, z1: p.z1 ?? dist.largo + 0.5 })),
+      ...(dist.medicos?.pasillos || []),
       ...(dist.peligrosos?.pasillos || []).map((p) => ({ ...p, z0: dist.peligrosos.z0 + 0.3, z1: dist.peligrosos.z1 - 0.3 })),
     ];
     franjas.forEach((p) => {
@@ -373,6 +381,25 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
         linea.position.set(x, 0.01, zc);
         grupo.add(linea);
       });
+    });
+
+    // ---------- Pasillos de atrás y túneles (franjas a lo ancho, en X) ----------
+    const franjaX = (f, color = '#94a3b8', y = 0.006) => {
+      const w = f.x1 - f.x0;
+      grupo.add(plano(w, f.z1 - f.z0, color, (f.x0 + f.x1) / 2, (f.z0 + f.z1) / 2, y));
+      [f.z0 + 0.05, f.z1 - 0.05].forEach((z) => {
+        const linea = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.08), matLinea);
+        linea.rotation.x = -Math.PI / 2;
+        linea.position.set((f.x0 + f.x1) / 2, y + 0.006, z);
+        grupo.add(linea);
+      });
+    };
+    dist.pasillosAtras.forEach((f) => franjaX(f));
+    dist.tuneles.forEach((t) => {
+      franjaX(t, '#a5b4c8', 0.009);
+      const et = etiqueta(t.texto, { escala: 0.5, fondo: 'rgba(71,85,105,0.92)' });
+      et.position.set(t.x0 + 1.2, 1.2, (t.z0 + t.z1) / 2);
+      grupo.add(et);
     });
 
     // ---------- Pasillo al frente de los racks (llega a la puerta de peligrosos) ----------
@@ -519,6 +546,60 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       grupo.add(tP);
     }
 
+    // ---------- Almacén de médicos (detrás de los racks 01–06) ----------
+    if (dist.medicos) {
+      const md = dist.medicos;
+      grupo.add(plano(md.x1 - md.x0, md.z1 - md.z0, '#e0f2fe', (md.x0 + md.x1) / 2, (md.z0 + md.z1) / 2, 0.004));
+      const alto = Math.max(...cfg.medicos.racks.map((r) => r.niveles), 3) * H + 1.2;
+      const matM = new THREE.MeshStandardMaterial({ color: '#0284c7', transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
+      const bordeM = new THREE.LineBasicMaterial({ color: '#0369a1' });
+      const PUERTA = 2.4;
+      const muroM = (eje, fijo, a, b, huecos = []) => {
+        const cortes = [a, ...huecos.flat(), b];
+        for (let i = 0; i < cortes.length; i += 2) {
+          const [c0, c1] = [cortes[i], cortes[i + 1]];
+          if (c1 - c0 < 0.05) continue;
+          const m3 = new THREE.Mesh(new THREE.BoxGeometry(eje === 'x' ? c1 - c0 : 0.2, alto, eje === 'x' ? 0.2 : c1 - c0), matM);
+          m3.position.set(eje === 'x' ? (c0 + c1) / 2 : fijo, alto / 2, eje === 'x' ? fijo : (c0 + c1) / 2);
+          grupo.add(m3);
+          const borde = new THREE.LineSegments(new THREE.EdgesGeometry(m3.geometry), bordeM);
+          borde.position.copy(m3.position);
+          grupo.add(borde);
+        }
+        huecos.forEach(([h0, h1]) => {
+          const dintel = new THREE.Mesh(new THREE.BoxGeometry(eje === 'x' ? h1 - h0 : 0.2, alto - 2.6, eje === 'x' ? 0.2 : h1 - h0), matM);
+          dintel.position.set(eje === 'x' ? (h0 + h1) / 2 : fijo, 2.6 + (alto - 2.6) / 2, eje === 'x' ? fijo : (h0 + h1) / 2);
+          grupo.add(dintel);
+        });
+      };
+      const marcoX = (xc, z, texto) => {
+        [-1, 1].forEach((l) => grupo.add(caja(0.12, 2.6, 0.25, '#facc15', xc + (l * PUERTA) / 2, 1.3, z)));
+        grupo.add(caja(PUERTA + 0.12, 0.15, 0.25, '#facc15', xc, 2.6, z));
+        const t = etiqueta(texto, { escala: 0.7, fondo: 'rgba(30,41,59,0.9)' });
+        t.position.set(xc, 3.1, z);
+        grupo.add(t);
+      };
+      const hueco = (xc) => [xc - PUERTA / 2, xc + PUERTA / 2];
+      const c = md.cuarto;
+      // muro de adelante con la puerta de ingreso y la "Puerta 1" del cuarto
+      muroM('x', md.z0, md.x0, md.x1, [hueco(md.xPuerta), ...(c ? [hueco(c.xPuerta)] : [])].sort((a, b) => a[0] - b[0]));
+      muroM('x', md.z1, md.x0, md.x1);
+      muroM('z', md.x0, md.z0, md.z1);
+      muroM('z', md.x1, md.z0, md.z1);
+      marcoX(md.xPuerta, md.z0, 'Ingreso a médicos');
+      if (c) {
+        // cuarto de los racks 36 y 37: muro del lado de M1 y muro del fondo con puerta
+        if (c.x0 > md.x0 + 0.3) muroM('z', c.x0, c.z0, c.z1);
+        if (c.x1 < md.x1 - 0.3) muroM('z', c.x1, c.z0, c.z1);
+        muroM('x', c.z1, c.x0, c.x1, [hueco(c.xPuerta)]);
+        marcoX(c.xPuerta, md.z0, 'Puerta 1');
+        marcoX(c.xPuerta, c.z1, 'Puerta');
+      }
+      const tM = etiqueta('MÉDICOS', { escala: 1.8, fondo: 'rgba(3,105,161,0.92)' });
+      tM.position.set((md.x0 + md.x1) / 2, alto + 1.6, md.z1 + 0.5);
+      grupo.add(tM);
+    }
+
     // ---------- Datos de cada profundidad ----------
     const infos = {};
     racks.forEach((r) => {
@@ -532,7 +613,7 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
     let nVigas = 0;
     racks.forEach((r) => {
       const [pD, pH] = rangoProfundidades(cfg, r);
-      nParantes += (pH - pD + 2 + columnasDeRack(cfg, r).length) * 2;
+      nParantes += (pH - pD + 2 + columnasDeRack(cfg, r).length) * 2 + 20;
       for (let p = pD; p <= pH; p++) {
         const i = infos[r][p];
         if (!i.inactiva) nVigas += (i.niveles - i.desde + 2) * 2;
@@ -565,9 +646,22 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
           parantes.setMatrixAt(ip++, tmp.matrix);
         });
       };
+      // puentes con ubicaciones anchas: sin parantes intermedios por profundidad, sino en los bordes de cada ubicación
+      const anchoEn = (p) => {
+        const a = infos[r][p];
+        return a && !a.inactiva && (a.span.n > 1 || a.sinArriba);
+      };
+      for (let p = pD; p <= pH; p++) {
+        const a = infos[r][p];
+        if (a.inactiva || a.span.n <= 1 || a.span.k !== 0) continue;
+        for (let k = 1; k < a.span.n; k++) parante(a.span.inicio + k * a.span.ancho, a.altura * H, a.libres * H);
+      }
       for (let b = pD - 1; b <= pH; b++) {
-        const zFin = b >= pD ? filaDe(cfg, r, b) : null; // donde termina b
-        const zIni = b + 1 <= pH ? filaDe(cfg, r, b + 1) - 1 : null; // donde empieza b+1
+        if (anchoEn(b) && anchoEn(b + 1) && infos[r][b].puente && infos[r][b + 1].puente) continue;
+        const sB = infos[r][b]?.span;
+        const sB1 = infos[r][b + 1]?.span;
+        const zFin = b >= pD ? sB.inicio + sB.ancho : null; // donde termina b
+        const zIni = b + 1 <= pH ? sB1.inicio : null; // donde empieza b+1
         if (zFin != null && zIni != null && Math.abs(zFin - zIni) > 0.001) {
           // hay una columna en medio: cada lado lleva su propio parante
           parante(zFin, alto(b) * H || 0.01);
@@ -581,15 +675,15 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       }
       for (let p = pD; p <= pH; p++) {
         const i = infos[r][p];
-        if (i.inactiva) continue;
+        if (i.inactiva || i.sinArriba) continue;
         const ys = [];
         for (let n = i.desde; n <= i.niveles; n++) ys.push(i.bases[n - 1] * H);
         ys.push(i.altura * H);
         ys.forEach((y0) => {
           const y = y0 < 0.01 ? 0.08 : y0;
           [x0 + 0.04, x0 + F - 0.04].forEach((x) => {
-            tmp.position.set(x, y, (filaDe(cfg, r, p) - 0.5) * A);
-            tmp.scale.set(0.07, 0.12, A - 0.04);
+            tmp.position.set(x, y, (i.span.inicio + i.span.ancho / 2) * A);
+            tmp.scale.set(0.07, 0.12, i.span.ancho * A - 0.04);
             tmp.updateMatrix();
             vigas.setMatrixAt(iv++, tmp.matrix);
           });
@@ -619,10 +713,11 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       const cx = xRack[u.rack] + F / 2;
       const cy = info.bases[u.nivel - 1] * H;
       const hN = info.alturas[u.nivel - 1] * H;
-      const cz = (filaDe(cfg, u.rack, u.prof) - 0.5) * A;
-      cajas[u.codigo] = { y0: cy, h: hN };
+      const cz = (info.span.inicio + info.span.ancho / 2) * A;
+      const lU = info.span.ancho * A; // largo de la ubicación (más largo si es ancha sobre un puente)
+      cajas[u.codigo] = { y0: cy, h: hN, z: cz, l: lU };
       tmp.position.set(cx, cy + hN / 2, cz);
-      tmp.scale.set(F, hN, A);
+      tmp.scale.set(F, hN, lU);
       tmp.updateMatrix();
       clic.setMatrixAt(i, tmp.matrix);
 
@@ -636,11 +731,11 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
         return;
       }
       const hc = Math.max(hN - 0.3, hN * 0.6);
-      const anchoP = A / np;
+      const anchoP = lU / np;
       if (hayOcupacion && modoColor === 'cliente') col.set(colorCliente(clientes, dato.cliente));
-      else col.copy(esRackPeligrosos(u.rack) ? COLOR_CARTON_PEL : COLOR_CARTON);
+      else col.copy(zonaDe(cfg, u.rack) === 'peligrosos' ? COLOR_CARTON_PEL : COLOR_CARTON);
       for (let k = 0; k < np; k++) {
-        tmp.position.set(cx, cy + 0.14 + hc / 2, cz - A / 2 + anchoP * (k + 0.5));
+        tmp.position.set(cx, cy + 0.14 + hc / 2, cz - lU / 2 + anchoP * (k + 0.5));
         tmp.scale.set(F * 0.85, hc, anchoP * 0.85);
         tmp.updateMatrix();
         cargas.setMatrixAt(ic, tmp.matrix);
@@ -678,7 +773,9 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
         enrejadas.length,
       );
       enrejadas.forEach(([r, p], i) => {
-        const alto = infos[r][p].altura * H;
+        const inf = infos[r][p];
+        const hn = inf.enrejadoHasta && inf.enrejadoHasta <= inf.niveles ? inf.enrejadoHasta : null;
+        const alto = (hn ? inf.bases[hn - 1] + inf.alturas[hn - 1] : inf.altura) * H; // hasta el nivel indicado
         tmp.position.set(xRack[r] + F / 2, alto / 2, (filaDe(cfg, r, p) - 0.5) * A);
         tmp.scale.set(F + 0.08, alto, A - 0.02);
         tmp.updateMatrix();
@@ -694,8 +791,13 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       const [pD, pH] = rangoProfundidades(cfg, r);
       columnasDeRack(cfg, r).forEach((k) => {
         if (k.desde > filaDe(cfg, r, pH) || pD > pH) return; // fuera del rack
-        const z0 = (k.desde - 1) * A;
+        const z0 = inicioColumna(cfg, r, k) * A;
         const lz = k.ocupa * A;
+        if (k.tipo === 'muro') {
+          // muro: corta todo el fondo del rack
+          grupo.add(caja(F + 0.1, altoTecho, lz - 0.05, '#cbd5e1', xRack[r] + F / 2, altoTecho / 2, z0 + lz / 2));
+          return;
+        }
         const col3 = new THREE.Mesh(new THREE.BoxGeometry(Math.min(F * 0.6, 0.7), altoTecho, Math.min(lz * 0.6, 0.8)), matColumna);
         col3.position.set(xRack[r] + F / 2, altoTecho / 2, z0 + lz / 2);
         grupo.add(col3);
@@ -751,7 +853,8 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       const pel = esRackPeligrosos(r);
       const yEt = (pel ? infos[r][pD].altura * H : altoMax) + 2.2; // bien arriba del rack
       [(filaDe(cfg, r, pD) - 1) * A - 1.2, filaDe(cfg, r, pH) * A + 1.2].forEach((z) => {
-        const s = etiqueta(codRack(r), pel ? { fondo: 'rgba(185,28,28,0.92)' } : undefined);
+        const zona = zonaDe(cfg, r);
+        const s = etiqueta(codRack(r), zona === 'peligrosos' ? { fondo: 'rgba(185,28,28,0.92)' } : zona === 'medicos' ? { fondo: 'rgba(3,105,161,0.92)' } : undefined);
         s.position.set(x, Math.max(yEt, 2.5), z);
         grupo.add(s);
       });
@@ -798,7 +901,7 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
   const pararseFrente = (m, cod) => {
     const { rack: r, p } = (() => {
       const [a, b] = cod.split('-');
-      return { rack: /^\d+$/.test(a) ? +a : a, p: +b };
+      return { rack: leerRack(a), p: +b };
     })();
     const { F, A, xRack } = m.dims;
     const P = cfg.medidas.pasillo;
@@ -820,13 +923,13 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
       return;
     }
     const [a, b] = seleccion.split('-');
-    const r = /^\d+$/.test(a) ? +a : a;
+    const r = leerRack(a);
     const p = +b;
     const { F, A, xRack, cajas } = m.dims;
     const c = cajas[seleccion];
-    const pos = new THREE.Vector3(xRack[r] + F / 2, c.y0 + c.h / 2, (filaDe(cfg, r, p) - 0.5) * A);
+    const pos = new THREE.Vector3(xRack[r] + F / 2, c.y0 + c.h / 2, c.z ?? (filaDe(cfg, r, p) - 0.5) * A);
     m.marca.position.copy(pos);
-    m.marca.scale.set(F + 0.1, c.h + 0.05, A + 0.05);
+    m.marca.scale.set(F + 0.1, c.h + 0.05, (c.l ?? A) + 0.05);
     m.marca.visible = true;
     if (m.ultimaSel === seleccion) return;
     m.ultimaSel = seleccion;

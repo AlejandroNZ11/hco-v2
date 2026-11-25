@@ -4,7 +4,7 @@ import * as XLSX from 'xlsx';
 import { cargarConfigAlmacen, guardarConfigAlmacen } from '../../services/almacenService';
 import {
   claveProf, codProf, codRack, codigoUbicacion, colorCliente, generarCatalogo, infoProfundidad,
-  esRackPeligrosos, leerAlturas, leerRack, listaRacks, normalizarUbicacion, separarCodigo,
+  esRackPeligrosos, leerAlturas, leerRack, listaRacks, normalizarUbicacion, separarCodigo, zonaDe,
 } from './almacenModelo';
 import { AlzadoRack, Planta } from './Vista2D';
 import EditorConfig from './EditorConfig';
@@ -246,7 +246,7 @@ export default function Almacen3D() {
         })}
         {vista === 'rack' && (
           <select value={rack} onChange={(e) => setRack(leerRack(e.target.value))} className="alm-sel-rack">
-            {listaRacks(cfg).map((r) => <option key={r} value={r}>{esRackPeligrosos(r) ? `Peligrosos ${r}` : `Rack ${codRack(r)}`}</option>)}
+            {listaRacks(cfg).map((r) => <option key={r} value={r}>{esRackPeligrosos(r) ? `${zonaDe(cfg, r) === 'medicos' ? 'Médicos' : 'Peligrosos'} ${r}` : `Rack ${codRack(r)}`}</option>)}
           </select>
         )}
         {(vista === '3d' || vista === 'rack') && clientes.length > 0 && (
@@ -304,7 +304,7 @@ export default function Almacen3D() {
               Rack {codRack(selProf.rack)} · Profundidad {codProf(selProf.prof)}
               {` · Altura ${infoSel.altura} niveles base`}
               {infoSel.puente && ` · Puente: existe desde el nivel ${infoSel.desde}`}
-              {infoSel.enrejado && ' · Enrejado'}
+              {infoSel.enrejado && (infoSel.enrejadoHasta ? ` · Enrejado hasta el nivel ${infoSel.enrejadoHasta}` : ' · Enrejado')}
               {` · ${infoSel.pallets} pallet${infoSel.pallets > 1 ? 's' : ''} por ubicación`}
             </p>
             {!puedeConfigurar && <p className="alm-sin-acceso"><FaLock /> Solo lectura. No tienes acceso para editar.</p>}

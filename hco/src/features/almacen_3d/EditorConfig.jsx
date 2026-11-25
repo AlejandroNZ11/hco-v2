@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { FaPlus, FaTrash } from 'react-icons/fa';
-import { claveProf, codRack, distribucion, leerAlturas, nombrePasillo, pasillosImpares, pasillosPares, profundidadesDeRack } from './almacenModelo';
+import {
+  claveProf, codRack, distribucion, leerAlturas, leerRack, nombrePasillo, pasillosImpares, pasillosPares, profundidadesDeRack,
+} from './almacenModelo';
 
 const OPC_PALLETS = [1, 2, 3, 4];
 
@@ -17,9 +19,9 @@ const listaRacks = (t) => {
   const out = new Set();
   String(t || '').split(/[,;\s]+/).filter(Boolean).forEach((p) => {
     const m = p.match(/^(\d+)-(\d+)$/);
-    if (m) for (let i = +m[1]; i <= +m[2]; i++) out.add(i);
+    if (m) for (let i = +m[1]; i <= +m[2]; i++) out.add(leerRack(i));
     else if (/^[A-Za-z][A-Za-z0-9]{0,3}$/.test(p)) out.add(p.toUpperCase());
-    else if (entero(p, 1)) out.add(entero(p, 1));
+    else if (entero(p, 1)) out.add(leerRack(entero(p, 1))); // "36" de médicos queda como texto
   });
   return [...out].sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
 };
@@ -47,6 +49,18 @@ export default function EditorConfig({ cfg, setCfg }) {
   const setPel = (campo, valor) => setCfg((c) => ({ ...c, peligrosos: { ...c.peligrosos, [campo]: valor } }));
   const setPelRack = (i, cambios) =>
     setCfg((c) => ({ ...c, peligrosos: { ...c.peligrosos, racks: c.peligrosos.racks.map((x, j) => (j === i ? { ...x, ...cambios } : x)) } }));
+
+  const setMed = (campo, valor) => setCfg((c) => ({ ...c, medicos: { ...c.medicos, [campo]: valor } }));
+  const setMedRack = (i, cambios) =>
+    setCfg((c) => ({ ...c, medicos: { ...c.medicos, racks: c.medicos.racks.map((x, j) => (j === i ? { ...x, ...cambios } : x)) } }));
+  const moverMed = (i, d) =>
+    setCfg((c) => {
+      const racks = [...c.medicos.racks];
+      [racks[i], racks[i + d]] = [racks[i + d], racks[i]];
+      return { ...c, medicos: { ...c.medicos, racks } };
+    });
+  const codigoLibre = (v, i) =>
+    /^[A-Z0-9]{1,4}$/.test(v) && ![...cfg.peligrosos.racks, ...cfg.medicos.racks].some((o) => o.codigo === v && o !== cfg.medicos.racks[i]);
 
   const moverPel = (i, d) =>
     setCfg((c) => {
@@ -166,6 +180,12 @@ export default function EditorConfig({ cfg, setCfg }) {
       <section className="alm-card alm-card-ancha">
         <h3>Racks y pasillos</h3>
         <p className="alm-ayuda">Haz clic entre dos racks para poner o quitar un pasillo. Sin pasillo = espalda con espalda.</p>
+        <div className="alm-grid-form">
+          <label>Pasillo por la parte de atrás (m, 0 = sin pasillo)<input type="number" min="0" step="0.5" value={cfg.anchoPasilloAtras} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) set('anchoPasilloAtras', v); }} /></label>
+          <label className="alm-check-linea" style={{ alignSelf: 'end' }}>
+            <input type="checkbox" checked={cfg.tuneles} onChange={(e) => set('tuneles', e.target.checked)} /> Mostrar túneles (paso por los puentes)
+          </label>
+        </div>
         <div className="alm-pasillos">
           <span className="alm-pas-pas" title="Pasillo">pasillo</span>
           {Array.from({ length: cfg.racks }, (_, i) => i + 1).map((r) => {
@@ -299,31 +319,101 @@ export default function EditorConfig({ cfg, setCfg }) {
 
         <h4 className="alm-subtitulo">Enrejados (ubicaciones con jaula)</h4>
         <table className="alm-tabla">
-          <thead><tr><th>Rack</th><th>Desde</th><th>Hasta</th><th /></tr></thead>
+          <thead><tr><th>Rack</th><th>Desde</th><th>Hasta</th><th>Hasta nivel</th><th /></tr></thead>
           <tbody>
             {cfg.enrejados.map((x, i) => (
               <tr key={`${i}-${cfg.enrejados.length}`}>
                 <td><input type="text" defaultValue={codRack(x.rack)} onBlur={(e) => {
                   const v = e.target.value.trim();
                   if (!v) { e.target.value = codRack(x.rack); return; }
-                  setEnrejado(i, { rack: /^\d+$/.test(v) ? +v : v.toUpperCase() });
+                  setEnrejado(i, { rack: leerRack(v) });
                 }} /></td>
                 <td><input type="number" min="1" value={x.desde} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setEnrejado(i, { desde: v, hasta: Math.max(v, x.hasta) }); }} /></td>
                 <td><input type="number" min="1" value={x.hasta} onChange={(e) => { const v = entero(e.target.value, 1); if (v && v >= x.desde) setEnrejado(i, { hasta: v }); }} /></td>
+                <td><input type="number" min="1" placeholder="todo" value={x.hastaNivel ?? ''} onChange={(e) => setEnrejado(i, { hastaNivel: entero(e.target.value, 1) })} /></td>
                 <td><button type="button" className="alm-btn-icono" title="Quitar" onClick={() => set('enrejados', cfg.enrejados.filter((_, j) => j !== i))}><FaTrash /></button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('enrejados', [...cfg.enrejados, { rack: 'P6', desde: 1, hasta: 1 }])}><FaPlus /> Agregar enrejado</button>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('enrejados', [...cfg.enrejados, { rack: 'P6', desde: 1, hasta: 1, hastaNivel: null }])}><FaPlus /> Agregar enrejado</button>
+        <p className="alm-ayuda">Sirve para cualquier rack (P6, M1, 07…). <b>Hasta nivel</b> vacío = la jaula cubre toda la altura; ej. M1 009–010 hasta el nivel 4 (5 y 6 sin reja).</p>
       </section>
 
-      <section className="alm-card">
-        <h3>Puentes (paso por debajo del rack)</h3>
-        <p className="alm-ayuda">De la profundidad "desde" a "hasta" se quita la parte de abajo (alto libre en niveles base). Racks vacío = todos los del almacén principal; en peligrosos se nombran. Ej.: <code>1-10, 15</code>, <code>23-32</code> o <code>P2, P3, P4, P5</code>.
-          <b> Ubic. arriba</b> = cuántas ubicaciones hay sobre el paso (2, 3 o 4; vacío = las que salgan de la altura). <b>Pallets</b> = pallets por ubicación en el puente.</p>
+      <section className="alm-card alm-card-ancha">
+        <h3>Almacén de médicos</h3>
+        <p className="alm-ayuda">
+          Va detrás de los racks, pasando el pasillo de atrás. Ubicaciones como <code>M1-009-4</code> o <code>36-005-2</code>.
+          Los racks van de izquierda a derecha (desde el lado del rack 01) en el orden de la tabla. <b>Fila</b> = fila de médicos donde arranca
+          (1 = junto al pasillo de atrás). <b>Misma línea que</b> = va en la misma línea que otro rack (36 bajo M5, 37 bajo M6).
+          La altura de cada rack se pone en <b>Altura</b> (5 o 6 niveles).
+        </p>
+        <label className="alm-check-linea">
+          <input type="checkbox" checked={cfg.medicos.activo} onChange={(e) => setMed('activo', e.target.checked)} /> Mostrar médicos
+        </label>
+        <div className="alm-grid-form">
+          <label>Empieza en X (m desde el borde del rack 01)<input type="number" step="0.5" value={cfg.medicos.x} onChange={(e) => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) setMed('x', v); }} /></label>
+          <label>Separación del pasillo de atrás (m)<input type="number" min="0" step="0.1" value={cfg.medicos.separacion} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setMed('separacion', v); }} /></label>
+          <label>Puerta de ingreso (m desde el borde)<input type="number" min="0" step="0.5" value={cfg.medicos.puertaIngreso} onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 0) setMed('puertaIngreso', v); }} /></label>
+          <label>Niveles para racks nuevos
+            <select value={cfg.medicos.nivelesPorDefecto} onChange={(e) => setMed('nivelesPorDefecto', +e.target.value)}>
+              {[4, 5, 6, 7].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="alm-check-linea">
+          <input type="checkbox" checked={cfg.medicos.cuarto.activo} onChange={(e) => setMed('cuarto', { ...cfg.medicos.cuarto, activo: e.target.checked })} />
+          Cuarto cerrado con los racks
+          <input type="text" style={{ width: 90 }} defaultValue={cfg.medicos.cuarto.racks.join(', ')}
+            onBlur={(e) => setMed('cuarto', { ...cfg.medicos.cuarto, racks: e.target.value.split(/[,;\s]+/).filter(Boolean).map((x) => x.toUpperCase()) })} />
+          hasta la fila
+          <input type="number" min="1" style={{ width: 60 }} value={cfg.medicos.cuarto.hastaFila} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setMed('cuarto', { ...cfg.medicos.cuarto, hastaFila: v }); }} />
+          (Puerta 1 adelante y Puerta atrás)
+        </label>
         <table className="alm-tabla">
-          <thead><tr><th>Desde</th><th>Hasta</th><th>Alto libre</th><th>Ubic. arriba</th><th>Pallets</th><th>Racks</th><th /></tr></thead>
+          <thead><tr><th>Rack</th><th>Desde</th><th>Hasta</th><th>Altura</th><th>Fila</th><th>Pallets</th><th>Pasillo antes</th><th>Misma línea que</th><th /></tr></thead>
+          <tbody>
+            {cfg.medicos.racks.map((x, i) => (
+              <tr key={x.codigo}>
+                <td><input type="text" defaultValue={x.codigo} onBlur={(e) => {
+                  const v = e.target.value.trim().toUpperCase().replace(/^0+(?=\d)/, '');
+                  if (codigoLibre(v, i)) setMedRack(i, { codigo: v });
+                  else e.target.value = x.codigo;
+                }} /></td>
+                <td><input type="number" min="1" value={x.desde} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setMedRack(i, { desde: v, hasta: Math.max(v, x.hasta) }); }} /></td>
+                <td><input type="number" min="1" value={x.hasta} onChange={(e) => { const v = entero(e.target.value, 1); if (v && v >= x.desde) setMedRack(i, { hasta: v }); }} /></td>
+                <td><input type="number" min="1" value={x.niveles} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setMedRack(i, { niveles: v }); }} /></td>
+                <td><input type="number" min="1" value={x.fila} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setMedRack(i, { fila: v }); }} /></td>
+                <td><input type="number" min="1" max="4" placeholder={cfg.palletsPorUbicacion} value={x.pallets ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setMedRack(i, { pallets: v ? Math.min(v, 4) : null }); }} /></td>
+                <td style={{ textAlign: 'center' }}>{i === 0 || x.mismaXQue ? '—' : <input type="checkbox" style={{ width: 'auto' }} checked={x.pasilloAntes} onChange={(e) => setMedRack(i, { pasilloAntes: e.target.checked })} />}</td>
+                <td>
+                  <select value={x.mismaXQue || ''} onChange={(e) => setMedRack(i, { mismaXQue: e.target.value || null })}>
+                    <option value="">—</option>
+                    {cfg.medicos.racks.filter((o) => o.codigo !== x.codigo && !o.mismaXQue).map((o) => <option key={o.codigo} value={o.codigo}>{o.codigo}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <button type="button" className="alm-btn-icono alm-btn-orden" title="Subir" disabled={i === 0} onClick={() => moverMed(i, -1)}>▲</button>
+                  <button type="button" className="alm-btn-icono alm-btn-orden" title="Bajar" disabled={i === cfg.medicos.racks.length - 1} onClick={() => moverMed(i, 1)}>▼</button>
+                  <button type="button" className="alm-btn-icono" title="Quitar" onClick={() => setMed('racks', cfg.medicos.racks.filter((_, j) => j !== i))}><FaTrash /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => {
+          let k = 1;
+          while (cfg.medicos.racks.some((x) => x.codigo === `M${k}`)) k++;
+          setMed('racks', [...cfg.medicos.racks, { codigo: `M${k}`, desde: 1, hasta: 15, niveles: cfg.medicos.nivelesPorDefecto || 6, fila: 1, pasilloAntes: true, mismaXQue: null }]);
+        }}><FaPlus /> Agregar rack de médicos</button>
+      </section>
+
+      <section className="alm-card alm-card-ancha">
+        <h3>Puentes y túneles (paso por debajo del rack)</h3>
+        <p className="alm-ayuda">De la profundidad "desde" a "hasta" se quita la parte de abajo (alto libre en niveles base). Racks vacío = todos los del almacén principal; en peligrosos se nombran. Ej.: <code>1-10, 15</code>, <code>23-32</code> o <code>P2, P3, P4, P5</code>.
+          <b> Ubic. arriba</b> = cuántas ubicaciones hay sobre el paso (2, 3 o 4; vacío = las que salgan de la altura). <b>Pallets</b> = pallets por ubicación en el puente. <b>A lo ancho</b> = cuántas ubicaciones hay a lo ancho del puente (ej. puente 024–026 con 2: quedan 024 y 025 anchas y la 026 es solo paso; vacío = una por profundidad).</p>
+        <table className="alm-tabla">
+          <thead><tr><th>Desde</th><th>Hasta</th><th>Alto libre</th><th>Ubic. arriba</th><th>A lo ancho</th><th>Pallets</th><th>Racks</th><th /></tr></thead>
           <tbody>
             {cfg.puentes.map((b, i) => (
               <tr key={`${i}-${cfg.puentes.length}`}>
@@ -337,6 +427,7 @@ export default function EditorConfig({ cfg, setCfg }) {
                 }} /></td>
                 <td><input type="number" min="0" value={b.nivelesLibres} onChange={(e) => setPuente(i, 'nivelesLibres', entero(e.target.value, 0) ?? 0)} /></td>
                 <td><input type="number" min="1" max="10" placeholder="auto" value={b.nivelesArriba ?? ''} onChange={(e) => setPuente(i, 'nivelesArriba', entero(e.target.value, 1))} /></td>
+                <td><input type="number" min="1" max={b.hasta - b.desde + 1} placeholder={b.hasta - b.desde + 1} value={b.ubicacionesAncho ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setPuente(i, 'ubicacionesAncho', v ? Math.min(v, b.hasta - b.desde + 1) : null); }} /></td>
                 <td><input type="number" min="1" max="4" placeholder="rack" value={b.pallets ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setPuente(i, 'pallets', v ? Math.min(v, 4) : null); }} /></td>
                 <td><input type="text" placeholder="todos" defaultValue={(b.racks || []).join(', ')} onBlur={(e) => setPuente(i, 'racks', listaRacks(e.target.value))} /></td>
                 <td><button type="button" className="alm-btn-icono" title="Quitar" onClick={() => set('puentes', cfg.puentes.filter((_, j) => j !== i))}><FaTrash /></button></td>
@@ -344,21 +435,29 @@ export default function EditorConfig({ cfg, setCfg }) {
             ))}
           </tbody>
         </table>
-        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('puentes', [...cfg.puentes, { desde: 1, hasta: 1, nivelesLibres: 2, racks: [], nivelesArriba: null, pallets: null }])}><FaPlus /> Agregar puente</button>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('puentes', [...cfg.puentes, { desde: 1, hasta: 1, nivelesLibres: 2, racks: [], nivelesArriba: null, pallets: null, ubicacionesAncho: null }])}><FaPlus /> Agregar puente</button>
       </section>
 
       <section className="alm-card">
-        <h3>Columnas del edificio</h3>
+        <h3>Columnas y muros</h3>
         <p className="alm-ayuda">
           La columna ocupa el lugar de una o más profundidades. El rack no se alarga ni se mueven los puentes:
           la numeración sigue sin saltarse y el rack termina antes (ej. 044 con una columna de 1 → llega a 043).
-          <b> En la posición</b> = posición física donde empieza la columna (como si no hubiera columnas). Racks vacío = todos.
+          <b> En la posición</b> = posición física donde empieza (como si no hubiera columnas). Racks vacío = todos los del almacén principal;
+          en peligrosos y médicos se nombran (ej. <code>M5</code>) y la posición se cuenta desde el inicio de ese rack.
+          <b> Muro</b> corta todo el fondo del rack.
         </p>
         <table className="alm-tabla">
-          <thead><tr><th>Racks</th><th>En la posición</th><th>Ocupa (profundidades)</th><th /></tr></thead>
+          <thead><tr><th>Tipo</th><th>Racks</th><th>En la posición</th><th>Ocupa (profundidades)</th><th /></tr></thead>
           <tbody>
             {cfg.columnas.map((k, i) => (
               <tr key={`${i}-${cfg.columnas.length}`}>
+                <td>
+                  <select value={k.tipo || 'columna'} onChange={(e) => setColumna(i, { tipo: e.target.value })}>
+                    <option value="columna">Columna</option>
+                    <option value="muro">Muro</option>
+                  </select>
+                </td>
                 <td><input type="text" placeholder="todos" defaultValue={(k.racks || []).join(', ')} onBlur={(e) => setColumna(i, { racks: listaRacks(e.target.value) })} /></td>
                 <td><input type="number" min="1" value={k.desde} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setColumna(i, { desde: v }); }} /></td>
                 <td><input type="number" min="1" value={k.ocupa} onChange={(e) => { const v = entero(e.target.value, 1); if (v) setColumna(i, { ocupa: v }); }} /></td>
@@ -367,7 +466,7 @@ export default function EditorConfig({ cfg, setCfg }) {
             ))}
           </tbody>
         </table>
-        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('columnas', [...cfg.columnas, { racks: [], desde: 10, ocupa: 1 }])}><FaPlus /> Agregar columna</button>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('columnas', [...cfg.columnas, { racks: [], desde: 10, ocupa: 1, tipo: 'columna' }])}><FaPlus /> Agregar columna o muro</button>
       </section>
 
       <section className="alm-card">

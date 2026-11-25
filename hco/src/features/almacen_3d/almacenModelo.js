@@ -42,14 +42,42 @@ const PELIGROSOS_INICIAL = {
   ],
 };
 
+// Almacén de MÉDICOS, detrás de los racks 01·02 | 03·04 | 05·06 (según el plano).
+// De izquierda a derecha en X (lado del rack 01 hacia afuera): M1 | pasillo | M2·M3 | pasillo | M4·M5 | pasillo | M6.
+// Adelante (filas 1–14) está el cuarto con los racks 36 (bajo M5) y 37 (bajo M6), con su propia puerta.
+//   fila      = fila del almacén de médicos donde arranca su profundidad "desde" (1 = junto al pasillo de atrás).
+//   mismaXQue = va en la misma línea (X) que otro rack (36 bajo M5, 37 bajo M6).
+const MEDICOS_INICIAL = {
+  activo: true,
+  x: 0, // metros desde el borde del almacén (lado del rack 01) donde empieza M1
+  separacion: 0.3, // metros entre el pasillo de atrás y el muro de médicos
+  puertaIngreso: 5.5, // metros desde el borde izquierdo del muro de médicos al centro de la puerta de ingreso
+  nivelesPorDefecto: 6,
+  // cuarto cerrado con puerta adelante (Puerta 1) y atrás (Puerta)
+  cuarto: { activo: true, racks: ['36', '37'], hastaFila: 14 },
+  racks: [
+    { codigo: 'M1', desde: 1, hasta: 30, niveles: 6, fila: 1, pasilloAntes: false },
+    { codigo: 'M2', desde: 1, hasta: 16, niveles: 6, fila: 15, pasilloAntes: true },
+    { codigo: 'M3', desde: 1, hasta: 16, niveles: 6, fila: 15, pasilloAntes: false },
+    { codigo: 'M4', desde: 1, hasta: 15, niveles: 6, fila: 16, pasilloAntes: true },
+    { codigo: 'M5', desde: 1, hasta: 14, niveles: 6, fila: 16, pasilloAntes: false },
+    { codigo: 'M6', desde: 1, hasta: 15, niveles: 6, fila: 16, pasilloAntes: true },
+    { codigo: '36', desde: 1, hasta: 14, niveles: 6, fila: 1, mismaXQue: 'M5' },
+    { codigo: '37', desde: 1, hasta: 14, niveles: 6, fila: 1, mismaXQue: 'M6' },
+  ],
+};
+
 export const pad = (n, largo) => String(n).padStart(largo, '0');
 
 // Racks largos (23 al 32): llegan a la profundidad 054 y tienen un segundo puente por la 044.
 const RACKS_LARGOS = Array.from({ length: 10 }, (_, i) => 23 + i);
 
 export const CONFIG_INICIAL = {
-  version: 5,
+  version: 6,
   racks: 35,
+  // Pasillo por la parte de atrás de los racks (m, 0 = sin pasillo) y túneles (paso por los puentes).
+  anchoPasilloAtras: 3.2,
+  tuneles: true,
   // Pasillo entre el stage y el frente de los racks (m). Sigue por las puertas hasta peligrosos.
   pasilloFrente: 1.5,
   profundidades: 44,
@@ -68,15 +96,21 @@ export const CONFIG_INICIAL = {
   // racks vacío = todos los racks del almacén principal; para peligrosos se nombran (["P2","P3"]).
   // nivelesArriba = cuántas ubicaciones hay sobre el paso (2, 3 o 4; null = las que salgan de la altura).
   // pallets = pallets por ubicación en el puente (null = los del rack).
+  // ubicacionesAncho = cuántas ubicaciones hay a lo ancho sobre el puente. Ej. puente en las posiciones
+  // 024–026 con 2: el puente lleva la 024 y la 025 (anchas) y la 026 sigue después del puente
+  // (el rack termina una antes, como con una columna). null = una por profundidad.
   puentes: [
     { desde: 20, hasta: 20, nivelesLibres: 2, racks: [], nivelesArriba: null, pallets: null },
     { desde: 44, hasta: 44, nivelesLibres: 2, racks: RACKS_LARGOS, nivelesArriba: null, pallets: null },
     { desde: 3, hasta: 4, nivelesLibres: 2, racks: ['P2', 'P3', 'P4', 'P5'], nivelesArriba: null, pallets: null },
+    { desde: 3, hasta: 4, nivelesLibres: 2, racks: ['M5', 'M4'], nivelesArriba: null, pallets: null },
   ],
   // Columnas del edificio: ocupan `ocupa` posiciones del rack desde la posición física `desde`.
   // El rack no se alarga: pierde esas profundidades (la numeración sigue sin saltarse y termina antes)
   // y los puentes se quedan en su sitio. racks vacío = todos los del almacén principal.
-  columnas: [],
+  // En peligrosos y médicos se nombran y `desde` se cuenta desde el inicio del rack.
+  // tipo: 'columna' o 'muro'.
+  columnas: [{ racks: ['M5'], desde: 5, ocupa: 1, tipo: 'columna' }],
   // Rótulo colgado en la punta de cada rack (número con flecha hacia su pasillo).
   rotulos: { activo: true, altura: 4.5, atras: true },
   // ¿Pasillo después del último rack? (el 35 va pegado al muro)
@@ -86,8 +120,12 @@ export const CONFIG_INICIAL = {
     { antesDe: 3, cantidad: 1 },
     { antesDe: 23, cantidad: 2 },
   ],
-  // Ubicaciones con enrejado (jaula), por rack y rango de profundidades.
-  enrejados: [{ rack: 'P6', desde: 1, hasta: 12 }],
+  // Ubicaciones con enrejado (jaula), por rack y rango de profundidades. hastaNivel = la jaula llega
+  // hasta ese nivel (null = toda la altura). Ej. M1 009–010 enrejado hasta el nivel 4 (5 y 6 libres).
+  enrejados: [
+    { rack: 'P6', desde: 1, hasta: 12, hastaNivel: null },
+    { rack: 'M1', desde: 9, hasta: 10, hastaNivel: 4 },
+  ],
   medidas: {
     anchoPosicion: 1.2,
     altoNivel: 1.5, // alto de un nivel base
@@ -99,6 +137,8 @@ export const CONFIG_INICIAL = {
   stage: { activo: true, fondo: 15, rampas: 6, anchoRampa: 3.5 },
   // Almacén de peligrosos al costado. Códigos como P2-007-1 (rack P2, profundidad 007, nivel 1).
   peligrosos: PELIGROSOS_INICIAL,
+  // Almacén de médicos detrás de los racks. Códigos como M1-009-4 o 36-005-2.
+  medicos: MEDICOS_INICIAL,
 };
 
 // Pasillo después de cada rack impar: 01 | 02·03 | 04·05 | …
@@ -109,10 +149,22 @@ export const pasillosPares = (racks) => Array.from({ length: racks - 1 }, (_, i)
 // ---------------------------------------------------------------------------
 // Códigos
 // ---------------------------------------------------------------------------
-// Racks del almacén principal son números (1..35); los de peligrosos son textos ("P2").
+// Racks del almacén principal son números (1..35); los de peligrosos y médicos son textos ("P2", "M1", "36").
+// "36" y "37" son de médicos: se registran para que leerRack("36") devuelva el texto y no el número.
+const CODIGOS_ZONA = new Set();
+const registrarZonas = (cfg) => {
+  CODIGOS_ZONA.clear();
+  [...(cfg.peligrosos?.racks || []), ...(cfg.medicos?.racks || [])].forEach((x) => CODIGOS_ZONA.add(String(x.codigo)));
+};
+/** ¿Es un rack de peligrosos o de médicos? (no del almacén principal) */
 export const esRackPeligrosos = (r) => typeof r === 'string';
+export const esRackZona = esRackPeligrosos;
 export const codRack = (r) => (esRackPeligrosos(r) ? r : pad(r, 2));
-export const leerRack = (t) => (/^\d+$/.test(String(t)) ? +t : String(t).toUpperCase());
+export const leerRack = (t) => {
+  const s = String(t).trim().toUpperCase();
+  if (/^\d+$/.test(s)) return CODIGOS_ZONA.has(String(+s)) ? String(+s) : +s;
+  return s;
+};
 export const codProf = (p) => pad(p, 3);
 export const codigoUbicacion = (r, p, n) => `${codRack(r)}-${codProf(p)}-${n}`;
 export const claveProf = (r, p) => `${codRack(r)}-${codProf(p)}`;
@@ -157,6 +209,9 @@ export const completarConfig = (c) => {
   const viejo = !c || (c.version ?? 1) < 3;
   const antesV4 = !!c && (c.version ?? 1) < 4;
   const antesV5 = !!c && (c.version ?? 1) < 5;
+  const antesV6 = !!c && (c.version ?? 1) < 6;
+  // los códigos de médicos se registran antes de leer racks ("36" → texto)
+  registrarZonas({ peligrosos: c?.peligrosos || PELIGROSOS_INICIAL, medicos: c?.medicos || MEDICOS_INICIAL });
   let puentesGuardados = Array.isArray(c?.puentes) ? c.puentes : CONFIG_INICIAL.puentes;
   if (viejo && c) puentesGuardados = [...puentesGuardados, ...CONFIG_INICIAL.puentes.filter((b) => b.racks.some(esRackPeligrosos))];
   // v4: base 044; racks 23–32 hasta 054 con un segundo puente en la 044
@@ -171,6 +226,8 @@ export const completarConfig = (c) => {
     // la foto muestra 23·24 espalda con espalda: 01·02 | 03·04 … 35 solo
     if (JSON.stringify(pasillos) === JSON.stringify(pasillosImpares(base.racks))) pasillos = pasillosPares(base.racks);
   }
+  // v6: almacén de médicos (túnel M5·M4 en 003–004)
+  if (antesV6 && !puentesGuardados.some((b) => (b.racks || []).map(String).includes('M5'))) puentesGuardados = [...puentesGuardados, CONFIG_INICIAL.puentes[3]];
   const numOpc = (v, min, max) => (v == null || v === '' || !Number.isFinite(+v) ? null : Math.min(max, Math.max(min, Math.round(+v))));
   const puentes = puentesGuardados.map((b) => {
     const desde = +(b.desde ?? b.profundidad ?? 1);
@@ -181,35 +238,52 @@ export const completarConfig = (c) => {
       racks: (b.racks || []).map(leerRack),
       nivelesArriba: numOpc(b.nivelesArriba, 1, 10),
       pallets: numOpc(b.pallets, 1, 4),
+      ubicacionesAncho: numOpc(b.ubicacionesAncho, 1, 10),
     };
   });
-  const columnas = (Array.isArray(c?.columnas) ? c.columnas : CONFIG_INICIAL.columnas).map((k) => ({
+  let columnasGuardadas = Array.isArray(c?.columnas) ? c.columnas : CONFIG_INICIAL.columnas;
+  if (antesV6 && !columnasGuardadas.some((k) => (k.racks || []).map(String).includes('M5'))) columnasGuardadas = [...columnasGuardadas, ...CONFIG_INICIAL.columnas];
+  const columnas = columnasGuardadas.map((k) => ({
     racks: (k.racks || []).map(leerRack),
+    tipo: k.tipo === 'muro' ? 'muro' : 'columna',
     // formato anterior: { despuesDe, ancho }
     desde: Math.max(1, Math.round(+(k.desde ?? (+k.despuesDe || 0) + 1) || 1)),
     ocupa: Math.max(1, Math.round(+(k.ocupa ?? k.ancho) || 1)),
   }));
   const pel = { ...PELIGROSOS_INICIAL, ...(viejo ? {} : c?.peligrosos || {}) };
   if (antesV5 && (pel.adelante == null || +pel.adelante === 3)) pel.adelante = PELIGROSOS_INICIAL.adelante; // v5: más abajo
-  pel.racks = (pel.racks || []).map((x) => {
+  const normRack = (x, porDefecto) => {
     const desde = Math.max(1, +x.desde || 1);
+    const cod = String(x.codigo || porDefecto).toUpperCase();
     return {
-      codigo: String(x.codigo || 'P1').toUpperCase(),
+      codigo: /^\d+$/.test(cod) ? String(+cod) : cod,
       desde,
       hasta: Math.max(desde, +x.hasta || 1),
       niveles: Math.max(1, +x.niveles || 1),
       fila: Math.max(1, +(x.fila ?? desde) || 1),
       pasilloAntes: x.pasilloAntes !== false,
       pallets: x.pallets ? Math.min(4, Math.max(1, +x.pallets)) : null,
+      mismaXQue: x.mismaXQue ? String(x.mismaXQue).toUpperCase() : null,
     };
-  });
-  const enrejados = (viejo || !Array.isArray(c?.enrejados) ? CONFIG_INICIAL.enrejados : c.enrejados).map((e) => {
+  };
+  pel.racks = (pel.racks || []).map((x) => normRack(x, 'P1'));
+  const med = { ...MEDICOS_INICIAL, ...(c?.medicos || {}) };
+  med.cuarto = { ...MEDICOS_INICIAL.cuarto, ...(c?.medicos?.cuarto || {}) };
+  med.cuarto.racks = (med.cuarto.racks || []).map((x) => String(x).toUpperCase());
+  med.racks = (med.racks || []).map((x) => normRack(x, 'M1'));
+  let enrejadosGuardados = viejo || !Array.isArray(c?.enrejados) ? CONFIG_INICIAL.enrejados : c.enrejados;
+  if (antesV6 && !enrejadosGuardados.some((e) => String(e.rack).toUpperCase() === 'M1')) enrejadosGuardados = [...enrejadosGuardados, CONFIG_INICIAL.enrejados[1]];
+  const enrejados = enrejadosGuardados.map((e) => {
     const desde = Math.max(1, +e.desde || 1);
-    return { rack: leerRack(e.rack), desde, hasta: Math.max(desde, +e.hasta || desde) };
+    const hn = +e.hastaNivel;
+    return { rack: leerRack(e.rack), desde, hasta: Math.max(desde, +e.hasta || desde), hastaNivel: hn >= 1 ? Math.round(hn) : null };
   });
   const out = {
     ...base,
-    version: 5,
+    version: 6,
+    anchoPasilloAtras: Math.max(0, +(base.anchoPasilloAtras ?? 3.2) || 0),
+    tuneles: base.tuneles !== false,
+    medicos: med,
     pasilloFrente: Math.max(0, +(base.pasilloFrente ?? 1.5) || 0),
     enrejados,
     columnas,
@@ -229,25 +303,45 @@ export const completarConfig = (c) => {
     puentes,
   };
   delete out.disposicion;
+  registrarZonas(out);
   return out;
 };
 
-export const rackPeligrosos = (cfg, r) => cfg.peligrosos.racks.find((x) => x.codigo === r) || null;
+/** Definición de un rack de peligrosos o de médicos (o null). */
+export const rackPeligrosos = (cfg, r) =>
+  cfg.peligrosos.racks.find((x) => x.codigo === String(r)) || cfg.medicos?.racks.find((x) => x.codigo === String(r)) || null;
+export const rackZona = rackPeligrosos;
+
+/** 'peligrosos' | 'medicos' | null (almacén principal) */
+export const zonaDe = (cfg, r) => {
+  if (!esRackPeligrosos(r)) return null;
+  if (cfg.peligrosos.racks.some((x) => x.codigo === r)) return 'peligrosos';
+  if (cfg.medicos?.racks.some((x) => x.codigo === r)) return 'medicos';
+  return null;
+};
 
 /** Racks de peligrosos que se dibujan (si la zona está activa). */
 export const racksPeligrosos = (cfg) => (cfg.peligrosos.activo ? cfg.peligrosos.racks.map((x) => x.codigo) : []);
+/** Racks de médicos que se dibujan (si la zona está activa). */
+export const racksMedicos = (cfg) => (cfg.medicos?.activo ? cfg.medicos.racks.map((x) => x.codigo) : []);
 
-/** Todos los racks: 1..N del almacén principal + los de peligrosos. */
-export const listaRacks = (cfg) => [...Array.from({ length: cfg.racks }, (_, i) => i + 1), ...racksPeligrosos(cfg)];
+/** Todos los racks: 1..N del almacén principal + los de peligrosos + los de médicos. */
+export const listaRacks = (cfg) => {
+  registrarZonas(cfg);
+  return [...Array.from({ length: cfg.racks }, (_, i) => i + 1), ...racksPeligrosos(cfg), ...racksMedicos(cfg)];
+};
 
 /** Largo del rack en posiciones físicas (sin descontar columnas): 44, 54… */
 export const largoRack = (cfg, r) => cfg.racksDetalle[codRack(r)]?.profundidades ?? cfg.profundidades;
 
-/** Columnas del edificio que cortan el rack r (solo almacén principal), ordenadas de adelante hacia el fondo. */
+/**
+ * Columnas o muros que cortan el rack r, ordenados de adelante hacia el fondo.
+ * Sin racks = todos los del almacén principal; en peligrosos y médicos hay que nombrarlos.
+ */
 export const columnasDeRack = (cfg, r) =>
-  esRackPeligrosos(r)
-    ? []
-    : (cfg.columnas || []).filter((k) => !k.racks?.length || k.racks.some((x) => String(x) === String(r))).sort((a, b) => a.desde - b.desde);
+  (cfg.columnas || [])
+    .filter((k) => (k.racks?.length ? k.racks.some((x) => String(x) === String(r)) : !esRackPeligrosos(r)))
+    .sort((a, b) => a.desde - b.desde);
 
 /** Posiciones físicas del rack que ocupan columnas (dentro de su largo). */
 const posicionesColumna = (cfg, r) => {
@@ -260,8 +354,21 @@ const posicionesColumna = (cfg, r) => {
 };
 
 /** Última profundidad del rack: el largo menos lo que ocupan las columnas (44 sin columnas → 43 con una). */
-export const profundidadesDeRack = (cfg, r) =>
-  esRackPeligrosos(r) ? rackPeligrosos(cfg, r)?.hasta ?? 0 : largoRack(cfg, r) - posicionesColumna(cfg, r).size;
+/** Puentes del almacén principal con menos ubicaciones a lo ancho que posiciones (ej. 3 posiciones, 2 ubicaciones). */
+const puentesAnchos = (cfg, r) =>
+  esRackPeligrosos(r)
+    ? []
+    : cfg.puentes
+      .filter((b) => b.ubicacionesAncho && b.ubicacionesAncho < b.hasta - b.desde + 1 && puenteAplica(b, r))
+      .map((b) => ({ s: b.desde, L: b.hasta - b.desde + 1, N: b.ubicacionesAncho }));
+
+/** Última profundidad del rack: el largo menos columnas y menos lo que ahorran los puentes con ubicaciones anchas. */
+export const profundidadesDeRack = (cfg, r) => {
+  if (esRackPeligrosos(r)) return rackPeligrosos(cfg, r)?.hasta ?? 0;
+  const largo = largoRack(cfg, r);
+  const ahorro = puentesAnchos(cfg, r).filter((b) => b.s <= largo).reduce((s, b) => s + b.L - b.N, 0);
+  return largo - posicionesColumna(cfg, r).size - ahorro;
+};
 
 /** [primera, última] profundidad del rack. */
 export const rangoProfundidades = (cfg, r) =>
@@ -289,7 +396,8 @@ export const esProfundidadDePuente = (cfg, p, r = null) =>
     ? !!puenteEn(cfg, r, p)
     : cfg.puentes.some((b) => p >= b.desde && p <= b.hasta && (!b.racks?.length || b.racks.some((x) => !esRackPeligrosos(x))));
 
-export const enrejadoEn = (cfg, r, p) => cfg.enrejados.some((e) => String(e.rack) === String(r) && p >= e.desde && p <= e.hasta);
+/** Enrejado de la profundidad (o null). hastaNivel = la jaula llega hasta ese nivel. */
+export const enrejadoEn = (cfg, r, p) => cfg.enrejados.find((e) => String(e.rack) === String(r) && p >= e.desde && p <= e.hasta) || null;
 
 /**
  * Posición física (contando desde el frente, 1 = la de adelante) de la profundidad p del rack r.
@@ -298,12 +406,41 @@ export const enrejadoEn = (cfg, r, p) => cfg.enrejados.some((e) => String(e.rack
 export const filaDe = (cfg, r, p) => {
   if (esRackPeligrosos(r)) {
     const d = rackPeligrosos(cfg, r);
-    const adelante = (+cfg.peligrosos.adelante || 0) / cfg.medidas.anchoPosicion;
-    return (d ? d.fila + (p - d.desde) : p) - adelante;
+    if (!d) return p;
+    let rel = p - d.desde + 1; // posición dentro del rack (1 = la primera)
+    for (const k of columnasDeRack(cfg, r)) if (k.desde <= rel) rel += k.ocupa;
+    const f = d.fila + rel - 1;
+    if (zonaDe(cfg, r) === 'medicos') return medicosZ0(cfg) / cfg.medidas.anchoPosicion + f;
+    return f - (+cfg.peligrosos.adelante || 0) / cfg.medidas.anchoPosicion;
   }
+  // Columnas: se saltan sus posiciones. Puentes con N ubicaciones anchas en L posiciones:
+  // las N profundidades se reparten las L posiciones y las siguientes continúan después del puente.
+  const cortes = [
+    ...columnasDeRack(cfg, r).map((k) => ({ s: k.desde, o: k.ocupa })),
+    ...puentesAnchos(cfg, r),
+  ].sort((a, b) => a.s - b.s);
   let f = p;
-  for (const k of columnasDeRack(cfg, r)) if (k.desde <= f) f += k.ocupa;
+  for (const c of cortes) {
+    if (c.s > f) break;
+    if (c.o) f += c.o;
+    else {
+      const k = f - c.s;
+      if (k < c.N) return c.s - 1 + ((k + 1) * c.L) / c.N; // ubicación ancha sobre el puente
+      f += c.L - c.N;
+    }
+  }
   return f;
+};
+
+/** Fila (0 = el frente del almacén) donde empieza la columna o muro k del rack r. */
+export const inicioColumna = (cfg, r, k) => {
+  if (!esRackPeligrosos(r)) return k.desde - 1;
+  const d = rackPeligrosos(cfg, r);
+  if (!d) return k.desde - 1;
+  const desplaz = zonaDe(cfg, r) === 'medicos'
+    ? medicosZ0(cfg) / cfg.medidas.anchoPosicion
+    : -(+cfg.peligrosos.adelante || 0) / cfg.medidas.anchoPosicion;
+  return desplaz + d.fila - 1 + k.desde - 1;
 };
 
 /** Pallets por ubicación de una profundidad: puntual > puente > rack > general. */
@@ -349,7 +486,30 @@ export const infoProfundidad = (cfg, r, p) => {
 
   let desde = 1;
   while (desde <= niveles && bases[desde - 1] < libres - 0.001) desde++;
+
+  // Espacio que ocupa (en filas, 0 = el frente). Sobre un puente con N ubicaciones a lo ancho,
+  // las N primeras profundidades se reparten todo el ancho del puente y el resto queda solo como paso.
+  const fin = filaDe(cfg, r, p);
+  let span = { inicio: fin - 1, ancho: 1, k: 0, n: 1 };
+  let sinArriba = false;
+  const L = puente ? puente.hasta - puente.desde + 1 : 1;
+  const N = puente?.ubicacionesAncho ? Math.min(puente.ubicacionesAncho, L) : L;
+  if (puente && N < L && !esRackPeligrosos(r)) {
+    // almacén principal: la numeración continúa después del puente (ver filaDe)
+    const k = Math.round(((fin - (puente.desde - 1)) * N) / L) - 1;
+    span = { inicio: fin - L / N, ancho: L / N, k, n: N };
+  } else if (puente && N < L) {
+    const pos = p;
+    const k = pos - puente.desde;
+    const inicioPuente = esRackPeligrosos(r) ? filaDe(cfg, r, puente.desde) - 1 : puente.desde - 1;
+    if (k >= N) {
+      sinArriba = true;
+      desde = niveles + 1; // sin ubicaciones arriba del paso
+    } else span = { inicio: inicioPuente + (k * L) / N, ancho: L / N, k, n: N };
+  }
   return {
+    span,
+    sinArriba,
     niveles,
     alturas,
     bases,
@@ -357,7 +517,9 @@ export const infoProfundidad = (cfg, r, p) => {
     libres,
     desde,
     puente: !!puente,
-    enrejado: enrejadoEn(cfg, r, p),
+    enrejado: !!enrejadoEn(cfg, r, p),
+    // la jaula llega hasta el tope de este nivel (null = toda la altura)
+    enrejadoHasta: enrejadoEn(cfg, r, p)?.hastaNivel ?? null,
     pallets: palletsDe(cfg, r, p),
     inactiva: !!ov.inactiva || p > profundidadesDeRack(cfg, r) || p < rangoProfundidades(cfg, r)[0],
     cambiada: ov.niveles != null || !!ov.inactiva || !!ov.alturas || !!ov.pallets,
@@ -385,6 +547,9 @@ export const alturaMaxima = (cfg) => {
   Object.values(cfg.racksDetalle).forEach((d) => d.niveles && (max = Math.max(max, d.niveles)));
   return max;
 };
+
+/** Altura máxima (niveles base) de los racks de una zona ('peligrosos' | 'medicos'). */
+export const alturaMaximaZona = (cfg, zona) => Math.max(1, ...(cfg[zona]?.racks || []).map((x) => x.niveles));
 
 export const maxProfundidades = (cfg) => {
   let max = cfg.profundidades;
@@ -427,8 +592,9 @@ const ubicarApiladores = (cfg, pasillos, largo) => {
  * Posición (metros) de todo: racks, pasillos, stage, rampas y peligrosos.
  * X = racks uno al lado del otro, Z = profundidad (001 al frente), el stage queda en Z negativo.
  */
-export const distribucion = (cfg) => {
-  const { fondoRack, pasillo, espalda, anchoPosicion: A } = cfg.medidas;
+/** Racks y pasillos del almacén principal en X (de izquierda a derecha). */
+const layoutPrincipal = (cfg) => {
+  const { fondoRack, pasillo, espalda } = cfg.medidas;
   const racks = [];
   const pasillos = [];
   let x = 0;
@@ -446,10 +612,86 @@ export const distribucion = (cfg) => {
     pasillos.push({ x0: x, x1: x + pasillo, antesDe: cfg.racks + 1 });
     x += pasillo;
   } else x += 0.3; // el último rack va pegado al muro
-  const anchoPrincipal = x;
+  return { racks, pasillos, ancho: x };
+};
+
+/** Racks y pasillos de médicos en X, desde cfg.medicos.x hacia la derecha. */
+const layoutMedicos = (cfg) => {
+  const { fondoRack, pasillo, espalda } = cfg.medidas;
+  const M = cfg.medicos;
+  const racks = [];
+  const pasillos = [];
+  let x = +M.x || 0;
+  const x0 = x;
+  const enLinea = M.racks.filter((d) => !d.mismaXQue);
+  enLinea.forEach((d, i) => {
+    if (i > 0) {
+      if (d.pasilloAntes) {
+        pasillos.push({ x0: x, x1: x + pasillo });
+        x += pasillo;
+      } else x += espalda;
+    }
+    racks.push({ rack: d.codigo, x0: x, x1: x + fondoRack });
+    x += fondoRack;
+  });
+  M.racks.filter((d) => d.mismaXQue).forEach((d) => {
+    const ref = racks.find((r) => r.rack === d.mismaXQue);
+    if (ref) racks.push({ rack: d.codigo, x0: ref.x0, x1: ref.x1 });
+  });
+  return { racks, pasillos, x0, x1: x };
+};
+
+/** Dónde termina (Z, metros) cada rack del almacén principal: su última profundidad. */
+const finRack = (cfg, r) => filaDe(cfg, r, profundidadesDeRack(cfg, r)) * cfg.medidas.anchoPosicion;
+
+/** Z (metros) del muro de adelante de médicos: detrás de los racks que tiene delante + pasillo de atrás. */
+const cacheMedicos = new WeakMap();
+export const medicosZ0 = (cfg) => {
+  if (cacheMedicos.has(cfg)) return cacheMedicos.get(cfg);
+  const P = layoutPrincipal(cfg);
+  const M = layoutMedicos(cfg);
+  let fin = 0;
+  P.racks.forEach((r) => {
+    if (r.x1 > M.x0 - 0.5 && r.x0 < M.x1 + 0.5) fin = Math.max(fin, finRack(cfg, r.rack));
+  });
+  if (!fin) fin = Math.max(...P.racks.map((r) => finRack(cfg, r.rack)), 0);
+  const z0 = fin + (+cfg.anchoPasilloAtras || 0) + (+cfg.medicos.separacion || 0);
+  cacheMedicos.set(cfg, z0);
+  return z0;
+};
+
+export const distribucion = (cfg) => {
+  const { pasillo, anchoPosicion: A } = cfg.medidas;
+  const L = layoutPrincipal(cfg);
+  const racks = L.racks;
+  const pasillos = L.pasillos;
+  const anchoPrincipal = L.ancho;
   let filasMax = 0;
   for (let r = 1; r <= cfg.racks; r++) filasMax = Math.max(filasMax, filaDe(cfg, r, profundidadesDeRack(cfg, r)));
   const largo = filasMax * A;
+  const { fondoRack, espalda } = cfg.medidas;
+
+  // Pasillos de atrás: una franja detrás de cada rack (y de cada pasillo) donde termina.
+  // Los pasillos llegan hasta esa franja.
+  const wAtras = Math.max(+cfg.anchoPasilloAtras || 0, 0);
+  const finDe = {};
+  racks.forEach((r) => { finDe[r.rack] = finRack(cfg, r.rack); });
+  pasillos.forEach((p) => {
+    const vecinos = [p.antesDe - 1, p.antesDe].filter((r) => finDe[r] != null);
+    p.fin = Math.max(...vecinos.map((r) => finDe[r]), 0);
+    p.z1 = p.fin + (wAtras || 0.5);
+  });
+  const pasillosAtras = [];
+  if (wAtras) {
+    const tramos = [...racks.map((r) => ({ x0: r.x0, x1: r.x1, fin: finDe[r.rack] })), ...pasillos.map((p) => ({ x0: p.x0, x1: p.x1, fin: p.fin }))]
+      .sort((a, b) => a.x0 - b.x0);
+    tramos.forEach((t, i) => {
+      const x1 = tramos[i + 1] ? tramos[i + 1].x0 : anchoPrincipal;
+      const ult = pasillosAtras[pasillosAtras.length - 1];
+      if (ult && Math.abs(ult.z0 - t.fin) < 0.01 && Math.abs(ult.x1 - t.x0) < 0.5) ult.x1 = x1;
+      else pasillosAtras.push({ x0: t.x0, x1, z0: t.fin, z1: t.fin + wAtras });
+    });
+  }
 
   // Pasillo al frente de los racks (entre el stage y la profundidad 001)
   const pf = Math.max(+cfg.pasilloFrente || 0, 0);
@@ -503,6 +745,55 @@ export const distribucion = (cfg) => {
     racks.push(...pelRacks);
   }
 
+  // Médicos (según el plano), detrás de los racks 01–06
+  let medicos = null;
+  if (racksMedicos(cfg).length) {
+    const M = cfg.medicos;
+    const lay = layoutMedicos(cfg);
+    const z0 = medicosZ0(cfg);
+    const filaMax = Math.max(...M.racks.map((x) => filaDe(cfg, x.codigo, x.hasta)));
+    const z1 = filaMax * A + 0.3;
+    const xm0 = lay.x0 - 0.2;
+    const xm1 = lay.x1 + 0.3;
+    // cuarto cerrado (36 y 37) con su pasillo y dos puertas
+    let cuarto = null;
+    const enCuarto = lay.racks.filter((r) => M.cuarto?.racks?.includes(r.rack));
+    if (M.cuarto?.activo && enCuarto.length) {
+      const cx0 = Math.min(...enCuarto.map((r) => r.x0)) - 0.15;
+      const cx1 = Math.max(...enCuarto.map((r) => r.x1)) + 0.15;
+      const orden = [...enCuarto].sort((a, b) => a.x0 - b.x0);
+      const xPuerta = orden.length > 1 ? (orden[0].x1 + orden[1].x0) / 2 : (cx0 + cx1) / 2;
+      cuarto = { x0: Math.max(cx0, xm0), x1: Math.min(cx1, xm1), z0, z1: z0 + (M.cuarto.hastaFila || 14) * A + 0.1, xPuerta };
+    }
+    medicos = {
+      x0: xm0, x1: xm1, z0, z1,
+      xPuerta: xm0 + (+M.puertaIngreso || 0),
+      racks: lay.racks,
+      pasillos: lay.pasillos.map((p) => ({ ...p, z0: z0 + 0.2, z1: z1 - 0.2 })),
+      cuarto,
+    };
+    racks.push(...lay.racks);
+  }
+
+  // Túneles: el paso de personas por debajo de cada puente, de un lado al otro de los racks.
+  const tuneles = [];
+  if (cfg.tuneles) {
+    cfg.puentes.forEach((b) => {
+      const aplica = racks.filter((r) => (b.racks?.length ? b.racks.some((x) => String(x) === String(r.rack)) : !esRackPeligrosos(r.rack)));
+      if (!aplica.length) return;
+      const r0 = aplica[0].rack;
+      const zona = esRackPeligrosos(r0);
+      const zA = zona ? (filaDe(cfg, r0, b.desde) - 1) * A : (b.desde - 1) * A;
+      const zB = zona ? filaDe(cfg, r0, b.hasta) * A : b.hasta * A;
+      tuneles.push({
+        x0: Math.min(...aplica.map((r) => r.x0)) - (zona ? 0 : 0.2),
+        x1: Math.max(...aplica.map((r) => r.x1)) + (zona ? 0 : 0.2),
+        z0: zA, z1: zB,
+        texto: b.desde === b.hasta ? `Túnel ${pad(b.desde, 3)}` : `Túnel ${pad(b.desde, 3)}-${pad(b.hasta, 3)}`,
+      });
+    });
+  }
+
   // Stage al frente con rampas repartidas a lo ancho del almacén principal
   let stage = null;
   if (cfg.stage.activo) {
@@ -526,13 +817,14 @@ export const distribucion = (cfg) => {
     }
     : null;
 
-  const xMin = Math.min(0, peligrosos?.x0 ?? 0);
-  const xMax = Math.max(anchoPrincipal, peligrosos?.x1 ?? 0);
+  const xMin = Math.min(0, peligrosos?.x0 ?? 0, medicos?.x0 ?? 0);
+  const xMax = Math.max(anchoPrincipal, peligrosos?.x1 ?? 0, medicos?.x1 ?? 0);
+  const fondo = Math.max(largo, ...pasillosAtras.map((p) => p.z1), ...pasillos.map((p) => p.z1));
   return {
-    racks, pasillos, peligrosos, stage, frente,
+    racks, pasillos, peligrosos, medicos, stage, frente, pasillosAtras, tuneles,
     apiladores: ubicarApiladores(cfg, pasillos, largo),
     ancho: anchoPrincipal, largo,
-    xMin, xMax, zMin: stage ? stage.z0 - 4 : -2, zMax: Math.max(largo, peligrosos?.z1 ?? 0) + 2,
+    xMin, xMax, zMin: stage ? stage.z0 - 4 : -2, zMax: Math.max(fondo, peligrosos?.z1 ?? 0, medicos?.z1 ?? 0) + 2,
   };
 };
 

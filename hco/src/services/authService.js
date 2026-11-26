@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabaseClient';
+import { COLUMNAS_EMPLEADO } from './empleadosService';
 
 // Caché de la lista visual del Login (foto/nombre/rol). Antes se descargaba la tabla
 // `empleados` entera cada vez que se abría el Login.
@@ -70,10 +71,7 @@ export const iniciarSesion = (email, password) => {
 export const obtenerPerfilCompleto = async (userId) => {
   const { data, error } = await supabase
     .from('empleados')
-    .select(`
-      *,
-      cargos (nombre)
-    `)
+    .select(`${COLUMNAS_EMPLEADO}, cargos (nombre)`) // sin `cl`: la contraseña nunca viaja al navegador
     .eq('id', userId)
     .single();
 

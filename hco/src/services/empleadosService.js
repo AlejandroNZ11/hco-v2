@@ -20,11 +20,29 @@ export const subirFotoEmpleadoADrive = (dataUrlBase64, dniEmpleado = 'sin_dni') 
 // FUNCIONES CRUD DE EMPLEADOS Y CATÁLOGOS
 // =========================================================================
 
+// Columnas de `empleados` que se leen en las pantallas. NUNCA usar select('*') ni select() vacío
+// en esta tabla: traería la columna `cl` (contraseña) a todos los navegadores. La clave solo se
+// lee con obtenerClaveEmpleado() (pantalla de edición, solo SUPERADMIN). Si agregas una columna
+// nueva a la tabla y alguna pantalla la necesita, agrégala aquí.
+export const COLUMNAS_EMPLEADO =
+  'id, estado, dni, nombre, sexo, tipo, cargo_id, area_id, jefe_directo_id, rol, usuario, ' +
+  'fch_nacimiento, fch_salida, fecha_ingreso, correo_personal, correo_ceva, correo_3m, cod_mainchart, ' +
+  'hijos, celular, departamento, provincia, distrito, direccion, url_casa, coordenadas, ' +
+  'grupo_sanguineo, contacto_emergencia, rubrica, ruta_movilidad, motivo_salida, foto_url';
+
+/** Quita la contraseña de un objeto empleado (para no guardarla en Dexie ni en authUser). */
+export const sinClave = (emp) => {
+  if (!emp || typeof emp !== 'object' || !('cl' in emp)) return emp;
+  const copia = { ...emp };
+  delete copia.cl;
+  return copia;
+};
+
 export const obtenerTodosLosEmpleados = async () => {
   const { data, error } = await supabase
     .from('empleados')
     .select(`
-      *,
+      ${COLUMNAS_EMPLEADO},
       cargo:cargos(nombre),
       area:areas(nombre),
       jefe:jefe_directo_id(nombre)
@@ -38,7 +56,7 @@ export const obtenerTodosLosEmpleados = async () => {
 export const obtenerEmpleadoPorId = async (id) => {
   const { data, error } = await supabase
     .from('empleados')
-    .select('*')
+    .select(COLUMNAS_EMPLEADO)
     .eq('id', id)
     .maybeSingle();
 
@@ -46,12 +64,29 @@ export const obtenerEmpleadoPorId = async (id) => {
   return data;
 };
 
+/**
+ * Clave guardada de UN empleado (para que el SUPERADMIN se la recuerde a quien la olvidó).
+ * Pasa por la función SQL `obtener_clave_empleado`, que verifica en el servidor que quien la pide
+ * es SUPERADMIN (ver supabase/sql/seguridad_clave_empleados.sql).
+ */
+export const obtenerClaveEmpleado = async (id) => {
+  const { data, error } = await supabase.rpc('obtener_clave_empleado', { p_empleado_id: id });
+  if (error) throw new Error(`Error al obtener la clave: ${error.message}`);
+  return data || '';
+};
+
+/** Copia la clave a `empleados.cl` (al cambiarla o restablecerla). */
+export const guardarClaveEmpleado = async (id, clave) => {
+  const { error } = await supabase.from('empleados').update({ cl: clave }).eq('id', id);
+  if (error) throw new Error(`No se pudo guardar la clave en empleados: ${error.message}`);
+};
+
 export const crearEmpleado = async (empleadoData) => {
   invalidarConsultas('catalogos:');
   const { data, error } = await supabase
     .from('empleados')
     .insert([empleadoData])
-    .select()
+    .select(COLUMNAS_EMPLEADO)
     .single();
 
   if (error) throw new Error(`Error al crear empleado en BD: ${error.message}`);
@@ -62,13 +97,13 @@ export const crearEmpleado = async (empleadoData) => {
 export const actualizarEmpleado = async (id, empleadoData) => {
   invalidarConsultas('catalogos:');
   // Extraemos 'id' para no intentar sobreescribir la Primary Key en el UPDATE
-  const { id: _ignoreId, ...datosActualizar } = empleadoData;
+  const { id: _ignoreId, ...datosActualizar } = sinClave(empleadoData);
 
   const { data, error } = await supabase
     .from('empleados')
     .update(datosActualizar)
     .eq('id', id)
-    .select()
+    .select(COLUMNAS_EMPLEADO)
     .maybeSingle();
 
   if (error) throw new Error(`Error al actualizar empleado en BD: ${error.message}`);
@@ -84,7 +119,7 @@ export const cambiarEstadoEmpleado = async (id, nuevoEstado) => {
     .from('empleados')
     .update({ estado: nuevoEstado })
     .eq('id', id)
-    .select()
+    .select('id')
     .maybeSingle();
 
   if (error) throw new Error(`Error al cambiar estado: ${error.message}`);

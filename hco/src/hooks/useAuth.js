@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabaseClient';
+import { guardarClaveEmpleado } from '../services/empleadosService';
 
 const LOGIN_URL = "/";
 
@@ -26,7 +27,7 @@ function syncSessionFromLocal(user) {
 
 export function useAuth() {
   const navigate = useNavigate();
-  const [authUser, setAuthUser] = useState(() => getStoredAuthUser());
+  const [authUser] = useState(() => getStoredAuthUser());
 
   useEffect(() => {
     if (!authUser) {
@@ -39,7 +40,9 @@ export function useAuth() {
   const ejecutarCierreSesion = () => {
     localStorage.removeItem("authUser");
     sessionStorage.removeItem("authUser");
-    supabase.auth.signOut();
+    // Con huella activa la sesión de Supabase se conserva en el dispositivo: la huella la vuelve a
+    // abrir sin guardar la contraseña. Sin huella, se cierra también en el servidor.
+    if (!localStorage.getItem("hco_bio")) supabase.auth.signOut();
     navigate(LOGIN_URL, { replace: true });
   };
 
@@ -55,18 +58,14 @@ export function useAuth() {
     });
     if (authError) throw authError;
 
-    // 2. ACTUALIZA LA TABLA VISUAL 'EMPLEADOS'
+    // 2. Copia la clave a empleados.cl (para que el SUPERADMIN pueda recordársela al usuario).
+    //    No se guarda en authUser: la contraseña no queda en el navegador.
     if (authUser?.id) {
-      const { error: dbError } = await supabase.from('empleados')
-        .update({ cl: nuevaPass })
-        .eq('id', authUser.id);
-      
-      if (dbError) throw new Error("Auth actualizado, pero falló la tabla: " + dbError.message);
-      
-      const sessionActual = { ...authUser, cl: nuevaPass };
-      localStorage.setItem("authUser", JSON.stringify(sessionActual));
-      sessionStorage.setItem("authUser", JSON.stringify(sessionActual));
-      setAuthUser(sessionActual);
+      try {
+        await guardarClaveEmpleado(authUser.id, nuevaPass);
+      } catch (err) {
+        throw new Error("Auth actualizado, pero falló la tabla: " + err.message, { cause: err });
+      }
     }
   };
 

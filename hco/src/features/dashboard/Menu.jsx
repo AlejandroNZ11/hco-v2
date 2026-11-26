@@ -365,7 +365,7 @@ function MenuContenido() {
           },
           {
             title: "Reportes de Discrepancia",
-            description: "Registrar reportes de discrepancia.",
+            description: "Registrar reportes de discrepancia RDR.",
             Icon: FaSearch,
             accent: "accent-blue",
             buttonText: "Entrar",

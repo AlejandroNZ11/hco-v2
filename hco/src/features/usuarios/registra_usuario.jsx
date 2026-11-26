@@ -14,6 +14,9 @@ import { supabase } from '../../config/supabaseClient';
 import {
   crearEmpleado,
   actualizarEmpleado,
+  obtenerClaveEmpleado,
+  guardarClaveEmpleado,
+  sinClave,
   obtenerEmpleadoPorId,
   verificarDniExistente,
   verificarUsuarioExistente,
@@ -205,7 +208,7 @@ function RegistrarUsuarioContenido() {
           jefeDirecto: data.jefe_directo_id !== null && data.jefe_directo_id !== undefined ? String(data.jefe_directo_id) : "",
           rol: data.rol || "",
           usuario: data.usuario || "",
-          clave: data.cl || "",
+          clave: "", // la clave se pide aparte, solo para SUPERADMIN (ver abajo)
           fechaNacimiento: data.fch_nacimiento || "",
           fechaSalida: data.fch_salida || "",
           fechaIngreso: data.fecha_ingreso || "",
@@ -230,6 +233,14 @@ function RegistrarUsuarioContenido() {
           edad: edadCalculada,
           permanencia: permanenciaCalculada
         });
+
+        // Solo el SUPERADMIN ve la clave (para recordársela a quien la olvidó): se pide aparte,
+        // de UN empleado, y no se guarda en Dexie.
+        if (isSuperAdmin && isOnline) {
+          obtenerClaveEmpleado(id)
+            .then((clave) => setFormData((prev) => ({ ...prev, clave })))
+            .catch((err) => console.warn('No se pudo leer la clave:', err));
+        }
 
         if (data.foto_url) {
           if (esFotoBase64) setPhotoDataUrl(data.foto_url);
@@ -455,7 +466,9 @@ function RegistrarUsuarioContenido() {
         jefe_directo_id: parseId(formData.jefeDirecto),
         rol: formData.rol,
         usuario: usuarioLimpio,
-        cl: String(formData.clave || "").trim(),
+        // La clave solo se escribe al CREAR (DNI inicial). Al editar no se toca: la cambian
+        // "Cambiar contraseña" o "Restablecer clave".
+        ...(editingId ? {} : { cl: String(formData.clave || "").trim() }),
         fch_nacimiento: formData.fechaNacimiento || null,
         fch_salida: formData.fechaSalida || null,
         fecha_ingreso: formData.fechaIngreso || null,
@@ -489,10 +502,10 @@ function RegistrarUsuarioContenido() {
         }
 
         // Guardamos en localDb exactamente lo que confirmó Supabase
-        await localDb.usuarios.put(savedRecord || recordData);
+        await localDb.usuarios.put(sinClave(savedRecord || recordData));
         setMessage({ text: "Usuario guardado correctamente en el servidor.", type: "success" });
       } else {
-        await localDb.usuarios.put(recordData);
+        await localDb.usuarios.put(sinClave(recordData));
         await localDb.sync_queue.add({
           tabla: 'empleados',
           operacion: editingId ? 'UPDATE' : 'INSERT',
@@ -529,9 +542,7 @@ function RegistrarUsuarioContenido() {
       const { error: authError } = await supabase.rpc('restablecer_clave_admin', { user_id: editingId, nueva_clave: formData.dni });
       if (authError) throw authError;
 
-      await actualizarEmpleado(editingId, { cl: formData.dni });
-      await localDb.usuarios.update(editingId, { cl: formData.dni });
-
+      await guardarClaveEmpleado(editingId, formData.dni);
       setFormData(prev => ({ ...prev, clave: formData.dni }));
       setMessage({ text: "Contraseña restablecida exitosamente.", type: "success" });
     } catch (error) {
@@ -645,7 +656,7 @@ function RegistrarUsuarioContenido() {
             </div>
             <div className="field field-auto">
               <label>Clave {isSuperAdmin ? <span className="field-badge" style={{ backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0' }}>VISIBLE</span> : <span className="field-badge auto">OCULTO</span>}</label>
-              <input type="text" id="clave" value={isSuperAdmin ? (formData.clave || "Sin clave") : "••••••••••••"} readOnly style={!isSuperAdmin ? { letterSpacing: '3px', color: '#94a3b8', fontWeight: 'bold' } : {}} />
+              <input type="text" id="clave" value={isSuperAdmin && formData.clave ? formData.clave : "••••••••••••"} readOnly style={!isSuperAdmin ? { letterSpacing: '3px', color: '#94a3b8', fontWeight: 'bold' } : {}} />
             </div>
           </div>
 

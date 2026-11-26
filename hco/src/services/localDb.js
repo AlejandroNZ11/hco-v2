@@ -41,3 +41,14 @@ localDb.version(6).stores({
 localDb.version(7).stores({
   toma_lotes: 'id, pedido, sku, ruta, fecha_registro, _sincronizado'
 });
+
+// v8: Seguridad. Borra la contraseña (`cl`) que versiones anteriores guardaban en la caché local
+// de empleados y en la cola offline. Se ejecuta una sola vez por navegador al abrir la app.
+localDb.version(8).stores({}).upgrade(async (tx) => {
+  await tx.table('usuarios').toCollection().modify((u) => {
+    delete u.cl;
+  });
+  await tx.table('sync_queue').toCollection().modify((item) => {
+    if (item?.payload && typeof item.payload === 'object') delete item.payload.cl;
+  });
+});

@@ -175,9 +175,10 @@ export default function Login() {
     navigate('/menu');
   };
 
-  // Registra la biometría del dispositivo (se llama tras un login correcto con "Recordar cuenta")
-  // 1. Guardamos el usuario, ID de huella y la contraseña codificada
-  const activarBiometria = async (codigo, nombre, userId, passRaw) => {
+  // Registra la biometría del dispositivo (se llama tras un login correcto con "Recordar cuenta").
+  // Solo se guarda el usuario y el ID de la huella: la contraseña NO se guarda en el navegador.
+  // La huella desbloquea la sesión de Supabase que ya queda guardada en este dispositivo.
+  const activarBiometria = async (codigo, nombre, userId) => {
     try {
       const cred = await navigator.credentials.create({
         publicKey: {
@@ -190,11 +191,7 @@ export default function Login() {
         }
       });
       
-      localStorage.setItem(KEY_BIO, JSON.stringify({ 
-        usuario: codigo, 
-        credId: aB64(cred.rawId),
-        _p: aB64(new TextEncoder().encode(passRaw)) // Contraseña oculta para el auto-login
-      }));
+      localStorage.setItem(KEY_BIO, JSON.stringify({ usuario: codigo, credId: aB64(cred.rawId) }));
       setBioActivo(true);
     } catch (err) {
       console.warn('Biometría no activada:', err);
@@ -228,7 +225,7 @@ export default function Login() {
         localStorage.setItem(KEY_RECORDAR, userTrim); 
         if (bioSoportado && !bioActivo) {
           // Pasamos el usuario "corto" a la biometría
-          await activarBiometria(userTrim, emp?.nombre, authData.user.id, password); 
+          await activarBiometria(userTrim, emp?.nombre, authData.user.id); 
         }
       } else {
         localStorage.removeItem(KEY_RECORDAR);
@@ -273,14 +270,22 @@ export default function Login() {
         }
       });
 
-      // Si la huella es correcta, recuperamos la contraseña decodificándola
-      const decodedPass = new TextDecoder().decode(deB64(guardado._p));
-      const userTrim = guardado.usuario.trim();
-      const emailToLogin = userTrim.includes('@') ? userTrim : `${userTrim}@hco.com`;
+      // Huella correcta: usamos la sesión de Supabase guardada en este dispositivo (sin contraseña).
+      // getSession() la renueva sola si el token venció.
+      const userTrim = guardado.usuario.trim().toLowerCase();
+      const emailBio = userTrim.includes('@') ? userTrim : `${userTrim}@hco.com`;
+      const sesion = await obtenerSesionActiva();
 
-      // HACEMOS EL LOGIN CONTRA SUPABASE INMEDIATAMENTE
-      const authData = await iniciarSesion(emailToLogin, decodedPass);
-      const perfilData = await obtenerPerfilCompleto(authData.user.id);
+      if (!sesion || String(sesion.user?.email || '').toLowerCase() !== emailBio) {
+        mostrarAlerta(
+          'Ingresa con tu contraseña',
+          `Tu sesión en este dispositivo venció. Ingresa una vez con tu contraseña (con “Recordar cuenta”) para volver a usar ${dispositivo.nombre}.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      const perfilData = await obtenerPerfilCompleto(sesion.user.id);
 
       if (esInactivo(perfilData)) {
         await rechazarInactivo();

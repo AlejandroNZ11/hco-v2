@@ -1,9 +1,37 @@
 import { supabase } from '../config/supabaseClient';
-import { consultaCacheada, estaFresco, invalidarConsultas, marcarFresco, MIN } from './cacheConsultas';
+import { consultaCacheada, invalidarConsultas, alInvalidar, MIN } from './cacheConsultas';
 import { subirImagenDrive } from './driveService';
 import { localDb } from './localDb';
+import { sincronizarTabla } from './syncIncremental';
 
-const BOOT_CACHE_KEY = 'PRESTAMOS_SUPABASE_BOOT_V2';
+// Catálogos de préstamos guardados en el dispositivo { ts, data }: se reutilizan 30 min aunque se
+// cierre la app (antes se pedían las 7 tablas cada vez que se abría). Se borran al editar
+// conductores, placas, clientes o empresas (invalidarConsultas('catalogos:...')).
+const BOOT_CACHE_KEY = 'PRESTAMOS_SUPABASE_BOOT_V3';
+const MAESTROS_TTL_MS = 30 * MIN;
+alInvalidar('catalogos:prestamos', () => localStorage.removeItem(BOOT_CACHE_KEY));
+try {
+  localStorage.removeItem('PRESTAMOS_SUPABASE_BOOT_V2'); // formato anterior, ya no se usa
+} catch {
+  // sin localStorage disponible
+}
+
+const leerMaestrosGuardados = () => {
+  try {
+    const c = JSON.parse(localStorage.getItem(BOOT_CACHE_KEY) || 'null');
+    return c && c.data ? c : null;
+  } catch {
+    return null;
+  }
+};
+
+// Columnas de 'prestamos' que usan las pantallas (+ updated_at para la sincronización incremental)
+const COLUMNAS_PRESTAMO =
+  'uuid, id_prestamo, fecha_entrega, fecha_retorno, empresa_transporte_id, dni_conductor, nr_ruta, ' +
+  'nro_placa, despachador, nr_paletas, estado, nr_paletas_devueltas, paletas_pendientes, fecha_devolucion, ' +
+  'observacion_salida, firma_conductor, recibido_por, observacion_regreso, cliente_id, tipo_paleta_id, ' +
+  'area_registrador, area_proceso, retorno, conductor_retorno, firma_retorno, foto_salida, usuario_registra, ' +
+  'usuario_actualiza, fecha_actualiza, nr_paletas_noretorno, estado_garita, comentario_garita, updated_at';
 const TABLA_COLA = 'prestamos';
 
 /**
@@ -89,14 +117,10 @@ const esRegistroActivo = (item) => {
 // 1. OBTENER DATOS MAESTROS (INCLUYE EMPLEADOS Y ÁREAS)
 // =========================================================================
 const descargarMaestrosPrestamos = async () => {
-  // Sin internet: ir directo a la caché, sin esperar a que fallen 7 peticiones
-  if (!navigator.onLine) {
-    try {
-      const cache = localStorage.getItem(BOOT_CACHE_KEY);
-      if (cache) return JSON.parse(cache);
-    } catch {
-      // caché corrupta: se intenta online abajo
-    }
+  // Caché del dispositivo: sin internet se usa siempre; con internet, si tiene menos de 30 min
+  const guardados = leerMaestrosGuardados();
+  if (guardados && (!navigator.onLine || Date.now() - (guardados.ts || 0) < MAESTROS_TTL_MS)) {
+    return guardados.data;
   }
 
   try {
@@ -160,26 +184,23 @@ const descargarMaestrosPrestamos = async () => {
     const dataMaestra = { empresas, conductores, placas, clientes, tipos_paleta, empleados, areas };
 
     try {
-      localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify(dataMaestra));
+      localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: dataMaestra }));
     } catch {}
 
     return dataMaestra;
   } catch (error) {
     console.warn('Cargando catálogos desde caché local...', error);
-    try {
-      const cache = localStorage.getItem(BOOT_CACHE_KEY);
-      if (cache) return JSON.parse(cache);
-    } catch {}
+    if (guardados) return guardados.data;
     throw error;
   }
 };
 
 /**
- * Catálogos de préstamos (7 tablas). Se comparten 3 min entre pantallas y recargas silenciosas
+ * Catálogos de préstamos (7 tablas). Se comparten 30 min entre pantallas y recargas silenciosas
  * (antes se pedían las 7 tablas en cada montaje, reconexión y sincronización).
  * Se invalidan al crear/editar conductores, placas, clientes o empresas.
  */
-export const obtenerDatosMaestrosPrestamos = () => consultaCacheada('catalogos:prestamos', descargarMaestrosPrestamos, 3 * MIN);
+export const obtenerDatosMaestrosPrestamos = () => consultaCacheada('catalogos:prestamos', descargarMaestrosPrestamos, MAESTROS_TTL_MS);
 
 // =========================================
 // 2. CREAR PRÉSTAMO PALLET
@@ -351,41 +372,18 @@ const ordenarPorFechaEntrega = (filas) =>
  * Offline o red caída: lo último guardado en Dexie (incluye los pendientes de subir).
  */
 export const obtenerFilasPrestamos = async () => {
-  // Si el canal en vivo de 'prestamos' no se ha caído desde la última descarga, Dexie ya está al día
-  if (navigator.onLine && !estaFresco('prestamos')) {
+  if (navigator.onLine) {
     try {
-      const { data, error } = await supabase
-        .from('prestamos')
-        .select('*')
-        .order('fecha_entrega', { ascending: false });
-
-      if (error) throw new Error(`Error al cargar tracking: ${error.message}`);
-
-      let pendientes = [];
-      try {
-        pendientes = await localDb.prestamos.filter(p => p._sincronizado === false).toArray();
-      } catch {
-        // Dexie no disponible: se muestran solo los datos del servidor
-      }
-      const uuidsPendientes = new Set(pendientes.map(p => p.uuid));
-
-      const remotas = (data || [])
-        .filter(r => !uuidsPendientes.has(r.uuid))
-        .map(r => ({ ...r, _sincronizado: true }));
-
-      try {
-        await localDb.transaction('rw', localDb.prestamos, async () => {
-          await localDb.prestamos.clear();
-          await localDb.prestamos.bulkPut([...remotas, ...pendientes]);
-        });
-      } catch (err) {
-        console.warn('No se pudo refrescar la caché local de préstamos:', err);
-      }
-
-      marcarFresco('prestamos');
-      return ordenarPorFechaEntrega([...pendientes, ...remotas]);
+      // 1ª vez: tabla completa (paginada, sin el tope de 1000 filas). Después: solo lo que cambió.
+      await sincronizarTabla({
+        tabla: 'prestamos',
+        columnas: COLUMNAS_PRESTAMO,
+        clave: 'uuid',
+        tablaLocal: localDb.prestamos,
+        esPendiente: (p) => p._sincronizado === false,
+      });
     } catch (err) {
-      if (!esErrorDeRed(err)) throw err;
+      if (!esErrorDeRed(err)) throw new Error(`Error al cargar tracking: ${err.message}`, { cause: err });
       console.warn('Sin conexión estable, leyendo préstamos desde Dexie local...', err);
     }
   }

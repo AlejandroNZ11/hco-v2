@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
-import { estaFresco, marcarFresco } from './cacheConsultas';
+import { consultaCacheada, estaFresco, MIN } from './cacheConsultas';
+import { sincronizarTabla } from './syncIncremental';
 
 /**
  * Función interna para mantener sincronizado el estado_operativo en la tabla 'equipos'
@@ -126,61 +127,53 @@ export const sincronizarInspeccionesPendientes = async () => {
   return { synced, failed };
 };
 
-/**
- * Trae TODAS las inspecciones de Supabase en bloques de 1000
- * (Supabase devuelve como máximo 1000 filas por petición).
- */
-const obtenerTodasInspeccionesRemotas = async () => {
-  const TAM_BLOQUE = 1000;
-  const todas = [];
-  for (let desde = 0; ; desde += TAM_BLOQUE) {
-    const { data, error } = await supabase
-      .from('inspecciones')
-      .select('*')
-      .order('fecha_hora', { ascending: false })
-      .range(desde, desde + TAM_BLOQUE - 1);
-    if (error) return { data: null, error };
-    todas.push(...(data || []));
-    if (!data || data.length < TAM_BLOQUE) break;
-  }
-  return { data: todas, error: null };
-};
+// Columnas de 'inspecciones' que usan las pantallas (+ updated_at para la sincronización incremental)
+const COLUMNAS_INSPECCION =
+  'id, fecha_hora, area_id, equipo_id, usuario_id, foto_equipo, observaciones_generales, vb_operador, ' +
+  'entrevista_somnolencia, estado_mhe, estado_personal, estado_proceso, registrado_por_dni, ' +
+  'registrado_por_nombre, aprobado_por_id, revisado_el, chk_ant_estado, chk_ant_obs, chk_ant_fecha, ' +
+  'chk_ant_usuario, updated_at';
+
+const esInspeccionPendiente = (i) => i._sincronizado === false || String(i.id).startsWith('local_');
 
 /**
- * Obtiene todas las inspecciones combinando las pendientes de envío (Offline) + las de Supabase
+ * Catálogos de MHE (áreas, equipos, categorías) → Dexie. Como máximo cada 10 min; los cambios de
+ * equipos llegan además por tiempo real.
+ */
+const refrescarCatalogosMhe = () =>
+  consultaCacheada('catalogos:mhe-base', async () => {
+    const [resAreas, resEq, resCat] = await Promise.all([
+      supabase.from('areas').select('id, nombre'),
+      // '*' de equipos: incluye estado_operativo, fecha_habilitacion, habilitado_por_id y foto_url
+      supabase.from('equipos').select('*'),
+      supabase.from('categorias_equipos').select('id, nombre, version')
+    ]);
+    if (!resAreas.error && resAreas.data) await localDb.areas.bulkPut(resAreas.data);
+    if (!resEq.error && resEq.data) await localDb.equipos.bulkPut(resEq.data);
+    if (!resCat.error && resCat.data) await localDb.categorias_equipos.bulkPut(resCat.data);
+    return true;
+  }, 10 * MIN);
+
+/**
+ * Obtiene todas las inspecciones combinando las pendientes de envío (Offline) + las de Supabase.
+ * 1ª vez en el dispositivo: historial completo (paginado). Después: solo lo que cambió.
  */
 export const obtenerUltimasInspecciones = async () => {
-  // Si el canal en vivo de inspecciones/equipos no se cayó desde la última descarga, Dexie ya
-  // está al día: no se vuelve a bajar TODO el historial (puede ser de miles de filas).
-  if (navigator.onLine && !estaFresco('inspecciones')) {
-    // Si hay red, primero intentamos subir cualquier pendiente de envío
-    await sincronizarInspeccionesPendientes();
-
+  if (navigator.onLine) {
     try {
-      const [resInsp, resAreas, resEq, resCat] = await Promise.all([
-        obtenerTodasInspeccionesRemotas(),
-        supabase.from('areas').select('id, nombre'),
-        // Traemos '*' de equipos para incluir estado_operativo, fecha_habilitacion, habilitado_por_id y foto_url
-        supabase.from('equipos').select('*'),
-        supabase.from('categorias_equipos').select('id, nombre, version')
+      // Si hay red, primero intentamos subir cualquier pendiente de envío
+      if (!estaFresco('inspecciones')) await sincronizarInspeccionesPendientes();
+
+      await Promise.all([
+        sincronizarTabla({
+          tabla: 'inspecciones',
+          columnas: COLUMNAS_INSPECCION,
+          clave: 'id',
+          tablaLocal: localDb.inspecciones,
+          esPendiente: esInspeccionPendiente,
+        }),
+        refrescarCatalogosMhe()
       ]);
-
-      if (!resInsp.error) {
-        // Conservamos en Dexie cualquier registro local que aún no se haya sincronizado
-        const todasLocales = await localDb.inspecciones.toArray();
-        const noSincronizadas = todasLocales.filter(
-          i => i._sincronizado === false || String(i.id).startsWith('local_')
-        );
-
-        await localDb.inspecciones.clear();
-        const remotasMarcadas = (resInsp.data || []).map(i => ({ ...i, _sincronizado: true }));
-        await localDb.inspecciones.bulkPut([...noSincronizadas, ...remotasMarcadas]);
-
-        if (!resAreas.error && resAreas.data) await localDb.areas.bulkPut(resAreas.data);
-        if (!resEq.error && resEq.data) await localDb.equipos.bulkPut(resEq.data);
-        if (!resCat.error && resCat.data) await localDb.categorias_equipos.bulkPut(resCat.data);
-        marcarFresco('inspecciones');
-      }
     } catch (err) {
       console.warn("Sin conexión a Supabase, leyendo inspecciones desde Dexie local...", err);
     }
@@ -312,25 +305,23 @@ export const habilitarEquipoMhe = async (equipoId, usuarioId = null) => {
 export const obtenerDatosMaestrosMhe = async () => {
   if (navigator.onLine) {
     try {
-      const [resCat, resEq, resPreg, resAreas] = await Promise.all([
-        supabase.from('categorias_equipos').select('*').order('nombre'),
-        supabase.from('equipos').select('*'),
-        supabase.from('items_checklist').select('*'),
-        supabase.from('areas').select('id, nombre')
-      ]);
-
-      if (!resCat.error && !resEq.error && !resPreg.error) {
+      // Catálogos casi estáticos: se piden a Supabase como máximo cada 10 min y se guardan en Dexie
+      await consultaCacheada('catalogos:mhe-maestros', async () => {
+        const [resCat, resEq, resPreg, resAreas] = await Promise.all([
+          supabase.from('categorias_equipos').select('*'),
+          supabase.from('equipos').select('*'),
+          supabase.from('items_checklist').select('*'),
+          supabase.from('areas').select('id, nombre')
+        ]);
+        if (resCat.error || resEq.error || resPreg.error) {
+          throw resCat.error || resEq.error || resPreg.error;
+        }
         await localDb.categorias_equipos.bulkPut(resCat.data || []);
         await localDb.equipos.bulkPut(resEq.data || []);
         await localDb.items_checklist.bulkPut(resPreg.data || []);
         if (!resAreas.error && resAreas.data) await localDb.areas.bulkPut(resAreas.data);
-
-        return {
-          categorias: resCat.data || [],
-          equipos: resEq.data || [],
-          preguntas: resPreg.data || []
-        };
-      }
+        return true;
+      }, 10 * MIN);
     } catch (e) {
       console.warn("Modo offline: cargando catálogos MHE desde Dexie...", e);
     }
@@ -341,6 +332,7 @@ export const obtenerDatosMaestrosMhe = async () => {
     localDb.equipos.toArray(),
     localDb.items_checklist.toArray()
   ]);
+  categorias.sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es'));
 
   return { categorias, equipos, preguntas };
 };

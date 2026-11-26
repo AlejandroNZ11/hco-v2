@@ -52,3 +52,9 @@ localDb.version(8).stores({}).upgrade(async (tx) => {
     if (item?.payload && typeof item.payload === 'object') delete item.payload.cl;
   });
 });
+
+// v9: Fase 2 (Egress). Marca de la última sincronización de cada tabla grande: con ella solo se
+// piden a Supabase las filas que cambiaron (ver services/syncIncremental.js).
+localDb.version(9).stores({
+  sync_meta: 'tabla'
+});

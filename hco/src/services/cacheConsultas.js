@@ -29,10 +29,26 @@ export function consultaCacheada(clave, fn, ttlMs = 5 * MIN) {
   return p;
 }
 
+// Cachés guardadas fuera de memoria (localStorage) que también deben borrarse al invalidar
+const limpiezas = []; // { clave, fn }
+
+/** Registra `fn` para que se ejecute cuando se invalide `clave` (o un prefijo de ella). */
+export function alInvalidar(clave, fn) {
+  limpiezas.push({ clave, fn });
+}
+
 /** Borra las entradas cuya clave empieza con `prefijo` (llamar después de crear/editar). */
 export function invalidarConsultas(prefijo = '') {
   [...valores.keys()].forEach((k) => {
     if (k.startsWith(prefijo)) valores.delete(k);
+  });
+  limpiezas.forEach(({ clave, fn }) => {
+    if (!clave.startsWith(prefijo)) return;
+    try {
+      fn();
+    } catch {
+      // una limpieza que falla no debe romper la escritura que la pidió
+    }
   });
 }
 

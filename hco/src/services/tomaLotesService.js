@@ -1,11 +1,11 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
-import { estaFresco, marcarFresco } from './cacheConsultas';
+import { estaFresco } from './cacheConsultas';
+import { sincronizarTabla } from './syncIncremental';
 
 const TABLA = 'toma_lotes';
 const BLOQUE = 500; // filas por petición al subir
 const BLOQUE_IDS = 200; // ids por consulta .in()
-const BLOQUE_LECTURA = 1000; // Supabase devuelve máx. 1000 filas por petición
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -381,9 +381,15 @@ const marcarSincronizadas = async () => {
   if (listas.length) await localDb.toma_lotes.bulkPut(listas);
 };
 
+// Columnas de 'toma_lotes' que usa la pantalla (+ updated_at para la sincronización incremental)
+const COLUMNAS_TOMA_LOTES =
+  'id, ruta, cliente, pedido, sku, lotes, registrado_por_id, registrado_por_nombre, fecha_registro, ' +
+  'lotes_por_id, lotes_por_nombre, lotes_actualizado_en, lotes_detalle, updated_at';
+
 /**
- * Descarga TODO de Supabase a Dexie (la pantalla lee de Dexie con useLiveQuery → instantáneo).
- * Respeta lo que aún no se sube y quita lo que ya no existe en el servidor.
+ * Trae a Dexie lo que cambió en Supabase (la pantalla lee de Dexie con useLiveQuery → instantáneo).
+ * 1ª vez en el dispositivo: todo (paginado). Después: solo filas cambiadas + las eliminadas
+ * (bitácora `registros_eliminados`). Respeta lo que aún no se sube.
  */
 export const refrescarTomaLotes = async () => {
   if (!navigator.onLine) return { ok: false, offline: true };
@@ -392,33 +398,19 @@ export const refrescarTomaLotes = async () => {
 
   await sincronizarTomaLotesPendientes();
 
-  const remotas = [];
-  for (let desde = 0; ; desde += BLOQUE_LECTURA) {
-    const { data, error } = await supabase
-      .from(TABLA)
-      .select('*')
-      .order('fecha_registro', { ascending: false })
-      .range(desde, desde + BLOQUE_LECTURA - 1);
-    if (error) {
-      console.warn('No se pudo descargar la toma de lotes, usando caché local:', error);
-      return { ok: false, error };
-    }
-    remotas.push(...(data || []));
-    if (!data || data.length < BLOQUE_LECTURA) break;
+  try {
+    await sincronizarTabla({
+      tabla: TABLA,
+      columnas: COLUMNAS_TOMA_LOTES,
+      clave: 'id',
+      tablaLocal: localDb.toma_lotes,
+      esPendiente: (f) => f._sincronizado === false,
+      conEliminados: true,
+    });
+  } catch (error) {
+    console.warn('No se pudo descargar la toma de lotes, usando caché local:', error);
+    return { ok: false, error };
   }
-
-  const locales = await localDb.toma_lotes.toArray();
-  const sinSubir = new Set(locales.filter((f) => f._sincronizado === false).map((f) => f.id));
-  const idsRemotos = new Set(remotas.map((f) => f.id));
-  const borrar = locales.filter((f) => !sinSubir.has(f.id) && !idsRemotos.has(f.id)).map((f) => f.id);
-
-  await localDb.transaction('rw', localDb.toma_lotes, async () => {
-    if (borrar.length) await localDb.toma_lotes.bulkDelete(borrar);
-    await localDb.toma_lotes.bulkPut(
-      remotas.filter((f) => !sinSubir.has(f.id)).map((f) => ({ ...f, _sincronizado: true })),
-    );
-  });
-  marcarFresco(TABLA);
   return { ok: true };
 };
 

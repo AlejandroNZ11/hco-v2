@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import {
   alturaMaxima, codProf, codRack, colorCliente, distribucion, esRackPeligrosos, generarCatalogo,
-  columnasDeRack, filaDe, infoProfundidad, inicioColumna, leerRack, listaRacks, pasilloAntesDe, rangoProfundidades, zonaDe,
+  columnasDeRack, filaDe, infoProfundidad, puentesSoloVigas, inicioColumna, leerRack, listaRacks, pasilloAntesDe, rangoProfundidades, zonaDe,
 } from './almacenModelo';
 
 // Vista 3D del almacén (three.js).
@@ -618,6 +618,7 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
         const i = infos[r][p];
         if (!i.inactiva) nVigas += (i.niveles - i.desde + 2) * 2;
       }
+      puentesSoloVigas(cfg, r).forEach((v) => (nVigas += v.alturas.length * 2));
     });
     const geoCaja = new THREE.BoxGeometry(1, 1, 1);
     const parantes = new THREE.InstancedMesh(geoCaja, new THREE.MeshStandardMaterial({ color: COLOR_ESTRUCTURA, metalness: 0.3, roughness: 0.6 }), Math.max(nParantes, 1));
@@ -689,6 +690,20 @@ export default function Vista3D({ cfg, ocupacion, clientes, modoColor, seleccion
           });
         });
       }
+    });
+    // puentes sin ubicaciones: solo las vigas de amarre de lado a lado del paso
+    racks.forEach((r) => {
+      const x0 = xRack[r];
+      puentesSoloVigas(cfg, r).forEach((v) => {
+        v.alturas.forEach((y0) => {
+          [x0 + 0.04, x0 + F - 0.04].forEach((x) => {
+            tmp.position.set(x, y0 * H, (v.inicio + v.ancho / 2) * A);
+            tmp.scale.set(0.07, 0.12, v.ancho * A - 0.04);
+            tmp.updateMatrix();
+            vigas.setMatrixAt(iv++, tmp.matrix);
+          });
+        });
+      });
     });
     parantes.count = ip;
     vigas.count = iv;

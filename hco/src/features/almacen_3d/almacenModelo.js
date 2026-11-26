@@ -99,6 +99,8 @@ export const CONFIG_INICIAL = {
   // ubicacionesAncho = cuántas ubicaciones hay a lo ancho sobre el puente. Ej. puente en las posiciones
   // 024–026 con 2: el puente lleva la 024 y la 025 (anchas) y la 026 sigue después del puente
   // (el rack termina una antes, como con una columna). null = una por profundidad.
+  // soloVigas = el puente no tiene ubicaciones, solo vigas de amarre: sus posiciones no se cuentan
+  // (la numeración sigue después del puente y el rack termina antes, como con una columna).
   puentes: [
     { desde: 20, hasta: 20, nivelesLibres: 2, racks: [], nivelesArriba: null, pallets: null },
     { desde: 44, hasta: 44, nivelesLibres: 2, racks: RACKS_LARGOS, nivelesArriba: null, pallets: null },
@@ -239,6 +241,7 @@ export const completarConfig = (c) => {
       nivelesArriba: numOpc(b.nivelesArriba, 1, 10),
       pallets: numOpc(b.pallets, 1, 4),
       ubicacionesAncho: numOpc(b.ubicacionesAncho, 1, 10),
+      soloVigas: !!b.soloVigas,
     };
   });
   let columnasGuardadas = Array.isArray(c?.columnas) ? c.columnas : CONFIG_INICIAL.columnas;
@@ -359,8 +362,37 @@ const puentesAnchos = (cfg, r) =>
   esRackPeligrosos(r)
     ? []
     : cfg.puentes
-      .filter((b) => b.ubicacionesAncho && b.ubicacionesAncho < b.hasta - b.desde + 1 && puenteAplica(b, r))
-      .map((b) => ({ s: b.desde, L: b.hasta - b.desde + 1, N: b.ubicacionesAncho }));
+      .filter((b) => (b.soloVigas || (b.ubicacionesAncho && b.ubicacionesAncho < b.hasta - b.desde + 1)) && puenteAplica(b, r))
+      .map((b) => ({ s: b.desde, L: b.hasta - b.desde + 1, N: b.soloVigas ? 0 : b.ubicacionesAncho }));
+
+/**
+ * Puentes "solo vigas" del rack r: dónde están (en filas, 0 = el frente) y a qué alturas van las vigas
+ * (en niveles base, de abajo hacia arriba). Arrancan arriba del paso libre.
+ */
+export const puentesSoloVigas = (cfg, r) => {
+  const altura = alturaRack(cfg, r);
+  return cfg.puentes
+    .filter((b) => b.soloVigas && puenteAplica(b, r))
+    .map((b) => {
+      let inicio;
+      let fin;
+      if (!esRackPeligrosos(r)) {
+        if (b.desde > largoRack(cfg, r)) return null;
+        inicio = b.desde - 1;
+        fin = Math.min(b.hasta, largoRack(cfg, r));
+      } else {
+        const d = rackPeligrosos(cfg, r);
+        if (!d || b.desde > d.hasta || b.hasta < d.desde) return null;
+        inicio = filaDe(cfg, r, Math.max(b.desde, d.desde)) - 1;
+        fin = filaDe(cfg, r, Math.min(b.hasta, d.hasta));
+      }
+      const libres = Math.min(+b.nivelesLibres || 0, altura);
+      const k = b.nivelesArriba || Math.max(Math.round(altura - libres), 1);
+      const alturas = Array.from({ length: k + 1 }, (_, i) => redondear(libres + (i * (altura - libres)) / k));
+      return { puente: b, inicio, ancho: fin - inicio, libres, altura, alturas };
+    })
+    .filter(Boolean);
+};
 
 /** Última profundidad del rack: el largo menos columnas y menos lo que ahorran los puentes con ubicaciones anchas. */
 export const profundidadesDeRack = (cfg, r) => {
@@ -493,7 +525,7 @@ export const infoProfundidad = (cfg, r, p) => {
   let span = { inicio: fin - 1, ancho: 1, k: 0, n: 1 };
   let sinArriba = false;
   const L = puente ? puente.hasta - puente.desde + 1 : 1;
-  const N = puente?.ubicacionesAncho ? Math.min(puente.ubicacionesAncho, L) : L;
+  const N = puente?.soloVigas ? 0 : puente?.ubicacionesAncho ? Math.min(puente.ubicacionesAncho, L) : L;
   if (puente && N < L && !esRackPeligrosos(r)) {
     // almacén principal: la numeración continúa después del puente (ver filaDe)
     const k = Math.round(((fin - (puente.desde - 1)) * N) / L) - 1;

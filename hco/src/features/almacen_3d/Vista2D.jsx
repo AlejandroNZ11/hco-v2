@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   alturaMaxima, codProf, codRack, codigoUbicacion, colorCliente, colorOcupacion, distribucion,
-  columnasDeRack, esProfundidadDePuente, esRackPeligrosos, filaDe, infoProfundidad, inicioColumna, maxProfundidades,
+  columnasDeRack, esProfundidadDePuente, esRackPeligrosos, filaDe, infoProfundidad, inicioColumna, maxProfundidades, puentesSoloVigas,
   ocupacionProfundidad, rangoProfundidades, zonaDe,
 } from './almacenModelo';
 
@@ -148,6 +148,17 @@ export function Planta({ cfg, ocupacion, seleccionProf, onSeleccionarProf, onHov
         </g>,
       );
     }
+    // puentes sin ubicaciones (solo vigas): el paso queda vacío, con las vigas marcadas
+    puentesSoloVigas(cfg, r).forEach((v, i) => {
+      const rc = R(x0, x0 + F, v.inicio * A, (v.inicio + v.ancho) * A);
+      celdas.push(
+        <g key={`vig-${codRack(r)}-${i}`} onMouseMove={(e) => onHover?.(`Puente solo vigas en rack ${codRack(r)} · posiciones ${codProf(v.puente.desde)}–${codProf(v.puente.hasta)} · sin ubicaciones`, e.clientX, e.clientY)} onMouseLeave={() => onHover?.(null)}>
+          <rect x={rc.x} y={rc.y + 0.5} width={rc.width} height={Math.max(rc.height - 1, 1)} fill="#fff7ed" stroke="#f97316" strokeDasharray="3 2" />
+          <line x1={rc.x + 1} x2={rc.x + rc.width - 1} y1={rc.y + 2} y2={rc.y + 2} stroke="#f97316" strokeWidth="1.5" />
+          <line x1={rc.x + 1} x2={rc.x + rc.width - 1} y1={rc.y + rc.height - 2} y2={rc.y + rc.height - 2} stroke="#f97316" strokeWidth="1.5" />
+        </g>,
+      );
+    });
     // columnas del edificio que cortan el rack
     columnasDeRack(cfg, r).forEach((k, i) => {
       if (pD > pH || k.desde > filaDe(cfg, r, pH)) return;
@@ -405,6 +416,18 @@ export function AlzadoRack({ cfg, rack, ocupacion, clientes, seleccion, seleccio
         onClick={() => onSeleccionarProf(rack, p)}>{info.sinArriba ? '·' : info.niveles}</text>,
     );
   }
+  // puentes sin ubicaciones: solo vigas de amarre sobre el paso (no se cuentan como profundidades)
+  puentesSoloVigas(cfg, rack).forEach((v, i) => {
+    const x = izq + (v.inicio + 1 - f0) * CW;
+    const w = v.ancho * CW;
+    cols.push(
+      <g key={`vig${i}`} pointerEvents="none">
+        <rect x={x} y={piso - v.libres * UH} width={w} height={v.libres * UH} fill="url(#alm-rayas2)" opacity="0.35" />
+        {v.alturas.map((h, j) => <rect key={j} x={x - 1} y={piso - h * UH - 2} width={w + 2} height={4} fill="#f97316" />)}
+        <text x={x + w / 2} y={piso - v.altura * UH - 3} textAnchor="middle" className="alm-txt-eje alm-txt-mini">vigas</text>
+      </g>,
+    );
+  });
   columnasDeRack(cfg, rack).forEach((k, i) => {
     if (pD > pH || k.desde > filaDe(cfg, rack, pH)) return;
     const x = izq + (inicioColumna(cfg, rack, k) + 1 - f0) * CW;

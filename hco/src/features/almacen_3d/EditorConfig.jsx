@@ -411,9 +411,9 @@ export default function EditorConfig({ cfg, setCfg }) {
       <section className="alm-card alm-card-ancha">
         <h3>Puentes y túneles (paso por debajo del rack)</h3>
         <p className="alm-ayuda">De la profundidad "desde" a "hasta" se quita la parte de abajo (alto libre en niveles base). Racks vacío = todos los del almacén principal; en peligrosos se nombran. Ej.: <code>1-10, 15</code>, <code>23-32</code> o <code>P2, P3, P4, P5</code>.
-          <b> Ubic. arriba</b> = cuántas ubicaciones hay sobre el paso (2, 3 o 4; vacío = las que salgan de la altura). <b>Pallets</b> = pallets por ubicación en el puente. <b>A lo ancho</b> = cuántas ubicaciones hay a lo ancho del puente (ej. puente 024–026 con 2: quedan 024 y 025 anchas y la 026 es solo paso; vacío = una por profundidad).</p>
+          <b> Ubic. arriba</b> = cuántas ubicaciones hay sobre el paso (2, 3 o 4; vacío = las que salgan de la altura). <b>Pallets</b> = pallets por ubicación en el puente. <b>A lo ancho</b> = cuántas ubicaciones hay a lo ancho del puente (ej. puente 024–026 con 2: quedan 024 y 025 anchas y la 026 sigue después del puente; vacío = una por profundidad). <b>Solo vigas</b> = el puente no tiene ubicaciones, solo las vigas de amarre: esas posiciones no se cuentan y la numeración sigue después del puente.</p>
         <table className="alm-tabla">
-          <thead><tr><th>Desde</th><th>Hasta</th><th>Alto libre</th><th>Ubic. arriba</th><th>A lo ancho</th><th>Pallets</th><th>Racks</th><th /></tr></thead>
+          <thead><tr><th>Desde</th><th>Hasta</th><th>Alto libre</th><th>Ubic. arriba</th><th>A lo ancho</th><th>Solo vigas</th><th>Pallets</th><th>Racks</th><th /></tr></thead>
           <tbody>
             {cfg.puentes.map((b, i) => (
               <tr key={`${i}-${cfg.puentes.length}`}>
@@ -427,7 +427,8 @@ export default function EditorConfig({ cfg, setCfg }) {
                 }} /></td>
                 <td><input type="number" min="0" value={b.nivelesLibres} onChange={(e) => setPuente(i, 'nivelesLibres', entero(e.target.value, 0) ?? 0)} /></td>
                 <td><input type="number" min="1" max="10" placeholder="auto" value={b.nivelesArriba ?? ''} onChange={(e) => setPuente(i, 'nivelesArriba', entero(e.target.value, 1))} /></td>
-                <td><input type="number" min="1" max={b.hasta - b.desde + 1} placeholder={b.hasta - b.desde + 1} value={b.ubicacionesAncho ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setPuente(i, 'ubicacionesAncho', v ? Math.min(v, b.hasta - b.desde + 1) : null); }} /></td>
+                <td><input type="number" min="1" max={b.hasta - b.desde + 1} placeholder={b.hasta - b.desde + 1} disabled={b.soloVigas} value={b.ubicacionesAncho ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setPuente(i, 'ubicacionesAncho', v ? Math.min(v, b.hasta - b.desde + 1) : null); }} /></td>
+                <td style={{ textAlign: 'center' }}><input type="checkbox" title="Sin ubicaciones: solo vigas" checked={!!b.soloVigas} onChange={(e) => setPuente(i, 'soloVigas', e.target.checked)} /></td>
                 <td><input type="number" min="1" max="4" placeholder="rack" value={b.pallets ?? ''} onChange={(e) => { const v = entero(e.target.value, 1); setPuente(i, 'pallets', v ? Math.min(v, 4) : null); }} /></td>
                 <td><input type="text" placeholder="todos" defaultValue={(b.racks || []).join(', ')} onBlur={(e) => setPuente(i, 'racks', listaRacks(e.target.value))} /></td>
                 <td><button type="button" className="alm-btn-icono" title="Quitar" onClick={() => set('puentes', cfg.puentes.filter((_, j) => j !== i))}><FaTrash /></button></td>
@@ -435,7 +436,7 @@ export default function EditorConfig({ cfg, setCfg }) {
             ))}
           </tbody>
         </table>
-        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('puentes', [...cfg.puentes, { desde: 1, hasta: 1, nivelesLibres: 2, racks: [], nivelesArriba: null, pallets: null, ubicacionesAncho: null }])}><FaPlus /> Agregar puente</button>
+        <button type="button" className="alm-btn alm-btn-sec" onClick={() => set('puentes', [...cfg.puentes, { desde: 1, hasta: 1, nivelesLibres: 2, racks: [], nivelesArriba: null, pallets: null, ubicacionesAncho: null, soloVigas: false }])}><FaPlus /> Agregar puente</button>
       </section>
 
       <section className="alm-card">

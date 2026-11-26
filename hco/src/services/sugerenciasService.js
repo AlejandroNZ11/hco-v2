@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
-import { consultaCacheada, estaFresco, marcarFresco, MIN } from './cacheConsultas';
+import { consultaCacheada, estaFresco, MIN } from './cacheConsultas';
+import { sincronizarTabla } from './syncIncremental';
 
 /**
  * Convierte cualquier valor (array antiguo o string) en texto plano o null para columnas TEXT
@@ -125,29 +126,19 @@ export const sincronizarSugerenciasPendientes = async () => {
  * Obtiene todas las sugerencias combinando las locales (Offline) y las de Supabase
  */
 export const obtenerSugerencias = async () => {
-  // Tracking, Pizarra y Dashboard la piden al montar: si el canal en vivo no se cayó desde la
-  // última descarga, Dexie ya está al día y no se vuelven a bajar hasta 3000 filas.
-  if (navigator.onLine && !estaFresco('tarjetas_sugerencias')) {
-    await sincronizarSugerenciasPendientes();
-
+  // Tracking, Pizarra y Dashboard la piden al montar. 1ª vez en el dispositivo: todo el historial
+  // (paginado). Después: solo lo que cambió. Con el canal en vivo activo, ni eso.
+  if (navigator.onLine) {
     try {
-      const { data, error } = await supabase
-        .from('tarjetas_sugerencias')
-        .select('*')
-        .order('fecha_registro', { ascending: false })
-        .limit(3000);
-
-      if (!error && data) {
-        const todasLocales = await localDb.tarjetas_sugerencias.toArray();
-        const noSincronizadas = todasLocales.filter(
-          s => s._sincronizado === false || String(s.id).startsWith('local_')
-        );
-
-        await localDb.tarjetas_sugerencias.clear();
-        const remotasMarcadas = data.map(s => ({ ...s, _sincronizado: true }));
-        await localDb.tarjetas_sugerencias.bulkPut([...noSincronizadas, ...remotasMarcadas]);
-        marcarFresco('tarjetas_sugerencias');
-      }
+      if (!estaFresco('tarjetas_sugerencias')) await sincronizarSugerenciasPendientes();
+      await sincronizarTabla({
+        tabla: 'tarjetas_sugerencias',
+        columnas: '*', // incluye updated_at cuando exista la columna
+        clave: 'id',
+        tablaLocal: localDb.tarjetas_sugerencias,
+        esPendiente: (s) => s._sincronizado === false || String(s.id).startsWith('local_'),
+        conEliminados: true,
+      });
     } catch (err) {
       console.warn('Sin conexión estable, leyendo sugerencias desde Dexie local...', err);
     }

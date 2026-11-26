@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabaseClient';
 import { localDb } from './localDb';
-import { consultaCacheada, estaFresco, marcarFresco, MIN } from './cacheConsultas';
+import { consultaCacheada, MIN } from './cacheConsultas';
+import { sincronizarTabla } from './syncIncremental';
 
 export const ERRORES_POR_AREA = {
   "INBOUND": [
@@ -266,34 +267,24 @@ const leerCuadroQLocal = async () => {
 };
 
 export const obtenerRegistrosCuadroQ = async () => {
-  // Tracking, Pizarra y Radar la piden al montar: si el canal en vivo de cuadro_q no se cayó
-  // desde la última descarga, Dexie ya está al día (Realtime aplica cada cambio ahí).
-  if (estaFresco('cuadro_q')) return leerCuadroQLocal();
-  try {
-    const { data, error } = await supabase
-      .from('cuadro_q')
-      .select('*')
-      .order('fecha_registro', { ascending: false });
-
-    if (error) throw new Error(error.message);
-
-    const normalizados = (data || []).map(normalizarRegistroCuadroQ);
-
-    if (localDb.cuadro_q) {
-      // Reemplazo completo: así Dexie no conserva registros que ya se borraron en el servidor
-      // (Cuadro Q no tiene escrituras offline pendientes que proteger).
-      await localDb.transaction('rw', localDb.cuadro_q, async () => {
-        await localDb.cuadro_q.clear();
-        if (normalizados.length > 0) await localDb.cuadro_q.bulkPut(normalizados);
+  // Tracking, Pizarra y Radar la piden al montar. 1ª vez en el dispositivo: tabla completa
+  // (paginada, sin el tope de 1000 filas). Después: solo lo que cambió. Con el canal en vivo
+  // activo, ni eso. Dexie guarda las filas tal cual vienen; se normalizan al leer.
+  if (navigator.onLine && localDb.cuadro_q) {
+    try {
+      await sincronizarTabla({
+        tabla: 'cuadro_q',
+        columnas: '*', // incluye updated_at cuando exista la columna
+        clave: 'id',
+        tablaLocal: localDb.cuadro_q,
+        esPendiente: () => false, // Cuadro Q no tiene escrituras offline
+        conEliminados: true,
       });
-      marcarFresco('cuadro_q');
+    } catch (err) {
+      console.warn(`Modo Offline o error de red: ${err.message}. Leyendo caché...`);
     }
-
-    return normalizados;
-  } catch (err) {
-    console.warn(`Modo Offline o error de red: ${err.message}. Leyendo caché...`);
-    return leerCuadroQLocal();
   }
+  return leerCuadroQLocal();
 };
 
 /**
@@ -374,7 +365,7 @@ export const registrarCambioRemotoCuadroQ = async (cambio) => {
     if (cambio.tipo === 'DELETE') {
       if (cambio.anterior?.id) await localDb.cuadro_q.delete(cambio.anterior.id);
     } else if (cambio.nuevo?.id) {
-      await localDb.cuadro_q.put(normalizarRegistroCuadroQ(cambio.nuevo));
+      await localDb.cuadro_q.put(cambio.nuevo); // fila tal cual; se normaliza al leer
     }
   } catch (err) {
     console.warn('No se pudo aplicar el cambio remoto de Cuadro Q en Dexie:', err);

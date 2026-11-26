@@ -14,6 +14,7 @@ import {
 } from 'react-icons/fa';
 import { supabase } from '../../config/supabaseClient';
 import { consultaCacheada, MIN } from '../../services/cacheConsultas';
+import { obtenerLups } from '../../services/lupService';
 import './DashboardLup.css';
 import Loading from '../../layouts/Loading';
 
@@ -176,7 +177,8 @@ function DashboardLupContenido() {
     setLoading(true);
     try {
       const [resLup, resEmp] = await Promise.all([
-        supabase.from('lup').select('*'),
+        // Misma caché que Tracking LUP: solo baja lo que cambió desde la última vez
+        obtenerLups().catch(() => []),
         // Fotos/nombres de empleados: se comparten 10 min (no cambian entre visitas al dashboard)
         consultaCacheada('catalogos:lup-fotos', async () => {
           const r = await supabase.from('empleados').select('id, nombre, foto_url, area_id');
@@ -191,7 +193,7 @@ function DashboardLupContenido() {
         if (emp.nombre) empMap[emp.nombre.toLowerCase().trim()] = emp;
       });
 
-      setLups(resLup.data || []);
+      setLups(resLup || []);
       setEmpleadosMap(empMap);
     } catch (err) {
       console.error('Error cargando datos del dashboard:', err);

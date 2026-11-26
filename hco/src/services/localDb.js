@@ -58,3 +58,8 @@ localDb.version(8).stores({}).upgrade(async (tx) => {
 localDb.version(9).stores({
   sync_meta: 'tabla'
 });
+
+// v10: Fase 3 (Egress). Caché local de LUP: se descarga completa una vez y luego solo cambios.
+localDb.version(10).stores({
+  lup: 'id, fecha_registro'
+});

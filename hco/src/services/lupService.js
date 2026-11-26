@@ -1,6 +1,8 @@
 import { supabase } from '../config/supabaseClient';
 import { subirImagenDrive } from './driveService';
 import { consultaCacheada, MIN } from './cacheConsultas';
+import { localDb } from './localDb';
+import { sincronizarTabla } from './syncIncremental';
 
 // =========================================================================
 // SUBIDA A GOOGLE DRIVE (vía Edge Function `subir-drive`)
@@ -13,19 +15,40 @@ export const subirImagenADrive = (dataUrlBase64, nombreArchivo) =>
 // =========================================================================
 
 /**
- * Obtiene la lista de todas las LUP ordenadas por fecha de registro descendente
+ * Obtiene la lista de todas las LUP ordenadas por fecha de registro descendente.
+ * 1ª vez en el dispositivo: tabla completa (paginada). Después: solo lo que cambió.
+ * Sin internet: lo guardado en el dispositivo.
  */
 export const obtenerLups = async () => {
-  const { data, error } = await supabase
-    .from('lup')
-    .select('*')
-    .order('fecha_registro', { ascending: false });
-
-  if (error) {
-    console.error('Error obteniendo LUPs:', error);
-    throw error;
+  let errorRed = null;
+  if (navigator.onLine) {
+    try {
+      await sincronizarTabla({
+        tabla: 'lup',
+        columnas: '*', // incluye updated_at cuando exista la columna
+        clave: 'id',
+        tablaLocal: localDb.lup,
+        esPendiente: () => false, // LUP no tiene escrituras offline
+        conEliminados: true,
+      });
+    } catch (error) {
+      console.error('Error obteniendo LUPs, usando caché local:', error);
+      errorRed = error;
+    }
   }
-  return data || [];
+
+  const lista = await localDb.lup.toArray();
+  if (!lista.length && errorRed) throw errorRed; // sin caché que mostrar: igual que antes
+  return lista.sort((a, b) => new Date(b.fecha_registro || 0) - new Date(a.fecha_registro || 0));
+};
+
+/** Guarda en la caché local las filas que devolvió una escritura (se ven sin esperar a la red). */
+const guardarLupsLocal = async (filas) => {
+  try {
+    if (filas?.length) await localDb.lup.bulkPut(filas.map((f) => ({ ...f, _sincronizado: true })));
+  } catch (err) {
+    console.warn('No se pudo actualizar la caché local de LUP:', err);
+  }
 };
 
 /**
@@ -88,6 +111,7 @@ export const crearLup = async (payload) => {
     console.error('Error creando LUP:', error);
     throw error;
   }
+  await guardarLupsLocal(data);
   return data;
 };
 
@@ -114,6 +138,7 @@ export const actualizarLup = async (id, payload) => {
     console.error('Error actualizando LUP:', error);
     throw error;
   }
+  await guardarLupsLocal(data);
   return data;
 };
 
@@ -131,5 +156,6 @@ export const cambiarOperatividadLup = async (id, payload) => {
     console.error('Error cambiando operatividad de la LUP:', error);
     throw error;
   }
+  await guardarLupsLocal(data);
   return data;
 };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FaPlus, FaSearch, FaUndo, FaChevronLeft, FaChevronRight, FaIdCard, FaTruck, FaUserTie,
-  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaFileExcel, FaTimes, FaShieldAlt
+  FaEdit, FaEye, FaCheck, FaDolly, FaPenNib, FaEraser, FaSave, FaBuilding, FaWrench, FaFileExcel, FaTimes, FaShieldAlt, FaChartPie
 } from 'react-icons/fa';
 import Loading from '../../layouts/Loading';
 import './trackingprestamos.css';
@@ -852,7 +852,10 @@ function TrackingPrestamosContenido() {
           <button type="button" className="btn-action-secondary" onClick={handleLimpiarFiltros}>
             <FaUndo /> <span>Limpiar</span>
           </button>
-          
+          <button type="button" className="btn-action-primary" onClick={() => navigate('/prestamos/dashboard')}>
+            <FaChartPie /> <span>Dashboard</span>
+          </button>
+
           {/* VISIBLE SOLO PARA ROLES ADMINISTRATIVOS (OCULTO PARA USUARIO REGULAR) */}
           {esAdmin && (
             <>
